@@ -1,0 +1,306 @@
+{% extends "assets/base.html" %}
+{% block title %}Produits transformés{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3>Produits Transformés</h3>
+    <div class="accordion" id="produitsTransformesAccordion">
+
+        <!-- ================= Boulangerie & pâtes ================= -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingBoulangerie">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBoulangerie">
+                    Boulangerie & pâtes
+                </button>
+            </h2>
+            <div id="collapseBoulangerie" class="accordion-collapse collapse" data-bs-parent="#produitsTransformesAccordion">
+                <div class="accordion-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produit in produits_boulangerie %}
+                                <tr class="clickable-row"
+                                    data-produit-id="{{ produit.id }}"
+                                    data-produit-nom="{{ produit.nom }}"
+                                    style="cursor: pointer;">
+                                    <td>{{ produit.nom }}</td>
+                                    <td>{{ produit.quantite_disponible }}</td>
+                                    <td>{{ produit.get_unite_display }}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm out-of-stock-btn"
+                                                data-id="{{ produit.id }}">
+                                            Out Of Stock
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">Aucun produit</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Sauces & condiments ================= -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingSauces">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSauces">
+                    Sauces & condiments
+                </button>
+            </h2>
+            <div id="collapseSauces" class="accordion-collapse collapse" data-bs-parent="#produitsTransformesAccordion">
+                <div class="accordion-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produit in produits_sauces %}
+                                <tr class="clickable-row"
+                                    data-produit-id="{{ produit.id }}"
+                                    data-produit-nom="{{ produit.nom }}"
+                                    style="cursor: pointer;">
+                                    <td>{{ produit.nom }}</td>
+                                    <td>{{ produit.quantite_disponible }}</td>
+                                    <td>{{ produit.get_unite_display }}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm out-of-stock-btn"
+                                                data-id="{{ produit.id }}">
+                                            Out Of Stock
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">Aucune sauce</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Préparations viandes & poissons ================= -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingViandes">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseViandes">
+                    Préparations de viandes & poissons
+                </button>
+            </h2>
+            <div id="collapseViandes" class="accordion-collapse collapse" data-bs-parent="#produitsTransformesAccordion">
+                <div class="accordion-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produit in produits_viandes %}
+                                <tr class="clickable-row"
+                                    data-produit-id="{{ produit.id }}"
+                                    data-produit-nom="{{ produit.nom }}"
+                                    style="cursor: pointer;">
+                                    <td>{{ produit.nom }}</td>
+                                    <td>{{ produit.quantite_disponible }}</td>
+                                    <td>{{ produit.get_unite_display }}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm out-of-stock-btn"
+                                                data-id="{{ produit.id }}">
+                                            Out Of Stock
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">Aucune préparation</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Légumes préparés ================= -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingLegumes">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLegumes">
+                    Légumes préparés
+                </button>
+            </h2>
+            <div id="collapseLegumes" class="accordion-collapse collapse" data-bs-parent="#produitsTransformesAccordion">
+                <div class="accordion-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produit in produits_legumes %}
+                                <tr class="clickable-row"
+                                    data-produit-id="{{ produit.id }}"
+                                    data-produit-nom="{{ produit.nom }}"
+                                    style="cursor: pointer;">
+                                    <td>{{ produit.nom }}</td>
+                                    <td>{{ produit.quantite_disponible }}</td>
+                                    <td>{{ produit.get_unite_display }}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm out-of-stock-btn"
+                                                data-id="{{ produit.id }}">
+                                            Out Of Stock
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">Aucun légume préparé</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Desserts préparés ================= -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingDesserts">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDesserts">
+                    Desserts préparés
+                </button>
+            </h2>
+            <div id="collapseDesserts" class="accordion-collapse collapse" data-bs-parent="#produitsTransformesAccordion">
+                <div class="accordion-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Quantité</th>
+                                <th>Unité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produit in produits_desserts %}
+                                <tr class="clickable-row"
+                                    data-produit-id="{{ produit.id }}"
+                                    data-produit-nom="{{ produit.nom }}"
+                                    style="cursor: pointer;">
+                                    <td>{{ produit.nom }}</td>
+                                    <td>{{ produit.quantite_disponible }}</td>
+                                    <td>{{ produit.get_unite_display }}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm out-of-stock-btn"
+                                                data-id="{{ produit.id }}">
+                                            Out Of Stock
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">Aucun dessert</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= Modal Produit Transformé ================= -->
+<div class="modal fade" id="produitModal" tabindex="-1" aria-labelledby="produitModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Options pour <span id="produitModalNom"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-2">
+                    <a href="#" id="btnFicheTechnique" class="btn btn-info">Fiche technique</a>
+                    <a href="#" id="btnRecette" class="btn btn-primary">Recette</a>
+                    <a href="#" id="btnOrdreFabrication" class="btn btn-success">Ordre de fabrication</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  // Ouvrir la modal au clic sur une ligne
+  document.querySelectorAll(".clickable-row").forEach(row => {
+    row.addEventListener("click", function() {
+      const produitId = this.dataset.produitId;
+      const produitNom = this.dataset.produitNom;
+
+      document.getElementById("produitModalNom").textContent = produitNom;
+      document.getElementById("btnFicheTechnique").href = `/production/produit/${produitId}/fiche-technique/`;
+      document.getElementById("btnRecette").href = `/production/produit/${produitId}/recette/`;
+      document.getElementById("btnOrdreFabrication").href = `/production/produit/${produitId}/ordre-fabrication/`;
+
+      new bootstrap.Modal(document.getElementById("produitModal")).show();
+    });
+  });
+
+  // Bouton Out Of Stock
+  document.querySelectorAll(".out-of-stock-btn").forEach(btn => {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation(); // ne pas ouvrir la modal
+      const produitId = this.dataset.id;
+
+      if (!confirm("⚠️ Mettre ce produit en rupture et désactiver les plats liés ?")) return;
+
+      fetch(`/api/produit-transforme/${produitId}/out-of-stock/`, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "Content-Type": "application/json"
+        }
+      })
+      .then(r => r.json())
+      .then(data => {
+        alert(data.message + " Plats désactivés : " + data.plats_desactives);
+        location.reload();
+      })
+      .catch(err => {
+        console.error("Erreur:", err);
+        alert("❌ Erreur lors de la mise en rupture.");
+      });
+    });
+  });
+});
+</script>
+{% endblock %}

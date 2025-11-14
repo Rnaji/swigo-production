@@ -1,0 +1,814 @@
+{% extends 'assets/base.html' %}
+{% load static %}
+
+{% block title %}
+    Tournées des Livreurs
+{% endblock %}
+
+{% block content %}
+<h1 class="text-center">
+    <img src="{% static 'assets/flaticon/livraison-de-nourriture.png' %}" alt="Icône de livraison de nourriture" style="width: 72px; height: 72px;">
+</h1>
+<div class="accordion mt-3" id="tourneesAccordion">
+    {% for data in tournees_data %}
+        {% with tournee=data.tournee %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-{{ tournee.nom }}">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapse-{{ tournee.nom }}"
+                            aria-expanded="false"
+                            aria-controls="collapse-{{ tournee.nom }}">
+                        Tournée pour le livreur {{ tournee.livreur }} - {{ tournee.nom }}
+                    </button>
+                </h2>
+                <div id="collapse-{{ tournee.nom }}" class="accordion-collapse collapse"
+                     aria-labelledby="heading-{{ tournee.nom }}"
+                     data-bs-parent="#tourneesAccordion">
+                    <div class="accordion-body" id="tournee-{{ tournee.nom }}" data-figee="{{ tournee.is_figee|yesno:'1,0' }}">
+                        <p>
+                            <strong>Date de la tournée :</strong>
+                            {{ tournee.date_tournee|default:"-"|slice:":10" }}  <!-- affiche '2025-06-05' -->
+                        </p>
+                        <p>
+                            <strong>Heure de retour prévue :</strong>
+                            <span class="heure-retour">
+                                {{ tournee.heure_retour_estime }}
+                            </span>
+                            
+                        </p>
+
+                        <h3>Commandes dans cette tournée</h3>
+                        <ul class="commandes-list">
+                            <li class="fixed-item" style="font-weight: bold;">
+                                Départ - En Route Chef!
+                                <span class="trajet-duree"></span> -
+                                Heure de départ :
+                                <span class="heure-depart" data-heure-depart="{{ tournee.heure_depart }}">
+                                    {{ tournee.heure_depart }}
+                                </span>
+                                
+                            </li>
+                            {% for commande in data.commandes %}
+                                <li id="commande-{{ commande.id }}"
+                                    class="commande-item commande-heure"
+                                    style="cursor: pointer;"
+                                    onclick="ouvrirModalCommande(
+                                        '{{ commande.id }}',
+                                        '{{ commande.latitude }}',
+                                        '{{ commande.longitude }}',
+                                        '{{ commande.telephone }}',
+                                        '{{ commande.has_message_for_livreur }}',
+                                        '{{ commande.message_pour_livreur|escapejs }}',
+                                        '{{ commande.paiement_a_recevoir }}')">
+                                    {% if commande.is_delivered %}
+                                        <span class="text-success">&#10004;</span>
+                                    {% endif %}
+                                    <strong>Commande #{{ commande.id }}</strong> - {{ commande.adresse }}
+                                    <span class="trajet-duree">
+                                        {% if commande.heure_passage %}
+                                            - Heure de passage estimée : {{ commande.heure_passage }}
+                                        {% endif %}
+                                    </span>
+                                </li>
+                            {% empty %}
+                                <li>Aucune commande associée à cette tournée.</li>
+                            {% endfor %}
+                            <li class="fixed-item" style="font-weight: bold;">
+                                Arrivée - En Route Chef!
+                                <span class="trajet-duree"></span>
+                                <span class="heure-arrivee"></span>
+                            </li>
+                        </ul>
+                        <p class="temps-total-tournee">
+                            <span class="temps-total">Calcul en cours...</span>
+                        </p>
+                        <div class="text-center mt-4">
+                            <button id="demarrerTourneeButton-{{ tournee.nom }}"
+                                    onclick="demarrerTournee('{{ tournee.nom }}')"
+                                    class="btn btn-primary py-2 px-4 fw-semibold text-white"
+                                    {% if tournee.is_figee %}disabled{% endif %}>
+                                C'est parti
+                            </button>
+                            <button onclick="marquerRetour('{{ tournee.nom }}')"
+                                    class="btn btn-secondary py-2 px-4 fw-semibold text-white">
+                                De retour
+                            </button>
+                        </div>
+                        <div id="qrcode-{{ tournee.nom }}" class="text-center mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        {% endwith %}
+    {% endfor %}
+</div>
+
+
+
+
+<!-- Modal de commande avec les icônes d'actions -->
+<div class="modal fade" id="commandeModal" tabindex="-1" aria-labelledby="commandeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="commandeModalLabel">Commande #</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Icônes d'actions en tant que boutons -->
+                <div class="action-icons d-flex justify-content-around mt-3">
+                    <button type="button" class="btn btn-outline-secondary" onclick="envoyerSMS()">
+                        <img src="{% static 'assets/flaticon/039-messages.png' %}" alt="SMS" style="width: 24px; height: 24px;"> SMS
+                    </button>
+                    <button id="gpsButton" type="button" class="btn btn-outline-secondary">
+                        <img src="{% static 'assets/flaticon/waze.png' %}" alt="GPS" style="width: 24px; height: 24px;"> GPS
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="appelerTelephone()">
+                        <img src="{% static 'assets/flaticon/038-appel-telephonique.png' %}" alt="Appeler" style="width: 24px; height: 24px;"> CALL
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <!-- Bouton Commande Livrée qui ouvre la modal de confirmation -->
+                <button type="button" class="btn btn-success" onclick="ouvrirModalConfirmation()">Commande Livrée</button>
+                <!-- Bouton Fermer -->
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation pour marquer la commande comme livrée -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmationModalLabel">Confirmer la Livraison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Êtes-vous sûr de vouloir marquer cette commande comme livrée ?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-success" onclick="confirmerLivraison()" id="livraisonButton">
+                    Commande Livrée
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+<!-- JSON des coordonnées pour calcul des trajets -->
+{{ commandes|json_script:"commandes_data" }}
+
+<script>
+    // Accéder aux données JSON depuis le script intégré
+    const commandesData = JSON.parse(document.getElementById("commandes_data").textContent);
+    console.log(commandesData);
+    // Utilisez `commandesData` dans votre JavaScript pour afficher ou manipuler les commandes
+</script>
+
+
+<!-- Import de jQuery et Google Maps API (pour utiliser DistanceMatrixService) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChxLP7_um9XUuGA3rHlUPTQuB7SRFuSNk"></script>
+
+<script>
+
+function toLocalIsoString(d) {
+    return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0') + 'T' +
+        String(d.getHours()).padStart(2, '0') + ':' +
+        String(d.getMinutes()).padStart(2, '0') + ':' +
+        String(d.getSeconds()).padStart(2, '0');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.accordion-collapse').forEach(item => {
+        item.addEventListener('shown.bs.collapse', function (event) {
+            const tourneeNom = event.target.getAttribute('id').replace('collapse-', '');
+            const tourneeElement = document.querySelector(`#tournee-${tourneeNom}`);
+
+            // STOP si tournée figée
+            const isFigee = tourneeElement.getAttribute('data-figee') === '1';
+            if (isFigee) {
+                console.log(`⏳ Tournée ${tourneeNom} déjà figée (flag DB), aucun recalcul ni AJAX`);
+                return;
+            }
+
+            const heureDepartElem = tourneeElement.querySelector('.heure-depart');
+            const heureDepartStr = heureDepartElem ? heureDepartElem.getAttribute('data-heure-depart') : null;
+
+            let dejaCalcule = false;
+            if (heureDepartStr) {
+                const trajetsCommande = Array.from(tourneeElement.querySelectorAll('.commande-item .trajet-duree'));
+                const toutRempli = trajetsCommande.length > 0 &&
+                    trajetsCommande.every(span => span.textContent.trim().startsWith('- Heure de passage estimée :'));
+                const heureRetourText = tourneeElement.querySelector('.heure-retour')?.textContent.trim();
+                if (toutRempli && heureRetourText && heureRetourText !== "Non spécifiée") {
+                    dejaCalcule = true;
+                }
+            }
+
+            if (dejaCalcule) {
+                console.log(`⏳ Tournée ${tourneeNom} déjà figée côté front, aucun recalcul JS, aucune requête AJAX`);
+                return;
+            }
+
+            if (!heureDepartStr) {
+                const tempsTotalElem = tourneeElement.querySelector('.temps-total');
+                if (tempsTotalElem) {
+                    tempsTotalElem.textContent = "La tournée n’a pas encore commencé. Cliquez sur 'C’est parti' pour démarrer.";
+                }
+                return;
+            }
+
+            // Dernier recours (premier lancement)
+            const heureDepartObj = new Date(heureDepartStr);
+            calculerTempsDeTrajet(tourneeNom, heureDepartObj);
+        });
+    });
+});
+
+
+
+
+
+
+let heureDepart; // Global, OK
+
+function demarrerTournee(tourneeNom) {
+    const tourneeElement = document.querySelector(`#tournee-${tourneeNom}`);
+
+    heureDepart = new Date(new Date().getTime() + 3 * 60 * 1000); // +3min
+    const heureDepartLocal = toLocalIsoString(heureDepart); // <- CORRECT
+
+
+
+    const demarrerButton = document.getElementById(`demarrerTourneeButton-${tourneeNom}`);
+    if (demarrerButton) {
+        demarrerButton.disabled = true;
+    }
+
+    $.ajax({
+        url: '/api/demarrer-tournee/',
+        type: 'POST',
+        data: { 
+            heure_depart: heureDepartLocal,   // <-- On n'utilise plus toISOString
+            tournee_nom: tourneeNom
+        },
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    })
+    
+    .done(function(response) {
+        console.log(`Démarrage de la tournée ${tourneeNom} réussi :`, response);
+
+        // 🟢 Marque la tournée comme figée côté DOM
+        if (tourneeElement) {
+            tourneeElement.setAttribute('data-figee', '1');
+        }
+        // Désactive le bouton (sécurité)
+        if (demarrerButton) {
+            demarrerButton.disabled = true;
+        }
+
+        // Optionnel : badge visuel
+        let badge = tourneeElement.querySelector('.badge-figee');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = "badge-figee";
+            badge.style.cssText = "color:white;background:#888;padding:0.4em 1em;border-radius:1em;display:inline-block;margin:1em 0;";
+            badge.innerText = "Tournée figée";
+            tourneeElement.prepend(badge);
+        }
+
+        // Affichage statique seulement
+        const heureDepartElem = tourneeElement.querySelector('.heure-depart');
+        if (heureDepartElem) {
+            heureDepartElem.setAttribute('data-heure-depart', heureDepartLocal);
+            heureDepartElem.textContent = "Heure de départ : " + heureDepartLocal.slice(11, 19); // format HH:MM:SS
+        }
+
+
+        // Calcul visuel si tu veux, mais aucun POST derrière !
+        calculerTempsDeTrajet(tourneeNom, heureDepart);
+
+    })
+    .fail(function(xhr, status, error) {
+        console.error(`Erreur lors du démarrage de la tournée ${tourneeNom} :`, error);
+        if (demarrerButton) {
+            demarrerButton.disabled = false;
+        }
+    });
+}
+
+
+
+
+function calculerTempsDeTrajet(nomTournee, heureDepart) {
+    if (!heureDepart) {
+        console.error("Erreur : heure de départ non définie.");
+        return;
+    }
+
+    console.log(`Calcul du temps de trajet pour la tournée ${nomTournee}`);
+    $.ajax({
+        url: `/api/tournee/${nomTournee}/adresses/`,
+        method: "GET",
+        success: function(data) {
+            if (data.length === 0) {
+                console.error(`Aucune commande dans la tournée ${nomTournee}.`);
+                return;
+            }
+
+            // Trier les commandes par ordre avant de faire les calculs
+            data.sort((a, b) => a.ordre - b.ordre);
+
+            let tempsTotal = 0;
+            let tempsTotalChezClient = data.length * 3 * 60; // Temps passé chez chaque client (3 minutes par client)
+            const service = new google.maps.DistanceMatrixService();
+            const origineRestaurant = { lat: 49.27153667708692, lng: 1.7812730971414836 };
+            let heuresPassageData = [];
+
+            // Premier trajet : du restau à la première commande
+            service.getDistanceMatrix({
+                origins: [origineRestaurant],
+                destinations: [{ lat: parseFloat(data[0].latitude), lng: parseFloat(data[0].longitude) }],
+                travelMode: 'DRIVING',
+            }, function(response, status) {
+                if (status === 'OK') {
+                    const duree = response.rows[0].elements[0].duration.value;
+                    tempsTotal += duree;
+                    const premiereHeurePassage = new Date(heureDepart.getTime() + tempsTotal * 1000);
+                    const premiereHeurePassageISO = toLocalIsoString(premiereHeurePassage);
+                    heuresPassageData.push({ commande_id: data[0].id, heure_passage: premiereHeurePassageISO });
+
+                    const firstCommandeItem = document.querySelector(`#tournee-${nomTournee} li:nth-child(2) .trajet-duree`);
+                    if (firstCommandeItem) {
+                        firstCommandeItem.textContent = ` - Temps de trajet : ${Math.round(duree / 60)} minutes - Heure de passage : ${premiereHeurePassageISO.slice(11, 19)}`;
+                    }
+
+                    if (data.length === 1) {
+                        calculerTempsRetour(nomTournee, service, data[0], tempsTotal, tempsTotalChezClient, heuresPassageData, heureDepart);
+                        return;
+                    }
+                    calculerTempsEntreCommandes(nomTournee, data, tempsTotal, tempsTotalChezClient, service, heuresPassageData, heureDepart);
+                } else {
+                    console.error(`Erreur avec DistanceMatrix pour la tournée ${nomTournee} : ` + status);
+                }
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error(`Erreur lors de la récupération des adresses de la tournée ${nomTournee} :`, error);
+        }
+    });
+}
+
+
+
+
+function calculerTempsEntreCommandes(nomTournee, data, tempsTotal, tempsTotalChezClient, service, heuresPassageData, heureDepart) {
+    let calculsEffectues = 0;
+    const totalCalculs = data.length - 1;
+
+    for (let i = 1; i < data.length; i++) {
+        const origine = { lat: parseFloat(data[i - 1].latitude), lng: parseFloat(data[i - 1].longitude) };
+        const destination = { lat: parseFloat(data[i].latitude), lng: parseFloat(data[i].longitude) };
+
+        service.getDistanceMatrix({
+            origins: [origine],
+            destinations: [destination],
+            travelMode: 'DRIVING',
+        }, function(response, status) {
+            if (status === 'OK') {
+                const duree = response.rows[0].elements[0].duration.value;
+                tempsTotal += duree + 3 * 60; // 3 min chez client précédent
+                const heurePassage = new Date(heureDepart.getTime() + tempsTotal * 1000);
+                const heurePassageISO = toLocalIsoString(heurePassage);
+
+                heuresPassageData.push({ commande_id: data[i].id, heure_passage: heurePassageISO });
+
+                const allCommandes = document.querySelectorAll(`#tournee-${nomTournee} .commande-heure`);
+                const listItem = allCommandes[i]?.querySelector('.trajet-duree');
+                if (listItem) {
+                    listItem.textContent = ` - Temps de trajet : ${Math.round(duree / 60)} minutes - Heure de passage : ${heurePassageISO.slice(11, 19)}`;
+                }
+
+                calculsEffectues++;
+                if (calculsEffectues === totalCalculs) {
+                    calculerTempsRetour(nomTournee, service, data[data.length - 1], tempsTotal, tempsTotalChezClient, heuresPassageData, heureDepart);
+                }
+            } else {
+                console.error(`Erreur avec DistanceMatrix entre commandes pour la tournée ${nomTournee} : ` + status);
+            }
+        });
+    }
+}
+
+
+
+function calculerTempsRetour(nomTournee, service, derniereCommande, tempsTotal, tempsTotalChezClient, heuresPassageData, heureDepart) {
+    const restaurantCoords = { lat: 49.27153667708692, lng: 1.7812730971414836 };
+
+    service.getDistanceMatrix({
+        origins: [{
+            lat: parseFloat(derniereCommande.latitude),
+            lng: parseFloat(derniereCommande.longitude)
+        }],
+        destinations: [restaurantCoords],
+        travelMode: 'DRIVING',
+    }, function(response, status) {
+        if (status === 'OK') {
+            const duree = response.rows[0].elements[0].duration.value;
+            tempsTotal += duree;
+
+            const heureArrivee = new Date(heureDepart.getTime() + (tempsTotal + 3 * 60) * 1000); // 3 min pour retour
+            const heureArriveeISO = toLocalIsoString(heureArrivee);
+            const formattedHeureArrivee = heureArriveeISO.slice(11, 19);
+
+            // Mise à jour DOM
+            const retourElement = document.querySelector(`#tournee-${nomTournee} .heure-retour`);
+            if (retourElement) {
+                retourElement.textContent = formattedHeureArrivee;
+            }
+
+            const arriveeElement = document.querySelector(`#tournee-${nomTournee} .heure-arrivee`);
+            if (arriveeElement) {
+                arriveeElement.textContent = `Temps de trajet : ${Math.round(duree / 60)} minutes - Heure d'arrivée : ${formattedHeureArrivee}`;
+            }
+
+            // Appel AJAX pour enregistrer l'heure de retour estimée
+            $.ajax({
+                url: `/api/tournee/${nomTournee}/update-heure-retour-estime/`,
+                type: 'POST',
+                data: {
+                    heure_retour_estime: heureArriveeISO
+                },
+                success: function(response) {
+                    console.log(`✅ Heure de retour enregistrée pour la tournée ${nomTournee}.`, response);
+                },
+                error: function(xhr, status, error) {
+                    console.error(`❌ Erreur lors de la mise à jour de l'heure de retour pour la tournée ${nomTournee} :`, xhr.responseText || error);
+                }
+            });
+
+            afficherTempsTotal(tempsTotal + 3 * 60, tempsTotalChezClient, nomTournee);
+            envoyerHeuresPassage(heuresPassageData);
+
+        } else {
+            console.error(`❌ Erreur DistanceMatrix API (retour) pour la tournée ${nomTournee} : ` + status);
+        }
+    });
+}
+
+
+
+function afficherTempsTotal(tempsTotal, tempsTotalChezClient, nomTournee) {
+    const tourneeContainer = document.querySelector(`#tournee-${nomTournee}`);
+    
+    // Vérification de l'existence de `tourneeContainer`
+    if (!tourneeContainer) {
+        console.error(`Conteneur de la tournée introuvable pour le nom : ${nomTournee}`);
+        return;  // Arrête l'exécution de la fonction
+    }
+
+    const tempsTotalElement = tourneeContainer.querySelector('.temps-total');
+    
+    if (!tempsTotalElement) {
+        console.error(`Élément temps-total introuvable dans la tournée : ${nomTournee}`);
+        return;
+    }
+
+    const totalMinutesDeRoute = Math.floor((tempsTotal - tempsTotalChezClient - 3 * 60) / 60);
+    const totalMinutesChezClient = Math.floor(tempsTotalChezClient / 60);
+    const totalAvecPreparation = totalMinutesDeRoute + totalMinutesChezClient + 3;
+
+    tempsTotalElement.textContent = `Temps total de la tournée : ${totalAvecPreparation} minutes (3 minutes de préparation + ${totalMinutesDeRoute} minutes de route + ${totalMinutesChezClient} minutes chez les clients)`;
+}
+
+function envoyerHeuresPassage(data) {
+    // Bloque si tournée figée
+    const tourneeNom = data.length ? data[0].tournee_nom || data[0].tourneeNom || null : null;
+    if (tourneeNom) {
+        const tourneeElement = document.querySelector(`#tournee-${tourneeNom}`);
+        if (tourneeElement && tourneeElement.getAttribute('data-figee') === '1') {
+            console.log("⛔ Tournée déjà figée, aucun envoi AJAX.");
+            return;
+        }
+    }
+
+    $.ajax({
+        url: '/api/tournee/update-heures-passage/',
+        type: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        data: JSON.stringify(data),
+        contentType: 'application/json',
+        success: function(response) {
+            console.log("Heures de passage enregistrées avec succès.", response);
+        },
+        error: function(xhr, status, error) {
+            if (xhr.status === 403) {
+                console.warn("⛔ Heures déjà figées côté serveur, enregistrement interdit !");
+                // Optionnel : message utilisateur
+                // alert("Cette tournée est déjà figée, impossible de modifier les horaires.");
+            } else {
+                console.error("Erreur lors de l'enregistrement des heures de passage :", error);
+            }
+        }
+    });
+}
+
+
+
+
+
+
+    // Fonction pour appeler le numéro de téléphone
+    function appelerTelephone(numeroTelephone) {
+        window.location.href = `tel:${numeroTelephone}`;
+    }
+
+    // Fonction pour ouvrir Google Maps avec les coordonnées fournies
+    function ouvrirGPS(latitude, longitude) {
+    // Si les coordonnées sont des chaînes avec des virgules, remplacer par des points
+    if (typeof latitude === 'string') {
+        latitude = latitude.replace(',', '.');
+    }
+    if (typeof longitude === 'string') {
+        longitude = longitude.replace(',', '.');
+    }
+
+    // URL pour ouvrir directement Waze avec la navigation activée
+    const wazeUrl = `https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`;
+    window.open(wazeUrl, '_blank');
+}
+
+    function envoyerSMS() {
+        alert("SMS envoyé pour la commande.");
+    }
+
+
+    let currentCommandeId;
+
+    function ouvrirModalCommande(id, latitude, longitude, numeroTelephone, hasMessage, messagePourLivreur, paiementARecevoir) {
+    currentCommandeId = id;
+    
+    console.log("PAIEMENT À RECEVOIR =", paiementARecevoir);
+
+    // Mettre à jour le titre de la modal avec le numéro de commande
+    const modalLabel = document.getElementById('commandeModalLabel');
+    modalLabel.textContent = `Commande #${id}`;
+    
+    // Configurer le bouton GPS pour ouvrir l'application avec les coordonnées fournies
+    const gpsButton = document.getElementById('gpsButton');
+    gpsButton.onclick = () => ouvrirGPS(latitude, longitude);
+
+    // Configurer le bouton Appeler
+    const callButton = document.querySelector('#commandeModal .action-icons button[onclick^="appelerTelephone"]');
+    callButton.onclick = () => appelerTelephone(numeroTelephone);
+
+    // Pas besoin de modifier les boutons d'action
+
+    // Gérer le bouton 'Vous avez un message' dans le modal-footer
+    const modalFooter = document.querySelector('#commandeModal .modal-footer');
+
+    // Supprimer le bouton 'Vous avez un message' s'il existe déjà pour éviter les duplications
+    const existingMessageButton = document.getElementById('messageLivreurButton');
+    if (existingMessageButton) {
+        existingMessageButton.remove();
+    }
+
+    // Ajouter le bouton si hasMessage est vrai
+    if (hasMessage === 'True' || hasMessage === true) {
+        const messageButton = document.createElement('button');
+        messageButton.type = 'button';
+        messageButton.className = 'btn btn-warning';
+        messageButton.id = 'messageLivreurButton';
+        messageButton.textContent = 'Vous avez un message';
+        messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur);
+
+        // Trouver le bouton 'Commande Livrée' et 'Fermer'
+        const commandeLivreeButton = modalFooter.querySelector('button.btn-success');
+        const fermerButton = modalFooter.querySelector('button.btn-danger');
+
+        // Insérer le bouton entre 'Commande Livrée' et 'Fermer'
+        modalFooter.insertBefore(messageButton, fermerButton);
+    }
+
+    // Afficher la modal de commande
+    const commandeModal = new bootstrap.Modal(document.getElementById('commandeModal'));
+    commandeModal.show();
+
+        // Supprimer le bouton 'Paiement à recevoir' s'il existe déjà
+    const existingPaiementButton = document.getElementById('paiementButton');
+    if (existingPaiementButton) {
+        existingPaiementButton.remove();
+    }
+
+    if (paiementARecevoir === 'true') {
+        const paiementButton = document.createElement('button');
+        paiementButton.type = 'button';
+        paiementButton.className = 'btn btn-outline-danger';
+        paiementButton.id = 'paiementButton';
+        paiementButton.textContent = 'Paiement à recevoir';
+        paiementButton.onclick = () => {
+            alert('Le livreur doit récupérer un paiement pour cette commande.');
+        };
+
+        const modalFooter = document.querySelector('#commandeModal .modal-footer');
+        const fermerButton = modalFooter.querySelector('button.btn-danger');
+        modalFooter.insertBefore(paiementButton, fermerButton);
+        console.log("✅ Bouton 'Paiement à recevoir' inséré !");
+
+    }
+
+}
+
+// Fonction pour afficher une modal de confirmation avant de marquer la commande comme livrée
+function ouvrirModalConfirmation() {
+    // Afficher la modal de confirmation
+    const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+    confirmationModal.show();
+}
+
+// Fonction pour confirmer la livraison de la commande
+function confirmerLivraison() {
+    // Fermer la modal de confirmation
+    const confirmationModal = bootstrap.Modal.getInstance(document.getElementById('confirmationModal'));
+    confirmationModal.hide();
+
+    // Envoyer une requête AJAX pour marquer la commande comme livrée
+    $.ajax({
+        url: `/api/commande/${currentCommandeId}/set-delivered/`,
+        type: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        success: function(response) {
+            alert("Commande marquée comme livrée.");
+            // Ajouter une coche verte à côté de la commande livrée
+            ajouterTickVert(currentCommandeId);
+        },
+        error: function(xhr, status, error) {
+            console.error("Erreur lors de la mise à jour de la livraison :", error);
+        }
+    });
+}
+
+// Fonction utilitaire pour ajouter un tick vert à côté de la commande livrée
+function ajouterTickVert(commandeId) {
+    const commandeItem = document.querySelector(`#commande-${commandeId}`);
+    if (commandeItem) {
+        commandeItem.innerHTML = `<span class="text-success">&#10004;</span> ` + commandeItem.innerHTML;
+    }
+}
+
+
+const tourneeNom = "{{ tournee.nom }}";  // Utiliser le nom de la tournée
+
+function marquerRetour(tourneeNom) {
+    // 1. Requête pour mettre à jour l'heure de retour réelle
+    $.ajax({
+        url: `/api/update-heure-retour-reel/${tourneeNom}/`,
+        type: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        success: function(response) {
+            console.log("Réponse API retour :", response);
+            if (response && response.success) {
+                // 2. Si succès, deuxième requête pour marquer la tournée comme terminée
+                $.ajax({
+                    url: `/api/marquer-retour/${tourneeNom}/`,
+                    type: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    success: function(markResponse) {
+                        if (markResponse && markResponse.status === 'success') {
+                            alert(markResponse.message || "Tournée marquée comme terminée.");
+                            // Supprime dynamiquement l'élément de la tournée de l'affichage
+                            const tourneeElement = document.getElementById(`heading-${tourneeNom}`);
+                            if (tourneeElement) {
+                                tourneeElement.closest('.accordion-item').remove();
+                            }
+                            // Affiche un message si aucune tournée restante
+                            const remainingTournees = document.querySelectorAll('.accordion-item').length;
+                            if (remainingTournees === 0) {
+                                const message = document.createElement('p');
+                                message.textContent = "Toutes les tournées sont terminées.";
+                                document.getElementById('tourneesAccordion').appendChild(message);
+                            }
+                        } else {
+                            const msg = (markResponse && markResponse.message) ? markResponse.message : "Erreur inconnue lors du marquage de la tournée.";
+                            console.error("Erreur : " + msg);
+                            alert("Erreur : " + msg);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error(`Erreur lors du marquage de la tournée ${tourneeNom} comme terminée :`, error);
+                        alert("Erreur lors du marquage de la tournée comme terminée.");
+                    }
+                });
+            } else {
+    const msg = (response && (response.message || response.error))
+        ? (response.message || response.error)
+        : "Erreur inconnue lors de l'enregistrement du retour.";
+    console.error("Erreur : " + msg);
+    alert("Erreur : " + msg);
+}
+
+        },
+        error: function(xhr, status, error) {
+            console.error(`Erreur lors de la mise à jour de l'heure de retour pour la tournée ${tourneeNom} :`, error);
+            alert("Erreur lors de l'enregistrement de l'heure de retour.");
+        }
+    });
+}
+
+
+
+
+
+function afficherMessageLivreur(message) {
+    // Afficher le message dans une alerte ou une modal
+    alert(`Message pour le livreur:\n\n${message}`);
+}
+
+
+
+// Fonction pour générer le QR code
+function afficherQRCode(tourneeNom, dataQR) {
+    const qrcodeDiv = document.getElementById(`qrcode-${tourneeNom}`);
+    if (!qrcodeDiv) return;
+
+    // Vide le contenu précédent
+    qrcodeDiv.innerHTML = "";
+
+    // Génère le QR code
+    new QRCode(qrcodeDiv, {
+        text: dataQR,
+        width: 128,
+        height: 128
+    });
+}
+
+// Modifie la fonction demarrerTournee pour générer le QR code et le persister
+function demarrerTournee(tourneeNom) {
+    const tourneeElement = document.querySelector(`#tournee-${tourneeNom}`);
+    heureDepart = new Date(new Date().getTime() + 3 * 60 * 1000); // +3min
+    const heureDepartLocal = toLocalIsoString(heureDepart);
+
+    const demarrerButton = document.getElementById(`demarrerTourneeButton-${tourneeNom}`);
+    if (demarrerButton) {
+        demarrerButton.disabled = true;
+    }
+
+    $.ajax({
+        url: '/api/demarrer-tournee/',
+        type: 'POST',
+        data: { 
+            heure_depart: heureDepartLocal,
+            tournee_nom: tourneeNom
+        },
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    })
+    .done(function(response) {
+        // ... (ton code existant de badge, disable bouton, etc.)
+
+        // 1. Génère le QR code (ici, on encode le nom de la tournée mais tu peux encoder ce que tu veux)
+        afficherQRCode(tourneeNom, `http://127.0.0.1:8000/tournees-livreurs/${tourneeNom}`);
+
+        // 2. Persiste dans le localStorage
+        localStorage.setItem(`qrcode_shown_${tourneeNom}`, "1");
+
+        // ... (ton code existant de mise à jour DOM, calcul, etc.)
+        const heureDepartElem = tourneeElement.querySelector('.heure-depart');
+        if (heureDepartElem) {
+            heureDepartElem.setAttribute('data-heure-depart', heureDepartLocal);
+            heureDepartElem.textContent = "Heure de départ : " + heureDepartLocal.slice(11, 19); // format HH:MM:SS
+        }
+        calculerTempsDeTrajet(tourneeNom, heureDepart);
+    })
+    .fail(function(xhr, status, error) {
+        if (demarrerButton) {
+            demarrerButton.disabled = false;
+        }
+    });
+}
+
+// Au chargement, on ré-affiche le QR code pour les tournées où il doit l'être
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[id^='qrcode-']").forEach(function(div) {
+        const tourneeNom = div.id.replace("qrcode-", "");
+        if (localStorage.getItem(`qrcode_shown_${tourneeNom}`) === "1") {
+            // Génère le QR code (adapter ici le contenu à encoder si besoin)
+            afficherQRCode(tourneeNom, `http://127.0.0.1:8000/tournees-livreurs/${tourneeNom}`);
+        }
+    });
+});
+
+</script>
+
+
+{% endblock %}

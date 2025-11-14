@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>En Route Chef!</title>
+    
+    <link rel="shortcut icon" href="{% static 'swigo/images/favicon.ico' %}">
+    <link rel="stylesheet" href="{% static 'swigo/icons/flaticon/flaticon_mycollection.css' %}">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'swigo/vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'swigo/vendor/bootstrap-select/dist/css/bootstrap-select.min.css' %}">
+    <link rel="stylesheet" href="{% static 'swigo/css/style.css' %}">
+    
+    {% block additional_css %}{% endblock %}
+    
+    <style>
+        /* Votre CSS existant */
+        html, body { margin: 0; padding: 0; background: #fff; min-height: 100vh; }
+        .page-wraper { min-height: 100vh; display: flex; flex-direction: column; }
+        .page-content { flex: 1; background: white; }
+        .footer { font-size: 14px; padding: 20px 0; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+<div class="page-wraper">
+    {% include 'swigo/elements/offcanvas.html' %}
+
+    <div class="page-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block footer %}
+    <footer class="footer text-center text-muted mt-5">
+        <div class="container">
+            <p>&copy; {{ now|date:"Y"|default:"2024" }} En Route Chef! – Tous droits réservés.</p>
+            <p>
+                <a href="{% url 'swigo:mentions_rgpd' %}" class="text-muted">Mentions légales</a> |
+                <a href="{% url 'swigo:faq' %}" class="text-muted">FAQ</a> |
+                <a href="{% url 'swigo:contact-us' %}" class="text-muted">Contact</a>
+            </p>
+        </div>
+    </footer>
+    {% endblock %}
+</div>
+
+<!-- JavaScript - ORDRE IMPORTANT -->
+<!-- jQuery d'abord -->
+<script src="{% static 'swigo/vendor/jquery/jquery.min.js' %}"></script>
+
+<!-- Puis Bootstrap JS -->
+<script src="{% static 'swigo/vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+
+<!-- Ensuite les autres bibliothèques -->
+<script src="{% static 'swigo/vendor/global/global.min.js' %}"></script>
+<script src="{% static 'swigo/vendor/bootstrap-select/dist/js/bootstrap-select.min.js' %}"></script>
+<script src="{% static 'swigo/js/custom.min.js' %}"></script>
+<script src="{% static 'swigo/js/deznav-init.js' %}"></script>
+
+{% block additional_js %}{% endblock %}
+
+<!-- Script de sécurité -->
+<script>
+    // Vérifie que Bootstrap est chargé
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap non chargé, rechargement...');
+        // Recharge Bootstrap en urgence
+        var script = document.createElement('script');
+        script.src = '{% static "swigo/vendor/bootstrap/js/bootstrap.bundle.min.js" %}';
+        document.body.appendChild(script);
+    }
+</script>
+</body>
+</html>

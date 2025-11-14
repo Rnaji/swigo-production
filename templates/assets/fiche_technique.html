@@ -1,0 +1,30 @@
+{% extends "assets/base.html" %}
+{% block title %}Fiche technique – {{ produit.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3>Fiche technique – {{ produit.nom }}</h3>
+    <p><strong>Portions standards :</strong> {{ recette.portions }}</p>
+    {% if recette.temperature_cuisson %}
+      <p><strong>Cuisson :</strong> {{ recette.temperature_cuisson }}°C – {{ recette.duree_cuisson_minutes }} min</p>
+    {% endif %}
+
+    <h4>Ingrédients</h4>
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Ingrédient</th><th>Quantité</th><th>Unité</th></tr>
+        </thead>
+        <tbody>
+            {% for ri in recette.ingredients.all %}
+              <tr>
+                <td>{{ ri.ingredient.nom }}</td>
+                <td>{{ ri.quantite }}</td>
+                <td>{{ ri.get_unite_display }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3">Aucun ingrédient défini</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    {% load static %}
+
+    <!-- Links Of CSS File -->
+    <link rel="stylesheet" href="{% static 'assets/css/sidebar-menu.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/simplebar.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/apexcharts.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/prism.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/rangeslider.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/sweetalert.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/quill.snow.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/google-icon.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/remixicon.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/swiper-bundle.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/fullcalendar.main.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'assets/flaticon/livraison-de-nourriture.png' %}" sizes="64x64">
+
+    <!-- Title -->
+    <title>{% block title %}En Route Chef!{% endblock %}</title>
+
+
+</head>
+
+<body class="boxed-size">
+    <!-- Start Preloader Area -->
+    <div class="preloader" id="preloader">
+        <div class="preloader">
+            <div class="waviy position-relative">
+                <span class="d-inline-block">En</span>
+                <span class="d-inline-block">Route</span>
+                <span class="d-inline-block">Chef</span>
+                <span class="d-inline-block">!</span>
+            </div>
+        </div>
+    </div>
+    <!-- End Preloader Area -->
+
+<!-- Start Sidebar Area -->
+<div class="sidebar-area" id="sidebar-area">
+    <div class="logo position-relative">
+        <div class="d-block text-decoration-none position-relative">
+            <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="logo-icon">
+        </div>
+    </div>
+
+    <aside id="layout-menu" class="layout-menu menu-vertical menu active" data-simplebar>
+        <ul class="menu-inner">
+            <li class="menu-title small text-uppercase">
+                <span class="menu-title-text">MAIN</span>
+            </li>
+
+            <!-- Commandes Section -->
+            <li class="menu-item">
+                <a href="javascript:void(0);" class="menu-link menu-toggle">
+                    <span class="material-symbols-outlined menu-icon">dashboard</span>
+                    <span class="title">Commandes</span>
+                </a>
+                <ul class="menu-sub">
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_logistique' %}" class="menu-link">Logistique</a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:commandes_du_jour' %}" class="menu-link">Commandes du jour</a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Préparation Section -->
+            <li class="menu-item">
+                <a href="javascript:void(0);" class="menu-link menu-toggle">
+                    <span class="material-symbols-outlined menu-icon">restaurant_menu</span>
+                    <span class="title">Préparation</span>
+                </a>
+                <ul class="menu-sub">
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_cuisine' %}" class="menu-link">Cuisine</a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_bar' %}" class="menu-link">Bar</a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Livraison Section -->
+<li class="menu-item">
+    <a href="javascript:void(0);" class="menu-link menu-toggle">
+        <span class="material-symbols-outlined menu-icon">local_shipping</span>
+        <span class="title">Livraison</span>
+    </a>
+    <ul class="menu-sub">
+        <li class="menu-item">
+            <a href="{% url 'swigo:tournees_livreurs' %}" class="menu-link">Livraison</a>
+        </li>
+    </ul>
+</li>
+
+
+<!-- Paiement Section -->
+<li class="menu-item">
+    <a href="javascript:void(0);" class="menu-link menu-toggle">
+        <span class="material-symbols-outlined menu-icon">point_of_sale</span>
+        <span class="title">Caisse</span>
+    </a>
+    <ul class="menu-sub">
+        <li class="menu-item">
+            <a href="{% url 'swigo:commandes_a_payer' %}" class="menu-link">
+                <span class="title">Commandes à Payer</span>
+            </a>
+        </li>
+        <li class="menu-item">
+            <a href="{% url 'swigo:commandes_payees' %}" class="menu-link">
+                <span class="title">Commandes Payées</span>
+            </a>
+        </li>
+    </ul>
+</li>
+
+
+
+            <!-- Production Section -->
+            <li class="menu-item">
+                <a href="javascript:void(0);" class="menu-link menu-toggle">
+                    <span class="material-symbols-outlined menu-icon">factory</span>
+                    <span class="title">Production</span>
+                </a>
+                <ul class="menu-sub">
+                    <!-- Gestion des matières premières -->
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_gestionnaire_stock' %}" class="menu-link">Ingrédients base</a>
+                    </li>
+
+                    <!-- Gestion des produits maison -->
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_produits_transformes' %}" class="menu-link">Produits transformés</a>
+                    </li>
+
+                    <!-- Vision globale -->
+                    <li class="menu-item">
+                        <a href="{% url 'swigo:assets_suivi_production' %}" class="menu-link">Suivi du stock</a>
+                    </li>
+                </ul>
+            </li>
+
+
+            <!-- Logout Section -->
+            <li class="menu-item">
+                <a href="logout.html" class="menu-link">
+                    <span class="material-symbols-outlined menu-icon">logout</span>
+                    <span class="title">Logout</span>
+                </a>
+            </li>
+        </ul>
+    </aside>
+</div>
+<!-- End Sidebar Area -->
+
+
+    <!-- Start Header Area -->
+    <header class="header-area bg-white mb-4 rounded-bottom-15" id="header-area">
+        <div class="row align-items-center">
+            <div class="col-lg-4 col-sm-6">
+                <div class="left-header-content">
+                    <ul class="d-flex align-items-center ps-0 mb-0 list-unstyled justify-content-center justify-content-sm-start">
+                        <li>
+                            <button class="header-burger-menu bg-transparent p-0 border-0" id="header-burger-menu">
+                                <span class="material-symbols-outlined">menu</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-lg-8 col-sm-6">
+                <div class="right-header-content mt-2 mt-sm-0">
+                    <ul class="d-flex align-items-center justify-content-center justify-content-sm-end ps-0 mb-0 list-unstyled">
+                        <li class="header-right-item">
+                            <div class="light-dark">
+                                <button class="switch-toggle settings-btn dark-btn p-0 bg-transparent" id="switch-toggle">
+                                    <span class="dark"><i class="material-symbols-outlined">light_mode</i></span> 
+                                    <span class="light"><i class="material-symbols-outlined">dark_mode</i></span>
+                                </button>
+                            </div>
+                        </li>
+                        <li class="header-right-item">
+                            <button class="fullscreen-btn bg-transparent p-0 border-0" id="fullscreen-button">
+                                <i class="material-symbols-outlined text-body">fullscreen</i>
+                            </button>
+                        </li>
+                        <li class="header-right-item">
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- End Header Area -->
+
+    <!-- Start Main Content Area -->
+    <div class="container-fluid">
+        <div class="main-content d-flex flex-column">
+            <!-- Main content goes here -->
+            {% block content %}{% endblock %}
+
+            <!-- Start Footer Area -->
+            <footer class="footer-area bg-white text-center rounded-top-7">
+                <p class="fs-14">© <span class="text-primary-div">En Route Chef!</span> 2024</a></p>
+            </footer>
+            <!-- End Footer Area -->
+        </div>
+    </div>
+    <!-- End Main Content Area -->
+
+    <!-- Link Of JS File -->
+    <!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- jQuery UI -->
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+<!-- jQuery UI CSS (optionnel pour styliser le drag & drop) -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/smoothness/jquery-ui.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+
+    <script src="{% static 'assets/js/sweetalert.js' %}"></script>
+    <script src="{% static 'assets/js/rangeslider.min.js' %}"></script>
+    <script src="{% static 'assets/js/quill.min.js' %}"></script>
+    <script src="{% static 'assets/js/sidebar-menu.js' %}"></script>
+    <script src="{% static 'assets/js/dragdrop.js' %}"></script>
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'assets/js/data-table.js' %}"></script>
+    <script src="{% static 'assets/js/feather.min.js' %}"></script>
+    <script src="{% static 'assets/js/swiper-bundle.min.js' %}"></script>
+    <script src="{% static 'assets/js/clipboard.min.js' %}"></script>
+    <script src="{% static 'assets/js/apexcharts.min.js' %}"></script>
+    <script src="{% static 'assets/js/prism.js' %}"></script>
+    <script src="{% static 'assets/js/fullcalendar.main.js' %}"></script>
+    <script src="{% static 'assets/js/simplebar.min.js' %}"></script>
+    <script src="{% static 'assets/js/custom/apexcharts.js' %}"></script>
+    <script src="{% static 'assets/js/custom/custom.js' %}"></script>
+    <!-- Autres fichiers JS -->
+    {% block scripts %}{% endblock %}
+
+</body>
+</html>

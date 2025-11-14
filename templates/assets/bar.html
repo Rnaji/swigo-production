@@ -1,0 +1,378 @@
+{% extends 'assets/base.html' %}
+{% load static %}
+
+{% block title %}
+    Commandes au Bar
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 style="text-align: center;">
+        <img src="{% static 'assets/flaticon/dessert.png' %}" alt="Icône de dessert" style="width: 72px; height: 72px; vertical-align: middle;">
+    </h2>
+    <h2 style="font-size: 1.2em;">
+        <img src="{% static 'assets/flaticon/livreur.png' %}" alt="Icône Livreurs" style="width: 48px; height: 48px;">
+    </h2>
+    <div id="livreurs-container" class="row">
+        <!-- Les livreurs seront chargés dynamiquement ici -->
+    </div>
+
+    <!-- Conteneur des commandes et des articles -->
+    <div id="tournees-container">
+        <!-- Les commandes et les récapitulatifs des tournées seront dynamiquement injectés ici -->
+    </div>
+
+    <!-- Modal de confirmation -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmationModalLabel">Confirmation</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Êtes-vous sûr que toutes les commandes de cette tournée sont prêtes pour le bar ?
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="button" class="btn btn-primary" id="confirmButton">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+
+<script>
+    let lastTournees = [];
+    let accordionState = {};
+    let chronometers = {};
+
+    function saveAccordionState() {
+        const accordions = document.querySelectorAll('.accordion-collapse');
+        accordions.forEach((accordion) => {
+            accordionState[accordion.id] = accordion.classList.contains('show');
+        });
+    }
+
+    function restoreAccordionState() {
+        for (const [id, isOpen] of Object.entries(accordionState)) {
+            const accordion = document.getElementById(id);
+            if (accordion) {
+                if (isOpen) {
+                    accordion.classList.add('show');
+                    accordion.previousElementSibling.querySelector('.accordion-button').classList.remove('collapsed');
+                } else {
+                    accordion.classList.remove('show');
+                    accordion.previousElementSibling.querySelector('.accordion-button').classList.add('collapsed');
+                }
+            }
+        }
+    }
+
+    function startChronometer(tourneeId, startTime) {
+        const chronometerElement = document.getElementById(`chronometer-tournee-${tourneeId}`);
+
+        if (!chronometerElement) {
+            console.error(`Element chronometer-tournee-${tourneeId} not found.`);
+            return;
+        }
+
+        if (chronometers[tourneeId]) {
+            clearInterval(chronometers[tourneeId]);
+        }
+
+        function updateChronometer() {
+            const now = new Date();
+            const start = new Date(startTime);
+            const elapsedTime = Math.floor((now - start) / 1000);
+            const hours = Math.floor(elapsedTime / 3600);
+            const minutes = Math.floor((elapsedTime % 3600) / 60);
+            const seconds = elapsedTime % 60;
+            chronometerElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        updateChronometer();
+        chronometers[tourneeId] = setInterval(updateChronometer, 1000);
+    }
+
+    function compareTournees(currentTournees, previousTournees) {
+        if (currentTournees.length !== previousTournees.length) {
+            return false;
+        }
+        for (let i = 0; i < currentTournees.length; i++) {
+            if (currentTournees[i].tournee_id !== previousTournees[i].tournee_id) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function loadCommandes() {
+        fetch("{% url 'swigo:get_commandes_bar' %}")
+            .then(response => response.json())
+            .then(data => {
+                const currentTournees = data.tournees_commandes.reverse();
+
+                if (!compareTournees(currentTournees, lastTournees)) {
+                    lastTournees = currentTournees;
+                    saveAccordionState();
+                    const container = document.getElementById('tournees-container');
+                    container.innerHTML = '';
+
+                    currentTournees.forEach((tournee) => {
+    const tourneeID = tournee.tournee_id; // numérique
+    const tourneeHtmlId = `tournee-${tourneeID}`;
+    let badgeHTML = '';
+    if (tournee.recently_closed) {
+        badgeHTML = `<span class="badge bg-danger ms-2" id="badge-${tourneeHtmlId}" style="font-size: 0.8rem;">New</span>`;
+    }
+    let chronometerHTML = '';
+    if (!tournee.is_pickup) {
+        chronometerHTML = `<span id="chronometer-tournee-${tourneeID}" class="ms-2">00h 00m 00s</span>`;
+    }
+
+    let tourneeHTML = `
+        <div class="accordion my-3" id="accordion-${tourneeHtmlId}">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-${tourneeHtmlId}">
+                    <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-${tourneeHtmlId}">
+                        <span>
+                            ${
+                                tournee.is_pickup
+                                ? `Emporté #${tournee.commandes[0].commande_id} — Heure commande à emporter : ${tournee.heure_emport || '–'}`
+                                : `Tournée ${tournee.tournee_nom} <span class="text-muted small">(ID: ${tourneeID})</span> ${badgeHTML}`
+                            }
+                        </span>
+                        ${chronometerHTML}
+                    </button>
+                </h2>
+                <div id="collapse-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-${tourneeHtmlId}" data-bs-parent="#accordion-${tourneeHtmlId}">
+                    <div class="accordion-body">
+                        <div class="accordion" id="subAccordion-${tourneeHtmlId}">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-commande-${tourneeHtmlId}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-commande-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-commande-${tourneeHtmlId}">
+                                        Récapitulatif de la commande
+                                    </button>
+                                </h2>
+                                <div id="collapse-commande-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-commande-${tourneeHtmlId}">
+                                    <div class="accordion-body">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID Commande</th>
+                                                    <th>Articles du Panier</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+    `;
+
+    tournee.commandes.forEach(commande => {
+        let articlesHTML = '<ul>';
+        commande.articles.forEach(article => {
+            articlesHTML += `<li><strong>${article.nom}</strong> - ${article.quantite}x`;
+            if (article.options.length > 0) {
+                articlesHTML += `<ul>`;
+                article.options.forEach(option => {
+                    articlesHTML += `<li>${option}</li>`;
+                });
+                articlesHTML += `</ul>`;
+            }
+            articlesHTML += `</li>`;
+        });
+        articlesHTML += '</ul>';
+        tourneeHTML += `<tr><td>${commande.commande_id}</td><td>${articlesHTML}</td></tr>`;
+    });
+
+    tourneeHTML += `
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-recap-${tourneeHtmlId}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-recap-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-recap-${tourneeHtmlId}">
+                                        Récapitulatif des Articles
+                                    </button>
+                                </h2>
+                                <div id="collapse-recap-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-recap-${tourneeHtmlId}">
+                                    <div class="accordion-body">
+                                        <ul id="recapitulatif-${tourneeID}" class="list-group"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between my-3">
+    `;
+
+    // === SECURITE ===
+    console.log("tournee.tournee_id", tournee.tournee_id);
+
+    if (typeof tourneeID !== "undefined" && tourneeID !== null) {
+        tourneeHTML += `
+            <button class="btn btn-primary" onclick="printEtiquettes(${tourneeID})">Étiquettes 🖨️ </button>
+            <button class="btn btn-success ms-auto" onclick="openConfirmationModal(${tourneeID})">C'est prêt 👍🏾</button>
+        `;
+    }
+    tourneeHTML += `
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML += tourneeHTML;
+
+    // Remplir les articles récap
+    const recapContainer = document.getElementById(`recapitulatif-${tourneeID}`);
+    for (const [categorie, articles] of Object.entries(tournee.aggregated_articles)) {
+        recapContainer.innerHTML += `<li class="list-group-item active">${categorie}</li>`;
+        for (const [articleKey, articleData] of Object.entries(articles)) {
+            recapContainer.innerHTML += `<li class="list-group-item">${articleData.nom} - ${articleData.quantite}x ${articleData.options ? ` (Options: ${articleData.options})` : ''}</li>`;
+        }
+    }
+
+    // Chrono seulement si pas pickup
+    if (tournee.start_time && !tournee.is_pickup) {
+        setTimeout(() => {
+            startChronometer(tourneeID, tournee.start_time);
+        }, 100);
+    }
+});
+
+
+                    restoreAccordionState();
+                }
+            });
+    }
+
+    function openConfirmationModal(tourneeId) {
+    // tourneeId est un number !
+    const confirmButton = document.getElementById('confirmButton');
+    confirmButton.onclick = function () {
+        setTourneeAsOkBar(tourneeId); // tourneeId numérique
+    };
+    const modal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+    modal.show();
+}
+
+    function printEtiquettes(tourneeId) {
+        const tournee = lastTournees.find(t => t.tournee_id === tourneeId);
+
+        if (tournee) {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write('<html><head><title>Étiquettes de Commande</title></head><body><pre>');
+
+            tournee.commandes.forEach(commande => {
+                if (commande.articles) {
+                    commande.articles.forEach(article => {
+                        for (let i = 0; i < article.quantite; i++) {
+                            let etiquetteContent = `Commande n°${commande.commande_id} - Plat: ${article.nom}`;
+                            if (article.options && article.options.length > 0) {
+                                etiquetteContent += ` (Options: ${article.options.join(', ')})`;
+                            }
+                            etiquetteContent += '\n';
+
+                            printWindow.document.write(etiquetteContent);
+                        }
+                    });
+                }
+            });
+
+            printWindow.document.write('</pre></body></html>');
+            printWindow.document.close();
+            printWindow.print();
+            printWindow.close();
+        } else {
+            console.error('Tournée non trouvée pour l’impression des étiquettes.');
+        }
+    }
+
+    function setTourneeAsOkBar(tourneeId) {
+        fetch(`/tournee/${tourneeId}/set_ok_bar/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`Erreur HTTP! Statut: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                loadCommandes();
+                const modalElement = document.getElementById('confirmationModal');
+                const bootstrapModal = bootstrap.Modal.getInstance(modalElement);
+                bootstrapModal.hide();
+            } else {
+                console.error('Erreur lors de la mise à jour de la tournée:', data.error);
+            }
+        })
+        .catch(error => console.error('Erreur:', error));
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function loadLivreursBar() {
+        fetch("{% url 'swigo:get_livreurs_disponibles_bar' %}")
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('livreurs-container');
+                container.innerHTML = '';
+
+                if (data.livreurs && data.livreurs.length > 0) {
+                    data.livreurs.forEach(livreur => {
+                        let heuresRetour = livreur.heures_retour_estimees ? livreur.heures_retour_estimees.join(', ') : '-';
+                        let numTournees = livreur.num_tournees ? livreur.num_tournees.join(', ') : '-';
+
+                        let livreurHTML = `
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h3 class="card-title">${livreur.nom}</h3>
+                                        <p class="card-text">
+                                            N° Tournée : ${numTournees}<br>
+                                            Retour : ${heuresRetour}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        container.innerHTML += livreurHTML;
+                    });
+                } else {
+                    container.innerHTML = '<p class="text-muted">Aucun livreur disponible pour le moment.</p>';
+                }
+            })
+            .catch(error => {
+                const container = document.getElementById('livreurs-container');
+                console.error('Erreur lors du chargement des livreurs pour le bar:', error);
+                container.innerHTML = '<p class="text-danger">Erreur lors du chargement des livreurs.</p>';
+            });
+    }
+
+    // Initialisation :
+    loadLivreursBar();
+    setInterval(loadLivreursBar, 10000);
+    loadCommandes();
+    setInterval(loadCommandes, 10000);
+</script>
+{% endblock %}

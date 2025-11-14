@@ -1,0 +1,167 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block additional_css %}
+<style>
+    .banner {
+        background-color: #fff;
+        text-align: center;
+        padding: 15px 0;
+        width: 100%;
+    }
+
+    .banner img {
+        max-height: 90px;
+        width: auto;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 30px;
+    }
+
+    .icon-row i {
+        font-family: 'Flaticon' !important;
+        color: #4CAF50;
+        transition: transform 0.2s ease, color 0.3s ease;
+        cursor: pointer;
+    }
+    .icon-row i:hover {
+        color: #7DA640;
+        transform: scale(1.2);
+    }
+
+    .confirmation-message {
+        background: #fff;
+        border-radius: 12px;
+        padding: 25px;
+        margin: 30px auto;
+        max-width: 650px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+
+    h1 {
+        color: #4CAF50;
+        font-size: 26px;
+        margin-bottom: 15px;
+    }
+
+    p {
+        color: #444;
+        font-size: 16px;
+        margin: 6px 0;
+    }
+
+    ul {
+        text-align: left;
+        padding-left: 20px;
+        margin: 10px 0;
+    }
+
+    li {
+        margin-bottom: 8px;
+    }
+
+    strong {
+        color: #4CAF50;
+    }
+
+    .label {
+        font-weight: bold;
+        color: #000;
+    }
+
+    .footer-note {
+        margin-top: 20px;
+        font-size: 15px;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Bannière avec logo -->
+<section class="banner">
+    {% if message_fermeture %}
+        <div class="alert alert-warning mt-3" style="font-size: 14px; font-weight: 400;">
+            {{ message_fermeture }}
+        </div>
+    {% endif %}
+    <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef">
+    <div class="icon-row">
+        <i class="flaticon-burger"></i>
+        <i class="flaticon-salade"></i>
+        <i class="flaticon-tajine-1"></i>
+        <i class="flaticon-poulet-frit"></i>
+    </div>
+</section>
+
+<div class="confirmation-message">
+    <h1>{{ message }}</h1>
+    <p>Votre commande <strong>#{{ commande.id }}</strong> a été validée avec succès ✅</p>
+
+    {% if commande.prenom_saisi or commande.nom_saisi %}
+        <p><span class="label">Nom :</span> <strong>{{ commande.prenom_saisi }} {{ commande.nom_saisi }}</strong></p>
+    {% endif %}
+
+    {% if commande.adresse_livraison %}
+        <p><span class="label">Adresse de livraison :</span> <strong>{{ commande.adresse_livraison.adresse_complete }}</strong></p>
+    {% endif %}
+
+    {% if commande.telephone_saisi %}
+        <p><span class="label">Téléphone :</span> <strong>{{ commande.telephone_saisi }}</strong></p>
+    {% endif %}
+
+    {% if commande.nom_saisi or commande.prenom_saisi or commande.adresse_livraison or commande.telephone_saisi or commande.email_saisi %}
+        <p style="font-style: italic; color: #d32f2f;">
+            (En cas d'erreur, contactez-nous vite au <strong style="color:#d32f2f;">06 95 59 98 59</strong>)
+        </p>
+    {% endif %}
+
+    {% if montant_total %}
+        <p><span class="label">Montant à payer :</span> <strong>{{ montant_total|floatformat:2 }} €</strong></p>
+    {% endif %}
+
+    {% if commande.is_commande_a_emporter %}
+        {% if creneau_retrait %}
+            <p><span class="label">Créneau de retrait :</span> <strong>{{ creneau_retrait }}</strong></p>
+        {% elif commande.heure_pick_up_specifie %}
+            <p><span class="label">Heure de retrait :</span> <strong>{{ commande.heure_pick_up_specifie|date:"H:i" }}</strong></p>
+        {% else %}
+            <p>Les informations de retrait ne sont pas encore disponibles.</p>
+        {% endif %}
+    {% else %}
+        {% if creneau_livraison %}
+            <p><span class="label">Créneau de livraison :</span> 
+                <strong>{{ commande.date_livraison_specifiee|date:"d/m/Y" }} entre {{ creneau_livraison }}</strong>
+            </p>
+        {% elif commande.heure_livraison_asap %}
+            <p><span class="label">Heure estimée :</span> 
+                <strong>{{ commande.heure_livraison_asap|date:"H:i" }}</strong>
+            </p>
+        {% endif %}
+    {% endif %}
+
+    <p><span class="label">Moyen de paiement :</span> <strong>{{ moyen_affiche }}</strong></p>
+
+    {% if commande.is_commande_a_emporter %}
+        <p><span class="label">Voici comment se déroulera le retrait :</span></p>
+        <ul>
+            <li>Votre commande sera prête à l'heure prévue.</li>
+            <li>Présentez-vous à l'entrée du restaurant avec le numéro <strong>#{{ commande.id }}</strong>.</li>
+        </ul>
+    {% else %}
+        <p><span class="label">Voici comment se déroulera la livraison :</span></p>
+        <ul>
+            <li>Vous recevrez un SMS du livreur quelques minutes avant son arrivée 📲</li>
+            <li>Il vous appellera juste avant de se présenter 🚚</li>
+        </ul>
+    {% endif %}
+
+    <p class="footer-note">🍴 Merci pour votre commande et bon appétit !<br> 👉 Suivez-nous sur <strong>Instagram</strong> et <strong>Facebook</strong> pour découvrir nos nouveautés.</p>
+</div>
+{% endblock %}

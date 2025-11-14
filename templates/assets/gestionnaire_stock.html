@@ -1,0 +1,446 @@
+<!-- swigo/templates/assets/gestionnaire_stock.html -->
+
+{% extends 'assets/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}
+    Gestionnaire des Stocks
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3>Ingrédients Base</h3>
+    <div class="accordion" id="groupesAccordion">
+        {% for label, ingredients in groupes_ingredients %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                        {{ label }}
+                    </button>
+                </h2>
+                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#groupesAccordion">
+                    <div class="accordion-body">
+                        {% if ingredients %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Quantité en Stock</th>
+                                        <th>Unité</th>
+                                        <th>Prix Achat (HT)</th>
+                                        <th>TVA Achat (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ingredient in ingredients %}
+                                        <tr 
+                                            class="clickable-row"
+                                            data-ingredient-id="{{ ingredient.id }}" 
+                                            data-ingredient-name="{{ ingredient.nom }}"
+                                            data-ingredient-unite="{{ ingredient.get_unite_stock_display }}"
+                                            style="cursor: pointer;"
+                                        >
+                                            <td>{{ ingredient.nom }}</td>
+                                            <td>{{ ingredient.quantite_stock }}</td>
+                                            <td>{{ ingredient.get_unite_stock_display }}</td>
+                                            <td>{{ ingredient.prix_unitaire_achat }} €</td>
+                                            <td>{{ ingredient.taux_tva_achat }}%</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center">Aucun ingrédient dans ce groupe.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p>Aucun ingrédient disponible dans ce groupe.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Boutons pour accéder aux listes de courses -->
+    <div class="d-flex justify-content-center mt-5 mb-4">
+        <button 
+            type="button" 
+            class="btn btn-success me-2" 
+            data-bs-toggle="modal" 
+            data-bs-target="#shoppingListsModal">
+            Mes Listes de Courses
+        </button>
+    </div>
+
+<!-- Modal "Mes Listes de Courses" -->
+<div class="modal fade" id="shoppingListsModal" tabindex="-1" aria-labelledby="shoppingListsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mes Listes de Courses</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                {% if fournisseurs_actifs %}
+                    <p>Choisissez un fournisseur pour voir sa liste de courses :</p>
+                    <ul class="list-group">
+                        {% for fournisseur in fournisseurs_actifs %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ fournisseur.nom }}
+                                <div>
+                                    <a href="{% url 'swigo:liste_de_courses' fournisseur_id=fournisseur.id %}" class="btn btn-outline-primary btn-sm me-2">
+                                        Voir Liste
+                                    </a>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">Aucun fournisseur n'a de liste de courses active.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Première Modal : Options pour l'Ingrédient -->
+    <div class="modal fade" id="firstModal" tabindex="-1" aria-labelledby="firstModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Options pour <span id="firstModalIngredientName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Que souhaitez-vous faire avec cet ingrédient ?</p>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" id="addToShoppingListButton">Ajouter à ma liste de courses</button>
+                        <button 
+                        type="button" 
+                        class="btn btn-success" 
+                        id="addStockButton"
+                        data-bs-toggle="modal"
+                        data-bs-target="#addStockModal">
+                        Ajouter du stock
+                    </button>
+                                        
+                        <button type="button" class="btn btn-danger" id="stockShortageButton">Rupture de stock</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal : Ajouter du stock -->
+    <div class="modal fade" id="addStockModal" tabindex="-1" aria-labelledby="addStockModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- Le formulaire pointe vers l'URL dynamique -->
+                <form id="addStockForm" method="post">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addStockModalLabel">Ajouter du stock</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Ajoutez du stock pour <strong id="stockIngredientName"></strong> :</p>
+                        <div class="mb-3">
+                            <label for="stockQuantity" class="form-label">Quantité (<span id="stockIngredientUnit"></span>)</label>
+                            <input type="number" class="form-control" id="stockQuantity" name="quantity" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="stockPrice" class="form-label">Prix par unité (€)</label>
+                            <input type="number" class="form-control" id="stockPrice" name="price_per_unit" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-success">Ajouter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deuxième Modal : Quantité à acheter -->
+    <div class="modal fade" id="quantityModal" tabindex="-1" aria-labelledby="quantityModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" id="quantityForm">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="quantityModalLabel">Quantité à acheter</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Indiquez la quantité pour <strong id="quantityModalIngredientName"></strong> :</p>
+                        <div class="mb-3">
+                            <label for="quantityInput" class="form-label">Quantité (<span id="ingredientUnit"></span>)</label>
+                            <input type="number" class="form-control" id="quantityInput" name="quantity" min="1" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-primary" id="proceedToFournisseurButton">Continuer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal : Choix du Fournisseur -->
+    <div class="modal fade" id="fournisseurModal" tabindex="-1" aria-labelledby="fournisseurModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" id="fournisseurForm">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="fournisseurModalLabel">Choisir le Fournisseur</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Ajouter <strong id="fournisseurModalIngredientName"></strong> à votre liste de courses chez :</p>
+                        <div class="mb-3">
+                            <label for="fournisseurSelect" class="form-label">Sélectionnez un fournisseur</label>
+                            <select class="form-select" id="fournisseurSelect" name="fournisseur_id" required>
+                                <option value="">Sélectionnez un fournisseur</option>
+                                {% for fournisseur in fournisseurs %}
+                                    <option value="{{ fournisseur.id }}">{{ fournisseur.nom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <input type="hidden" id="fournisseurIngredientId" name="ingredient_id" value="">
+                        <input type="hidden" id="selectedQuantity" name="quantity" value="">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Scripts spécifiques à la page -->
+
+    
+    <script>
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Récupérer les modals
+            const modals = {
+                firstModal: document.getElementById('firstModal'),
+                quantityModal: document.getElementById('quantityModal'),
+                fournisseurModal: document.getElementById('fournisseurModal'),
+                addStockModal: document.getElementById('addStockModal')
+            };
+        
+            // Récupérer les éléments nécessaires
+            const elements = {
+                firstModalIngredientName: document.getElementById('firstModalIngredientName'),
+                quantityModalIngredientName: document.getElementById('quantityModalIngredientName'),
+                ingredientUnitSpan: document.getElementById('ingredientUnit'),
+                addToShoppingListButton: document.getElementById('addToShoppingListButton'),
+                proceedToFournisseurButton: document.getElementById('proceedToFournisseurButton'),
+                fournisseurForm: document.getElementById('fournisseurForm'),
+                fournisseurIngredientId: document.getElementById('fournisseurIngredientId'),
+                selectedQuantity: document.getElementById('selectedQuantity'),
+                fournisseurSelect: document.getElementById('fournisseurSelect'),
+                quantityInput: document.getElementById('quantityInput'),
+                addStockButton: document.getElementById('addStockButton'),
+                stockIngredientName: document.getElementById('stockIngredientName'),
+                stockIngredientUnit: document.getElementById('stockIngredientUnit'),
+                stockQuantityInput: document.getElementById('stockQuantity'),
+                stockPriceInput: document.getElementById('stockPrice'),
+                addStockForm: document.getElementById('addStockForm')
+            };
+        
+            console.log("Initialisation des éléments DOM réussie.");
+        
+            let selectedIngredient = {
+                id: '',
+                name: '',
+                unit: ''
+            };
+        
+            // Fonction : Ouvrir une modal
+            function openModal(modal) {
+                if (modal) {
+                    new bootstrap.Modal(modal).show();
+                } else {
+                    console.error("Modal introuvable.");
+                }
+            }
+        
+            // Fonction : Fermer une modal
+            function closeModal(modal) {
+                const instance = bootstrap.Modal.getInstance(modal);
+                if (instance) {
+                    instance.hide();
+                }
+                // Supprimer les classes résiduelles et backdrops
+                document.body.classList.remove('modal-open');
+                document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+            }
+        
+            // Gestion du clic sur une ligne d'ingrédient
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.addEventListener('click', function () {
+                    selectedIngredient.id = row.getAttribute('data-ingredient-id');
+                    selectedIngredient.name = row.getAttribute('data-ingredient-name');
+                    selectedIngredient.unit = row.getAttribute('data-ingredient-unite');
+        
+                    if (!selectedIngredient.id || !selectedIngredient.name || !selectedIngredient.unit) {
+                        console.error("Données manquantes dans la ligne sélectionnée.");
+                        return;
+                    }
+        
+                    elements.firstModalIngredientName.textContent = selectedIngredient.name;
+                    elements.quantityModalIngredientName.textContent = selectedIngredient.name;
+                    elements.ingredientUnitSpan.textContent = selectedIngredient.unit;
+        
+                    console.log("Ingrédient sélectionné :", selectedIngredient);
+                    openModal(modals.firstModal);
+                });
+            });
+        
+            // Gestion du clic sur "Ajouter à ma liste de courses"
+            if (elements.addToShoppingListButton) {
+                elements.addToShoppingListButton.addEventListener('click', function () {
+                    closeModal(modals.firstModal);
+                    openModal(modals.quantityModal);
+                });
+            }
+        
+            // Gestion du clic sur "Continuer" dans le modal quantité
+            if (elements.proceedToFournisseurButton) {
+                elements.proceedToFournisseurButton.addEventListener('click', function () {
+                    const quantityValue = parseFloat(elements.quantityInput.value);
+        
+                    if (isNaN(quantityValue) || quantityValue <= 0) {
+                        alert("Veuillez entrer une quantité valide.");
+                        return;
+                    }
+        
+                    closeModal(modals.quantityModal);
+        
+                    elements.fournisseurIngredientId.value = selectedIngredient.id;
+                    elements.selectedQuantity.value = quantityValue;
+        
+                    openModal(modals.fournisseurModal);
+                });
+            }
+        
+            // Gestion de la soumission du formulaire fournisseur
+            if (elements.fournisseurForm) {
+                elements.fournisseurForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+        
+                    const ingredientId = elements.fournisseurIngredientId.value;
+                    const fournisseur_id = elements.fournisseurSelect.value;
+                    const quantityValue = parseFloat(elements.selectedQuantity.value);
+        
+                    if (!fournisseur_id) {
+                        alert("Veuillez sélectionner un fournisseur.");
+                        return;
+                    }
+        
+                    const url = `/ajouter-a-la-liste-de-courses/${ingredientId}/${fournisseur_id}/`;
+        
+                    fetch(url, {
+                            method: 'POST',
+                            credentials: 'same-origin', // <-- important pour envoyer le cookie
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'), // <-- token depuis le cookie
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ quantity: quantityValue })
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                window.location.reload();
+                            } else {
+                                alert("Erreur lors de l'ajout à la liste de courses.");
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Erreur réseau :", error);
+                        });
+                });
+            }
+        
+            // Gestion du clic sur "Ajouter du stock"
+            if (elements.addStockButton) {
+                elements.addStockButton.addEventListener('click', function () {
+                    elements.stockIngredientName.textContent = selectedIngredient.name;
+                    elements.stockIngredientUnit.textContent = selectedIngredient.unit;
+        
+                    elements.stockQuantityInput.value = '';
+                    elements.stockPriceInput.value = '';
+                    elements.addStockForm.action = `/ajouter-stock/${selectedIngredient.id}/`;
+        
+                    openModal(modals.addStockModal);
+                });
+            }
+        
+            // Gestion de la soumission du formulaire Ajouter du stock
+            if (elements.addStockForm) {
+                elements.addStockForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+        
+                    const quantity = parseFloat(elements.stockQuantityInput.value);
+                    const pricePerUnit = parseFloat(elements.stockPriceInput.value);
+        
+                    if (isNaN(quantity) || isNaN(pricePerUnit) || quantity <= 0 || pricePerUnit <= 0) {
+                        alert("Veuillez entrer des valeurs valides pour la quantité et le prix.");
+                        return;
+                    }
+        
+                    fetch(elements.addStockForm.action, {
+                        method: 'POST',
+                        credentials: 'same-origin', // <-- important
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'), // <-- cookie token
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ quantity, price_per_unit: pricePerUnit })
+                    })
+
+                        .then(response => {
+                            if (response.ok) {
+                                window.location.reload();
+                            } else {
+                                alert("Erreur lors de l'ajout du stock.");
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Erreur réseau :", error);
+                        });
+                });
+            }
+        
+            // Gestion de la fermeture des modals pour éviter le gel de l'écran
+            document.addEventListener('hidden.bs.modal', function () {
+                document.body.classList.remove('modal-open');
+                document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+            });
+        });
+    </script>
+</div>
+{% endblock %}

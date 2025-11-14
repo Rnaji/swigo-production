@@ -1,0 +1,141 @@
+$flaticon_mycollection-font: "flaticon_mycollection";
+
+@font-face {
+    font-family: $flaticon_mycollection-font;
+    src: url("./flaticon_mycollection.woff2?0bc462aa9168f05f320789c28871ed6a") format("woff2"),
+url("./flaticon_mycollection.woff?0bc462aa9168f05f320789c28871ed6a") format("woff"),
+url("./flaticon_mycollection.eot?0bc462aa9168f05f320789c28871ed6a#iefix") format("embedded-opentype"),
+url("./flaticon_mycollection.ttf?0bc462aa9168f05f320789c28871ed6a") format("truetype"),
+url("./flaticon_mycollection.svg?0bc462aa9168f05f320789c28871ed6a#flaticon_mycollection") format("svg");
+}
+
+i[class^="flaticon-"]:before, i[class*=" flaticon-"]:before {
+    font-family: flaticon_mycollection !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+$flaticon_mycollection-map: (
+    "boisson-non-alcoolisee": "\f101",
+    "menu": "\f102",
+    "burger": "\f103",
+    "sushi": "\f104",
+    "rouleau-de-sushi": "\f105",
+    "sushi-1": "\f106",
+    "dessert": "\f107",
+    "dessert-1": "\f108",
+    "salade": "\f109",
+    "salade-1": "\f10a",
+    "tajine": "\f10b",
+    "tajine-1": "\f10c",
+    "tajine-2": "\f10d",
+    "pates": "\f10e",
+    "spaghetti": "\f10f",
+    "farfalle": "\f110",
+    "fusilli": "\f111",
+    "poulet-frit": "\f112",
+    "dinde": "\f113",
+    "riz-au-poulet": "\f114",
+    "riz-saute": "\f115",
+    "riz-au-poulet-1": "\f116",
+    "plateau-repas": "\f117",
+    "paquet-alimentaire": "\f118",
+    "des-legumes": "\f119",
+    "livreur-1": "\f11a",
+    "appel-telephonique": "\f11b",
+    "fried-potatoes": "\f11c",
+    "catering": "\f11d",
+);
+
+.flaticon-boisson-non-alcoolisee:before {
+    content: map-get($flaticon_mycollection-map, "boisson-non-alcoolisee");
+}
+.flaticon-menu:before {
+    content: map-get($flaticon_mycollection-map, "menu");
+}
+.flaticon-burger:before {
+    content: map-get($flaticon_mycollection-map, "burger");
+}
+.flaticon-sushi:before {
+    content: map-get($flaticon_mycollection-map, "sushi");
+}
+.flaticon-rouleau-de-sushi:before {
+    content: map-get($flaticon_mycollection-map, "rouleau-de-sushi");
+}
+.flaticon-sushi-1:before {
+    content: map-get($flaticon_mycollection-map, "sushi-1");
+}
+.flaticon-dessert:before {
+    content: map-get($flaticon_mycollection-map, "dessert");
+}
+.flaticon-dessert-1:before {
+    content: map-get($flaticon_mycollection-map, "dessert-1");
+}
+.flaticon-salade:before {
+    content: map-get($flaticon_mycollection-map, "salade");
+}
+.flaticon-salade-1:before {
+    content: map-get($flaticon_mycollection-map, "salade-1");
+}
+.flaticon-tajine:before {
+    content: map-get($flaticon_mycollection-map, "tajine");
+}
+.flaticon-tajine-1:before {
+    content: map-get($flaticon_mycollection-map, "tajine-1");
+}
+.flaticon-tajine-2:before {
+    content: map-get($flaticon_mycollection-map, "tajine-2");
+}
+.flaticon-pates:before {
+    content: map-get($flaticon_mycollection-map, "pates");
+}
+.flaticon-spaghetti:before {
+    content: map-get($flaticon_mycollection-map, "spaghetti");
+}
+.flaticon-farfalle:before {
+    content: map-get($flaticon_mycollection-map, "farfalle");
+}
+.flaticon-fusilli:before {
+    content: map-get($flaticon_mycollection-map, "fusilli");
+}
+.flaticon-poulet-frit:before {
+    content: map-get($flaticon_mycollection-map, "poulet-frit");
+}
+.flaticon-dinde:before {
+    content: map-get($flaticon_mycollection-map, "dinde");
+}
+.flaticon-riz-au-poulet:before {
+    content: map-get($flaticon_mycollection-map, "riz-au-poulet");
+}
+.flaticon-riz-saute:before {
+    content: map-get($flaticon_mycollection-map, "riz-saute");
+}
+.flaticon-riz-au-poulet-1:before {
+    content: map-get($flaticon_mycollection-map, "riz-au-poulet-1");
+}
+.flaticon-plateau-repas:before {
+    content: map-get($flaticon_mycollection-map, "plateau-repas");
+}
+.flaticon-paquet-alimentaire:before {
+    content: map-get($flaticon_mycollection-map, "paquet-alimentaire");
+}
+.flaticon-des-legumes:before {
+    content: map-get($flaticon_mycollection-map, "des-legumes");
+}
+.flaticon-livreur-1:before {
+    content: map-get($flaticon_mycollection-map, "livreur-1");
+}
+.flaticon-appel-telephonique:before {
+    content: map-get($flaticon_mycollection-map, "appel-telephonique");
+}
+.flaticon-fried-potatoes:before {
+    content: map-get($flaticon_mycollection-map, "fried-potatoes");
+}
+.flaticon-catering:before {
+    content: map-get($flaticon_mycollection-map, "catering");
+}

@@ -1,0 +1,23 @@
+SECRET_KEY loaded: True
+STRIPE_SECRET_KEY loaded: True
+BASE_DIR: /Users/rachidnaji/PythonProject/projets/ERC/package
+[
+{
+  "model": "auth.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$720000$LXPFmpNEfdrYS76zTXVSmt$JpADGyZwdog0vwBlnoBpOC9nlNiGv2taeB3Y0L2QFvM=",
+    "last_login": "2025-10-28T16:51:37.456Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-09-10T08:35:04.988Z",
+    "groups": [],
+    "user_permissions": []
+  }
+}
+]

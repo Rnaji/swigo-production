@@ -1,0 +1,21 @@
+{% extends "assets/base.html" %}
+{% block title %}Recette – {{ produit.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3>Recette : {{ recette.nom }}</h3>
+    <p>{{ recette.instructions_globales }}</p>
+
+    <h4>Étapes</h4>
+    <ol>
+        {% for etape in recette.etapes.all %}
+          <li>
+            <strong>{{ etape.titre }}</strong> ({{ etape.duree_minutes }} min)<br>
+            {{ etape.description }}
+          </li>
+        {% empty %}
+          <li>Aucune étape définie</li>
+        {% endfor %}
+    </ol>
+</div>
+{% endblock %}

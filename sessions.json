@@ -1,0 +1,61 @@
+SECRET_KEY loaded: True
+STRIPE_SECRET_KEY loaded: True
+BASE_DIR: /Users/rachidnaji/PythonProject/projets/ERC/package
+[
+{
+  "model": "sessions.session",
+  "pk": "800769p9ph6hceqzgn46swg5hev932kf",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO-ydWSxXie2Kek5Q7S2NyRAbJRPhbg7BKVJOW_ezBtiGUfOSdohwRl9BS_Og0z_qKmCltelb9d5R4BwYIHjQ_JWpDvnW1Gx5GUagtoUtbezupYkz8vuHg56nvvfOnTWc-1IatLcWE0UMLnaOau1DYaiMAnqGI01iKYR7zuypy65gMZhA58vVvJBLA:1vDdb3:8DCvhWWDJufWH7fgfZEyHDs5OrVPYxrN54CK2cTpeEA",
+    "expire_date": "2025-11-11T06:54:21.627Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "a01sy5sdji4turrfrvh11wdbdhsqhyoh",
+  "fields": {
+    "session_data": "eyJjb21tYW5kZV9pZCI6MTIsInBhbmllcl9pZCI6MTR9:1v1iL8:Mxjjxx9zwEbbnJ4jt_zw-u8osMnAl4Cbe-kb7D_z43s",
+    "expire_date": "2025-10-09T09:32:38.640Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "izp0s10x3cxhp8b5ryy8s840fjp9u6i4",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO_iOrJYr5O1Kek5Q7S2NyRAbJRPhbg7RKRJOW_ezFvFMo6ck7RDUmegSr04DzL9o69Uy-vSt-u8IwXqwALHh-StSHfOt6Jjycs0BL0pem9nfS1JnpfdPRz0PPe_dejIc-1QajTckEEMkFztHBlDwWIURgEToyULYBvxvkM6dckFsA4a9fkCWNdBLw:1vDKbo:LXYfHgXZpuid_zC-MGtZNwsq_o-Ta-HMCV-O5NqvVo8",
+    "expire_date": "2025-11-10T10:37:52.035Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "jvq4dnpfwamatm52secxd6cyhwam5cu2",
+  "fields": {
+    "session_data": ".eJxVjMEOwiAQRP9lzw0RFgp49O43NAtsbdWCKe3J-O9a00uP8-bNvCGWaaKcuBsTnJVv4EV55Pkf0TTQ0boM3Vp3BBIOLFB8cN6KdKd8KyKWvMxjEJsi9raKa0n8vOzu4WCgOvzWobeejEM2qKi1CjHI5IxzVikbNEYmZKli1FZLqVv2vkd76pMLUjvZwucLWbNBMA:1vDmv3:zRh3mDjLJUK8OrjpgF8v1mcSB4jtFZJnwyoGq0oyQzk",
+    "expire_date": "2025-11-11T16:51:37.458Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "q5gzinsb9394sg8kocf13a9weuf9xkfy",
+  "fields": {
+    "session_data": ".eJxVjEEOwiAQRe_C2hCHoQVcuu8ZyAwMUjVtUtqV8e7apAvd_vfef6lI21rj1mSJY1YXBer0uzGlh0w7yHeabrNO87QuI-td0QdtepizPK-H-3dQqdVvzcUF6jxKh4Z6ZxAZsu-8d8Y4tpiEUMCkZJ0FsL2EUNCdS_YM1kOv3h_HYDbu:1vDWZk:xV6nwWqEqq69B6gJF36Z86bmn0tCQ5a1KtEwqr2c1BY",
+    "expire_date": "2025-11-10T23:24:32.476Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "rs4xs32nz5po5njtr93syqv54sl4egs1",
+  "fields": {
+    "session_data": "eyJjb21tYW5kZV9pZCI6NDIsInBhbmllcl9pZCI6NDh9:1vDtrS:nGtg9djsccalpmdP4wglbMgyMKQkt2wyGc0abiswVnE",
+    "expire_date": "2025-11-12T00:16:22.845Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "ydjgnd2p6yfinmr4m99dvwnm9lbdgc3w",
+  "fields": {
+    "session_data": ".eJxVjsEOgjAQRP-lZ9O43YUWj979BrJtF0GlNRROxn8XDBeub2Ze5qNCHkdOUdohqgudVMvL3LdLkelPFKgD8xyekrYgPjjdsw45zdPg9VbRe1r0LUd5XffuQdBz6de172zDlUOp0HBtDaKH6CrnrDHWEwZhFDAhkCUAqqVpOrTnLjoP5KBepW9Ow_6Svj_xmUDF:1uwOS3:aUI9VAoX8cZBBZrKUFqutJvCCNXQ4WH5GYYomKSfae4",
+    "expire_date": "2025-09-24T17:17:47.525Z"
+  }
+}
+]

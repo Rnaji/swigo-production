@@ -1,0 +1,272 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block additional_css %}
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    main {
+        flex: 1;
+    }
+
+    .banner {
+        background-color: white;
+        padding: 40px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .banner-side-img {
+        flex-shrink: 0;
+        margin-right: 20px;
+    }
+
+    .banner-side-img img {
+        max-height: 150px;
+        height: auto;
+        width: auto;
+    }
+
+    .banner-center {
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 32px;
+        color: #4CAF50;
+
+    }
+
+    .form-control {
+        width: 100%;
+    }
+
+    .option-grisee {
+        color: #999;
+    }
+
+    .no-slot-message, .fermeture-message {
+        color: red;
+        font-weight: 500;
+        text-align: center;
+        margin-top: 10px;
+    }
+    .icon-row i {
+    transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+    cursor: pointer;
+    }
+    .icon-row i:hover {
+        animation: shake 0.65s;
+        color: var(--primary, #7DA640);
+    }
+
+    @keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="banner">
+    <div class="banner-center">
+        <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef" style="max-height: 90px; width: auto;">
+        <div class="icon-row">
+            <i class="flaticon-burger"></i>
+            <i class="flaticon-salade"></i>
+            <i class="flaticon-tajine-1"></i>
+            <i class="flaticon-poulet-frit"></i>
+        </div>
+    </div>
+</section>
+
+<main>
+    <section class="content-inner" style="padding: 20px 0; background-color: #f8f9fa;">
+        <div class="container d-flex flex-wrap flex-md-nowrap justify-content-center align-items-center" style="gap: 20px;">
+            <!-- Colonne gauche : cheffe -->
+            <div class="image-col text-center hide-on-small"
+                 style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                <img src="/static/assets/images/cheffe.png" alt="Cheffe"
+                     style="max-height: 500px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+                     onmouseover="this.style.transform='scale(1.02)'"
+                     onmouseout="this.style.transform='scale(1)'">
+            </div>
+
+            <!-- Colonne centrale : formulaire -->
+            <div class="content-col d-flex flex-column align-items-center justify-content-center text-center"
+                 style="flex: 2; padding: 20px; max-width: 480px; width: 100%;">
+                <div class="search-description mb-4">
+                    <h2 style="font-weight: 300;">Planifiez Votre Livraison</h2>
+                    <p style="font-weight: 300;">Choisissez la date et l’heure souhaitées pour recevoir votre commande.</p>
+                    
+                    <p class="estimated-time text-success">
+                        ⏱️ Prochaine livraison possible à partir de :
+                        <strong id="heure-estimee"></strong>
+                    </p>
+                    
+                </div>
+
+                
+                <form id="deliveryTimeForm" method="post" style="width: 100%;">
+                    {% csrf_token %}
+                    <div class="form-group text-left mb-3">
+                        <label for="date_livraison">Choisir une date :</label>
+                        <select id="date_livraison" name="date_livraison" class="form-control">
+                            <!-- Options remplies par JS -->
+                        </select>
+                    </div>
+                
+                    <div class="form-group text-left mb-3">
+                        <label for="heure_livraison">Choisir une heure :</label>
+                        <select id="heure_livraison" name="heure_livraison" class="form-control"></select>
+                        <div id="no-slot-message" class="no-slot-message"></div>
+                    </div>
+                
+                    <button type="submit" class="btn btn-outline-success" style="width: 100%;">Valider</button>
+                </form>
+                
+            </div>
+
+            <!-- Colonne droite : poke bowl + burger -->
+            <div class="image-col text-center hide-on-small"
+                 style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <img src="/static/assets/images/pokebowl.png" alt="Poke"
+                     style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+                     onmouseover="this.style.transform='scale(1.05)'"
+                     onmouseout="this.style.transform='scale(1)'">
+                <img src="/static/assets/images/burgermmm.png" alt="Burger"
+                     style="max-height: 180px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+                     onmouseover="this.style.transform='scale(1.05)'"
+                     onmouseout="this.style.transform='scale(1)'">
+            </div>
+        </div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.2.0/build/global/luxon.min.js"></script>
+<script id="horaires-disponibles-json" type="application/json">
+    {{ horaires_disponibles|safe }}
+</script>
+
+<script>
+    const { DateTime } = luxon;
+
+    // Backend vars injectées par Django
+    const horairesRaw = JSON.parse(document.getElementById('horaires-disponibles-json').textContent);
+    const horairesDisponibles = horairesRaw.disponibles || {};
+    const horairesComplets = horairesRaw.complets || {};
+    const heureEstimee = "{{ heure_estimee }}";       // ex: "11:45"
+    const dateEstimee = "{{ date_estimee }}";         // ex: "2025-06-14"
+    const heureEstimeeAffichage = "{{ heure_estimee_affichage|escapejs }}"; // ex: "Vendredi 14 juin 2025 à 11:45"
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const selectDate = document.getElementById('date_livraison');
+        const selectHeure = document.getElementById('heure_livraison');
+        const noSlotMsg = document.getElementById('no-slot-message');
+        const heureEstimeeEl = document.getElementById('heure-estimee');
+
+        // Affiche la prochaine livraison possible (en français !)
+        heureEstimeeEl.textContent = heureEstimeeAffichage || "Aucun créneau disponible";
+
+        // Liste des dates valides (ne propose pas le passé !)
+        const datesKeys = Object.keys(horairesDisponibles)
+            .filter(dateKey => !dateEstimee || dateKey >= dateEstimee)
+            .sort();
+
+        // Remplit la liste des dates dans le select
+        selectDate.innerHTML = "";
+        datesKeys.forEach(dateKey => {
+            const option = document.createElement('option');
+            option.value = dateKey;
+            option.textContent = DateTime.fromISO(dateKey).setLocale('fr').toLocaleString(DateTime.DATE_FULL);
+            selectDate.appendChild(option);
+        });
+
+        // Sélectionne par défaut la vraie date proposée par le backend
+        if (dateEstimee && selectDate.querySelector(`[value="${dateEstimee}"]`)) {
+            selectDate.value = dateEstimee;
+        } else if (datesKeys.length > 0) {
+            selectDate.value = datesKeys[0];
+        }
+
+        // Met à jour les horaires pour la date choisie
+        function updateHours(selectedDate) {
+            const dateKey = DateTime.fromISO(selectedDate).toISODate();
+
+            // Heure minimale (créneau backend pour cette date ou minuit)
+            let minHeure = "00:00";
+            const todayIso = DateTime.now().toISODate();
+if (dateKey === todayIso) {
+    minHeure = DateTime.now().toFormat('HH:mm');
+}
+
+
+            const disponibles = horairesDisponibles[dateKey] || { 'MIDI': [], 'SOIR': [] };
+            const complets = horairesComplets[dateKey] || { 'MIDI': [], 'SOIR': [] };
+
+            let optionsHtml = '';
+            let hasValidSlot = false;
+
+            ['MIDI', 'SOIR'].forEach(service => {
+                const toutesHeures = complets[service] || [];
+                let groupHtml = '';
+
+                toutesHeures.forEach(heure => {
+                    if (typeof heure !== 'string' || !heure.includes(':')) return;
+                    if (heure < minHeure) return;
+
+                    const estDispo = (disponibles[service] || []).includes(heure);
+                    if (estDispo) hasValidSlot = true;
+
+                    const disabledAttr = estDispo ? '' : 'disabled';
+                    const label = estDispo ? heure : `${heure} [Complet]`;
+                    groupHtml += `<option value="${heure}" ${disabledAttr}>${label}</option>`;
+                });
+
+                if (groupHtml) {
+                    optionsHtml += `<optgroup label="${service}">${groupHtml}</optgroup>`;
+                }
+            });
+
+            selectHeure.innerHTML = optionsHtml;
+            noSlotMsg.textContent = (!hasValidSlot) ? 'Aucun créneau disponible à cette date.' : '';
+
+            // Sélection par défaut du premier créneau dispo
+            if (dateKey === dateEstimee && heureEstimee && selectHeure.querySelector(`[value="${heureEstimee}"]`)) {
+                selectHeure.value = heureEstimee;
+            } else if (selectHeure.querySelector('option:not([disabled])')) {
+                selectHeure.value = selectHeure.querySelector('option:not([disabled])').value;
+            }
+        }
+
+        // Initialisation au chargement
+        if (selectDate && selectDate.value) {
+            updateHours(selectDate.value);
+        }
+
+        selectDate.addEventListener('change', () => updateHours(selectDate.value));
+    });
+</script>
+
+
+{% endblock %}

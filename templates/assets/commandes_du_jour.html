@@ -1,0 +1,123 @@
+{% extends 'assets/base.html' %}
+{% block title %}Commandes du jour{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">📦 Commandes du {{ now|date:"d/m/Y" }}</h2>
+
+    {% if commandes_data %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Client</th>
+                    <th>Emporter</th>
+                    <th>Ville</th>
+                    <th>Heure</th>
+                    <th>Statut</th>
+                    <th>Total</th>
+                    <th>Paiement</th> <!-- ✅ Nouvelle colonne -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in commandes_data %}
+                    {% with commande=item.commande total=item.total %}
+                    <tr data-bs-toggle="modal" data-bs-target="#commandeModal{{ commande.id }}" style="cursor:pointer;">
+                        <td>#{{ commande.id }}</td>
+                        <td>{{ commande.client.nom }}</td>
+                        <td class="text-center">
+                            {% if commande.is_commande_a_emporter %}
+                                ✅
+                            {% else %}
+                                🚚
+                            {% endif %}
+                        </td>
+                        <td>{{ commande.adresse_livraison.ville }}</td>
+                        <td>{{ commande.heure_creation|time:"H:i" }}</td>
+                        <td>
+                            {% with statut=commande.get_statut %}
+                                {% if statut == 'Livrée' or statut == 'Récupérée' %}
+                                    <span class="badge bg-success">{{ statut }}</span>
+                                {% elif statut == 'Expédiée' or statut == 'Prête à être expédiée' or statut == 'Prête à être enlevée' %}
+                                    <span class="badge bg-primary text-white">{{ statut }}</span>
+                                {% elif statut == 'Cuisson terminée' %}
+                                    <span class="badge bg-warning text-dark">{{ statut }}</span>
+                                {% elif statut == 'En cuisine' or statut == 'En tournée' %}
+                                    <span class="badge bg-orange text-white" style="background-color: orange;">{{ statut }}</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ statut }}</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>{{ total|floatformat:2 }} €</td>
+                        <td class="text-center">
+                            {% if commande.is_paid %}
+                                ✅
+                            {% else %}
+                                ❌
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                        <!-- ✅ MODALE DE DÉTAILS -->
+                        <div class="modal fade" id="commandeModal{{ commande.id }}" tabindex="-1" aria-labelledby="commandeModalLabel{{ commande.id }}" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                <h5 class="modal-title" id="commandeModalLabel{{ commande.id }}">Commande #{{ commande.id }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                                </div>
+                                <div class="modal-body">
+                                <p><strong>Client :</strong> {{ commande.client.nom }}</p>
+                                <p><strong>Téléphone :</strong> {{ commande.client.numero_telephone }}</p> <!-- ✅ ajouté ici -->
+                                <p><strong>Adresse :</strong> {{ commande.adresse_livraison.adresse }}</p>
+                                <p><strong>Ville :</strong> {{ commande.adresse_livraison.ville }}</p>
+                                <p><strong>Heure :</strong> {{ commande.heure_creation|time:"H:i" }}</p>
+                                <p><strong>Statut :</strong> {{ commande.get_statut }}</p>
+                                <p><strong>À emporter :</strong> {% if commande.is_commande_a_emporter %}Oui{% else %}Non{% endif %}</p>
+                                <p><strong>Total :</strong> {{ total|floatformat:2 }} €</p>
+                                <p><strong>Payée :</strong> {% if commande.is_paid %}Oui{% else %}Non{% endif %}</p>
+                        
+                                {% if commande.panier %}
+                                    <hr>
+                                    <h6>Détails du panier :</h6>
+                                    <ul class="list-group">
+                                        {% for ligne in commande.panier.articlepanier_set.all %}
+                                            <li class="list-group-item d-flex justify-content-between">
+                                                <span>{{ ligne.plat.nom }} x{{ ligne.quantite }}</span>
+                                                <span>{{ ligne.prix_total|floatformat:2 }} €</span>
+                                            </li>
+                                            {% if ligne.options.all %}
+                                                <ul class="ms-3 border-start ps-2">
+                                                    {% for opt in ligne.options.all %}
+                                                        <li>{{ opt.nom }} — {{ opt.prix|floatformat:2 }} €</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-muted">Aucun panier associé.</p>
+                                {% endif %}
+                                </div>
+                                <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="7" class="text-end">Total du jour :</th>
+                    <th>{{ total_journalier|floatformat:2 }} €</th>
+                </tr>
+            </tfoot>
+        </table>
+    {% else %}
+        <div class="alert alert-info text-center">Aucune commande pour aujourd'hui.</div>
+    {% endif %}
+</div>
+{% endblock %}

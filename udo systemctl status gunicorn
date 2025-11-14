@@ -1,0 +1,20 @@
+[0;1;32m●[0m gunicorn.service - gunicorn daemon
+     Loaded: loaded (]8;;file://enroutechef-server/etc/systemd/system/gunicorn.service/etc/systemd/system/gunicorn.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Tue 2025-11-11 10:54:56 UTC; 3s ago
+   Main PID: 241447 (gunicorn)
+      Tasks: 4 (limit: 1110)
+     Memory: 113.0M (peak: 113.3M)
+        CPU: 3.569s
+     CGroup: /system.slice/gunicorn.service
+             ├─[0;38;5;245m241447 /home/enroutechef/app/env/bin/python3.12 /home/enroutechef/app/env/bin/gunicorn --access-logfile - --workers 3 --bind 127.0.0.1:8000 core.wsgi:application[0m
+             ├─[0;38;5;245m241448 /home/enroutechef/app/env/bin/python3.12 /home/enroutechef/app/env/bin/gunicorn --access-logfile - --workers 3 --bind 127.0.0.1:8000 core.wsgi:application[0m
+             ├─[0;38;5;245m241449 /home/enroutechef/app/env/bin/python3.12 /home/enroutechef/app/env/bin/gunicorn --access-logfile - --workers 3 --bind 127.0.0.1:8000 core.wsgi:application[0m
+             └─[0;38;5;245m241450 /home/enroutechef/app/env/bin/python3.12 /home/enroutechef/app/env/bin/gunicorn --access-logfile - --workers 3 --bind 127.0.0.1:8000 core.wsgi:application[0m
+
+Nov 11 10:54:56 enroutechef-server systemd[1]: Started gunicorn.service - gunicorn daemon.
+Nov 11 10:54:56 enroutechef-server gunicorn[241447]: [2025-11-11 10:54:56 +0000] [241447] [INFO] Starting gunicorn 21.2.0
+Nov 11 10:54:56 enroutechef-server gunicorn[241447]: [2025-11-11 10:54:56 +0000] [241447] [INFO] Listening at: http://127.0.0.1:8000 (241447)
+Nov 11 10:54:56 enroutechef-server gunicorn[241447]: [2025-11-11 10:54:56 +0000] [241447] [INFO] Using worker: sync
+Nov 11 10:54:56 enroutechef-server gunicorn[241448]: [2025-11-11 10:54:56 +0000] [241448] [INFO] Booting worker with pid: 241448
+Nov 11 10:54:56 enroutechef-server gunicorn[241449]: [2025-11-11 10:54:56 +0000] [241449] [INFO] Booting worker with pid: 241449
+Nov 11 10:54:56 enroutechef-server gunicorn[241450]: [2025-11-11 10:54:56 +0000] [241450] [INFO] Booting worker with pid: 241450

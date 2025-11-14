@@ -1,0 +1,257 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block additional_css %}
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    main {
+        flex: 1;
+    }
+
+    .banner {
+        background-color: white;
+        padding: 40px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .banner-center {
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 32px;
+        color: #4CAF50;
+    }
+
+    .form-select {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background-color: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        font-size: 15px;
+        font-weight: 400;
+        text-align: center;
+        text-align-last: center;
+        appearance: none;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-select:focus {
+        border-color: #0d0d40;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(13, 13, 64, 0.15);
+    }
+
+    .no-slot-message {
+        color: red;
+        font-weight: 500;
+        margin-top: 8px;
+        text-align: center;
+    }
+
+    @media (max-width: 991.98px) {
+        .hide-on-small {
+            display: none !important;
+        }
+    }
+
+    .icon-row i {
+        transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+        cursor: pointer;
+    }
+    
+    .icon-row i:hover {
+        animation: shake 0.65s;
+        color: var(--primary, #7DA640);
+    }
+
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(3px, 2px) rotate(0deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        50% { transform: translate(-1px, 2px) rotate(-1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 1px) rotate(-1deg); }
+        80% { transform: translate(-1px, -1px) rotate(1deg); }
+        90% { transform: translate(1px, 2px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="banner">
+    <div class="banner-center">
+        <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef" style="max-height: 90px; width: auto;">
+        <div class="icon-row">
+            <i class="flaticon-burger"></i>
+            <i class="flaticon-salade"></i>
+            <i class="flaticon-tajine-1"></i>
+            <i class="flaticon-poulet-frit"></i>
+        </div>
+    </div>
+</section>
+
+<main>
+    <section class="content-inner" style="padding: 20px 0; background-color: #f9f9f9;">
+        <div class="container d-flex flex-wrap flex-md-nowrap justify-content-center align-items-center" style="gap: 20px;">
+
+            <div class="image-col text-center hide-on-small"
+                style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+                <img src="{% static 'assets/images/cheffe.png' %}" alt="Cheffe"
+                    style="max-height: 500px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.02)'"
+                    onmouseout="this.style.transform='scale(1)'">
+            </div>
+
+            <div class="content-col d-flex flex-column align-items-center justify-content-center text-center"
+                style="flex: 2; padding: 20px; max-width: 480px; width: 100%;">
+
+                <div class="pickup-description mb-4">
+                    <h2 style="font-weight: 300;">Planifiez Votre Retrait</h2>
+                    <p style="font-weight: 300;">Choisissez un créneau de retrait parmi ceux disponibles aujourd'hui.</p>
+                </div>
+
+                {% if ferme %}
+                    <div class="alert alert-warning text-center w-100 mt-3">
+                        😴 Aucun service n'est prévu aujourd'hui.
+                    </div>
+                {% else %}
+                <form id="pickupTimeForm" method="post" style="width: 100%;">
+                    {% csrf_token %}
+                    <input type="hidden" name="commande_id" value="{{ request.GET.commande_id|default:request.session.commande_id }}">
+                    <div class="form-group text-left mb-3">
+                        <label for="heure_retrait">Choisir une heure :</label>
+                        <select id="heure_retrait" name="heure_retrait" class="form-select" required>
+                            <!-- Options dynamiques chargées en JS -->
+                        </select>
+                        <div id="no-slot-message" class="no-slot-message"></div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-success" style="width: 100%;">Valider</button>
+                </form>
+                {% endif %}
+
+            </div>
+
+            <div class="image-col text-center hide-on-small"
+                style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke"
+                    style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.05)'"
+                    onmouseout="this.style.transform='scale(1)'">
+                <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger"
+                    style="max-height: 180px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.05)'"
+                    onmouseout="this.style.transform='scale(1)'">
+            </div>
+        </div>
+    </section>
+</main>
+
+{% if not ferme %}
+<script id="horaires-disponibles-json" type="application/json">
+    {{ horaires_disponibles|safe }}
+</script>
+<script>
+    const service = "{{ service_actuel|default:'MIDI' }}";
+    const heureEstimeeServ = "{{ heure_estimee|default:'22:15' }}";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.2.0/build/global/luxon.min.js"></script>
+<script>
+    const { DateTime } = luxon;
+    const horairesDisponibles = JSON.parse(document.getElementById('horaires-disponibles-json').textContent);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const selectHeure = document.getElementById('heure_retrait');
+        const noSlotMsg = document.getElementById('no-slot-message');
+
+        const now = DateTime.now().setZone('Europe/Paris');
+        const todayKey = now.toISODate();
+        
+        // Récupération des horaires disponibles
+        const disponibles = horairesDisponibles['disponibles'] || {};
+        const horaires = disponibles[todayKey] || { 'MIDI': [], 'SOIR': [] };
+        const heures = horaires[service] || [];
+
+        console.log('=== DEBUG CRÉNEAUX ===');
+        console.log('Service:', service);
+        console.log('Heures disponibles:', heures);
+        console.log('Now:', now.toString());
+        console.log('Heure estimée serveur:', heureEstimeeServ);
+
+        let optionsHtml = '';
+        let firstValidHeure = null;
+
+        // Utiliser l'heure estimée du serveur comme référence
+        const [estH, estM] = heureEstimeeServ.split(':').map(Number);
+        const heureReference = now.set({ hour: estH, minute: estM, second: 0, millisecond: 0 });
+
+        heures.forEach(h => {
+            const [hH, hM] = h.split(':').map(Number);
+            const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
+            
+            console.log(`Créneau ${h}:`, slotDT.toString(), '>=', heureReference.toString(), '?', slotDT >= heureReference);
+            
+            // Condition plus permissive : accepter les créneaux à partir de l'heure estimée du serveur
+            if (slotDT >= heureReference) {
+                if (!firstValidHeure) firstValidHeure = h;
+                optionsHtml += `<option value="${h}">${h}</option>`;
+            }
+        });
+
+        // Si aucun créneau trouvé avec la référence serveur, essayer sans filtre strict
+        if (!optionsHtml && heures.length > 0) {
+            console.log('Aucun créneau avec filtre strict, essai sans filtre...');
+            heures.forEach(h => {
+                const [hH, hM] = h.split(':').map(Number);
+                const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
+                
+                // Accepter les créneaux qui ne sont pas trop dans le passé
+                if (slotDT >= now.minus({ minutes: 15 })) {
+                    if (!firstValidHeure) firstValidHeure = h;
+                    optionsHtml += `<option value="${h}">${h}</option>`;
+                }
+            });
+        }
+
+        if (optionsHtml) {
+            selectHeure.innerHTML = optionsHtml;
+            if (firstValidHeure) {
+                selectHeure.value = firstValidHeure;
+            }
+            noSlotMsg.textContent = '';
+            console.log('Créneaux affichés:', optionsHtml);
+        } else {
+            selectHeure.innerHTML = '<option value="">Aucun créneau disponible</option>';
+            noSlotMsg.textContent = 'Aucun créneau de retrait disponible pour aujourd\'hui.';
+            console.log('Aucun créneau disponible après filtrage');
+        }
+    });
+
+    // Gestion de la soumission du formulaire
+    document.getElementById('pickupTimeForm')?.addEventListener('submit', function(e) {
+        const selectedHeure = document.getElementById('heure_retrait').value;
+        if (!selectedHeure) {
+            e.preventDefault();
+            alert('Veuillez sélectionner un créneau horaire.');
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

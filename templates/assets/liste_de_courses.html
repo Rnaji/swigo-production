@@ -1,0 +1,237 @@
+<!-- swigo/templates/assets/liste_de_courses.html -->
+
+{% extends 'assets/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}
+    Mes Listes de Courses
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Listes de Courses pour {{ fournisseur.nom }}</h1>
+    
+    {% if listes_de_courses %}
+        {% for liste in listes_de_courses %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5>{{ liste.nom }}</h5>
+                        <p class="mb-0">Date : {{ liste.date }}</p>
+                    </div>
+                    <div>
+                        <!-- Bouton pour archiver la liste -->
+                        <form action="{% url 'swigo:archiver_liste_de_courses' liste.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning btn-sm">Archiver</button>
+                        </form>
+                        <!-- Bouton pour supprimer la liste -->
+                        <form action="{% url 'swigo:supprimer_liste_de_courses' liste.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette liste ?');">Supprimer</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if liste.articles.all %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Ingrédient</th>
+                                    <th>Quantité</th>
+                                    <th>Unité</th>
+                                    <th>Valider</th>
+                                    <th>Supprimer</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sortable-list-{{ liste.id }}">
+                                {% for article in liste.articles.all %}
+                                    <tr 
+                                        class="{% if article.est_achete %}purchased{% endif %}" 
+                                        draggable="true" 
+                                        data-article-id="{{ article.id }}"
+                                    >
+                                        <td class="ingredient-name">{{ article.ingredient.nom }}</td>
+                                        <td>{{ article.quantite }}</td>
+                                        <td>{{ article.get_unite_display }}</td>
+                                        <td class="text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                class="form-check-input toggle-purchased"
+                                                data-article-id="{{ article.id }}"
+                                                {% if article.est_achete %} checked{% endif %}
+                                            >
+                                        </td>
+                                        <td class="text-center">
+                                            <button class="btn btn-danger btn-sm delete-article" data-article-id="{{ article.id }}">
+                                                Supprimer
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>Cette liste de courses est vide.</p>
+                    {% endif %}
+                    
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Aucune liste de courses active pour ce fournisseur.</p>
+    {% endif %}
+    
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inclure le token CSRF globalement
+        const csrfToken = '{{ csrf_token }}';
+
+        // Fonction de validation (cocher un article comme acheté)
+        document.querySelectorAll('.toggle-purchased').forEach(checkbox => {
+            checkbox.addEventListener('change', function () {
+                const row = this.closest('tr');
+                const articleId = this.dataset.articleId;
+                
+                if (this.checked) {
+                    row.classList.add('purchased');
+                } else {
+                    row.classList.remove('purchased');
+                }
+
+                fetch(`/toggle_article_achete/${articleId}/`, {  // Ajout de backticks et guillemets
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken, // Utilise le token global
+                        'Content-Type': 'application/json'
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        console.error('Erreur lors de la mise à jour');
+                        this.checked = !this.checked; // Rétablir si erreur
+                        if (this.checked) {
+                            row.classList.add('purchased');
+                        } else {
+                            row.classList.remove('purchased');
+                        }
+                    }
+                }).catch(error => {
+                    console.error('Erreur réseau:', error);
+                    this.checked = !this.checked; // Rétablir si erreur
+                    if (this.checked) {
+                        row.classList.add('purchased');
+                    } else {
+                        row.classList.remove('purchased');
+                    }
+                });
+            });
+        });
+
+        // Fonction de suppression
+        document.querySelectorAll('.delete-article').forEach(button => {
+            button.addEventListener('click', function () {
+                const articleId = this.dataset.articleId;
+
+                if (confirm("Êtes-vous sûr de vouloir supprimer cet article ?")) {
+                    fetch(`/supprimer-article/${articleId}/`, {  // Ajout de backticks et guillemets
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken, // Utilise le token global
+                            'Content-Type': 'application/json'
+                        }
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload(); // Recharge la page pour refléter les changements
+                        } else {
+                            alert("Erreur lors de la suppression de l'article.");
+                        }
+                    }).catch(error => {
+                        console.error('Erreur réseau:', error);
+                    });
+                }
+            });
+        });
+
+        // Drag-and-drop functionality for each sortable list
+        document.querySelectorAll('tbody[id^="sortable-list-"]').forEach(sortableList => {
+            let draggedRow = null;
+
+            sortableList.addEventListener('dragstart', function (event) {
+                draggedRow = event.target;
+                event.target.style.opacity = '0.5';
+            });
+
+            sortableList.addEventListener('dragend', function (event) {
+                event.target.style.opacity = '';
+                draggedRow = null;
+
+                // Sauvegarder l'ordre après drag-and-drop
+                saveOrder(sortableList.id);
+            });
+
+            sortableList.addEventListener('dragover', function (event) {
+                event.preventDefault(); // Nécessaire pour permettre le drop
+                const afterElement = getDragAfterElement(sortableList, event.clientY);
+                if (afterElement == null) {
+                    sortableList.appendChild(draggedRow);
+                } else {
+                    sortableList.insertBefore(draggedRow, afterElement);
+                }
+            });
+
+            // Fonction pour obtenir l'élément après lequel insérer
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('tr[draggable="true"]:not(.dragging)')];
+
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) {
+                        return { offset: offset, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+
+            // Sauvegarder l'ordre des articles
+            function saveOrder(listId) {
+                const order = [...document.querySelector(`#${listId}`).children].map(row => row.dataset.articleId);
+
+                fetch('/save-article-order/', {  // Ajout de backticks et guillemets
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken, // Utilise le token global
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ order: order })
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('Ordre sauvegardé avec succès pour la liste:', listId);
+                    } else {
+                        console.error('Erreur lors de la sauvegarde de l\'ordre pour la liste:', listId);
+                    }
+                }).catch(error => console.error('Erreur réseau:', error));
+            }
+        });
+    });
+</script>
+
+<style>
+    .purchased {
+        text-decoration: line-through;
+        color: gray;
+    }
+
+    tr[draggable="true"] {
+        cursor: grab;
+    }
+
+    tr[draggable="true"]:active {
+        cursor: grabbing;
+    }
+</style>
+{% endblock %}

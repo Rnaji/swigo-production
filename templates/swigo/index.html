@@ -1,0 +1,26 @@
+{% extends 'assets/base.html' %}
+{% load static %}
+
+{% block title %}
+    Dashboard - Trezo
+{% endblock %}
+
+{% block content %}
+    <!-- Start Main Content Area -->
+    <div class="container-fluid">
+        <div class="main-content d-flex flex-column">
+            <!-- Contenu spécifique de l'index -->
+            <div class="content-area">
+                <h1>Bienvenue sur le tableau de bord !</h1>
+                <p>Ceci est le contenu de la page d'index, où vous pouvez voir des statistiques et des informations importantes.</p>
+                <!-- Ajouter d'autres sections spécifiques à cette page -->
+            </div>
+        </div>
+    </div>
+    <!-- End Main Content Area -->
+{% endblock %}
+
+{% block scripts %}
+    <!-- Scripts spécifiques pour la page index si nécessaire -->
+    <script src="{% static 'assets/js/index-specific.js' %}"></script>
+{% endblock %}

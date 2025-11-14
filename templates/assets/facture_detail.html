@@ -1,0 +1,83 @@
+{% extends "assets/base.html" %}
+{% block title %}Facture n°{{ facture.numero }}{% endblock %}
+{% block content %}
+<div class="container my-4">
+
+    <h2>Facture n°{{ facture.numero }}</h2>
+    <p><strong>Date émission :</strong> {{ facture.date_emission|date:"d/m/Y H:i" }}</p>
+    
+    <div class="mb-3" style="line-height: 1.5;">
+        {% if facture.societe %}
+            <strong>{{ facture.societe|upper }}</strong><br>
+        {% else %}
+            <strong>{{ facture.client }}</strong><br>
+        {% endif %}
+        {{ facture.adresse_facturation|linebreaksbr }}
+    </div>
+    
+    <p><strong>Mode de paiement :</strong>
+        {% if facture.commande.moyen_paiement %}
+            {{ facture.commande.get_moyen_paiement_display }}
+        {% else %}
+            N/A
+        {% endif %}
+    </p>
+    {% if facture.commande.montant_especes or facture.commande.montant_ticket or facture.commande.montant_stripe %}
+        <p>
+            <strong>Détail paiement :</strong>
+            {% if facture.commande.montant_especes %}
+                {{ facture.commande.montant_especes|floatformat:2 }} € espèces
+            {% endif %}
+            {% if facture.commande.montant_ticket %}
+                {% if facture.commande.montant_especes %} / {% endif %}
+                {{ facture.commande.montant_ticket|floatformat:2 }} € ticket resto
+            {% endif %}
+            {% if facture.commande.montant_stripe %}
+                {% if facture.commande.montant_especes or facture.commande.montant_ticket %} / {% endif %}
+                {{ facture.commande.montant_stripe|floatformat:2 }} € CB
+            {% endif %}
+        </p>
+    {% endif %}
+
+    {% if not facture.facture_sans_detail %}
+        <table class="table table-bordered mt-4">
+            <thead>
+                <tr>
+                    <th>Désignation</th>
+                    <th>Qté</th>
+                    <th>PU HT</th>
+                    <th>TVA</th>
+                    <th>Total TTC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ligne in facture.lignes.all %}
+                <tr>
+                    <td>{{ ligne.description }}</td>
+                    <td>{{ ligne.quantite }}</td>
+                    <td>{{ ligne.prix_unitaire_ht|floatformat:2 }} €</td>
+                    <td>{{ ligne.taux_tva|stringformat:".1f" }}%</td>
+                    <td>{{ ligne.montant_ttc|floatformat:2 }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info mt-4" style="font-size: 1.05rem;">
+            <strong>Repas complet(s) livré(s) :</strong>
+            Cette facture atteste la livraison de repas complets conformément à la commande. <br>
+            (Le détail des produits est archivé et disponible sur simple demande).
+        </div>
+    {% endif %}
+
+    <div class="mt-3">
+        <p><strong>Total HT :</strong> {{ facture.montant_ht|floatformat:2 }} €</p>
+        {% for taux, montant in tva_par_taux.items %}
+            <p><strong>TVA {{ taux|stringformat:".1f" }}% :</strong> {{ montant|floatformat:2 }} €</p>
+        {% endfor %}
+        <p><strong>Total TTC :</strong> {{ facture.montant_ttc|floatformat:2 }} €</p>
+    </div>
+    
+
+</div>
+{% endblock %}

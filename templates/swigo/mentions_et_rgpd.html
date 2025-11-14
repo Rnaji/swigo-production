@@ -1,0 +1,148 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .legal-container {
+        max-width: 850px;
+        margin: 40px auto;
+        padding: 0 20px;
+        font-size: 15px;
+        line-height: 1.7;
+    }
+
+    .legal-container h2 {
+        margin-top: 40px;
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    .legal-container h3 {
+        margin-top: 25px;
+        font-size: 18px;
+    }
+
+    .legal-container p {
+        margin-bottom: 1rem;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 32px;
+        color: #4CAF50;
+    }
+
+    .icon-row i {
+        transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+        cursor: pointer;
+    }
+
+    .icon-row i:hover {
+        animation: shake 0.65s;
+        color: var(--primary, #7DA640);
+    }
+    .banner {
+    background-color: white;
+    padding: 40px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.banner-center {
+    flex-grow: 1;
+    text-align: center; /* ✅ centrage horizontal */
+}
+
+.banner-center img {
+    max-height: 90px;
+    width: auto;
+    display: inline-block;
+}
+
+
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(3px, 2px) rotate(0deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        50% { transform: translate(-1px, 2px) rotate(-1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 1px) rotate(-1deg); }
+        80% { transform: translate(-1px, -1px) rotate(1deg); }
+        90% { transform: translate(1px, 2px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+</style>
+
+<section class="banner">
+    <div class="banner-center">
+        <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef" style="max-height: 90px; width: auto;">
+        <div class="icon-row">
+            <i class="flaticon-burger"></i>
+            <i class="flaticon-salade"></i>
+            <i class="flaticon-tajine-1"></i>
+            <i class="flaticon-poulet-frit"></i>
+        </div>
+    </div>
+</section>
+
+<section class="legal-container">
+    <h2>Mentions légales</h2>
+    <p><strong>Nom de l’entreprise :</strong> En Route Chef</p>
+    <p><strong>Forme juridique :</strong> Entreprise individuelle</p>
+    <p><strong>Responsable de publication :</strong> Rachid Naji</p>
+    <p><strong>Adresse :</strong> 117bis Rue de la Libération, 27140 Gisors, France</p>
+    <p><strong>Téléphone :</strong> +33 6 XX XX XX XX</p>
+    <p><strong>Email :</strong> contact@enroutechef.fr</p>
+    <p><strong>SIRET :</strong> 123 456 789 00000</p>
+
+    <h3>Hébergement</h3>
+    <p><strong>OVH SAS</strong> – 2 rue Kellermann – 59100 Roubaix – France – <a href="https://www.ovh.com" target="_blank">www.ovh.com</a></p>
+
+    <h3>Responsabilité</h3>
+    <p>Les informations présentes sur ce site sont régulièrement mises à jour. Toutefois, En Route Chef ne saurait être tenu responsable d'éventuelles erreurs ou omissions.</p>
+
+    <h2>Politique de confidentialité (RGPD)</h2>
+    <h3>Données collectées</h3>
+    <ul>
+        <li>Identité : nom, prénom</li>
+        <li>Coordonnées : adresse, téléphone, email</li>
+        <li>Données de commande et de paiement</li>
+        <li>Données de navigation (cookies anonymes)</li>
+    </ul>
+
+    <h3>Finalités et base légale</h3>
+    <p>Les données sont traitées pour :</p>
+    <ul>
+        <li>Gérer vos commandes (base légale : contrat)</li>
+        <li>Améliorer nos services (base légale : intérêt légitime)</li>
+        <li>Vous contacter à des fins commerciales (base légale : consentement)</li>
+    </ul>
+
+    <h3>Durée de conservation</h3>
+    <ul>
+        <li>3 ans après la dernière commande ou interaction</li>
+        <li>10 ans pour les données comptables</li>
+    </ul>
+
+    <h3>Destinataires</h3>
+    <p>En Route Chef et ses prestataires techniques : hébergeur, paiement sécurisé, service emailing. Pas de transfert hors UE.</p>
+
+    <h3>Vos droits</h3>
+    <p>Accès, rectification, suppression, opposition, portabilité. Pour exercer vos droits : <strong>contact@enroutechef.fr</strong></p>
+
+    <h2>Cookies</h2>
+    <h3>Utilisation</h3>
+    <p>Ce site utilise des cookies pour :</p>
+    <ul>
+        <li>Assurer le bon fonctionnement du site (panier, session)</li>
+        <li>Mesurer l’audience (via Google Analytics)</li>
+    </ul>
+{% endblock %}

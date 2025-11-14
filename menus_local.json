@@ -1,0 +1,122 @@
+[
+{
+  "model": "swigo.menu",
+  "pk": 1,
+  "fields": {
+    "nom": "Burger ERC + Accompagnement + Boisson",
+    "description": "Burger ERC avec accompagnement au choix et boisson",
+    "prix_ttc": "12.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 2,
+  "fields": {
+    "nom": "Burger ERC + Accompagnement + Boisson + Cookie",
+    "description": "Burger ERC avec accompagnement, boisson et cookie",
+    "prix_ttc": "14.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 3,
+  "fields": {
+    "nom": "Couscous + Boisson",
+    "description": "Couscous personnalisé avec boisson (Boulette/Poulet/Merguez)",
+    "prix_ttc": "16.30",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 4,
+  "fields": {
+    "nom": "Couscous + Boisson + Corne de Gazelle",
+    "description": "Couscous personnalisé avec boisson et corne de gazelle",
+    "prix_ttc": "18.30",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 5,
+  "fields": {
+    "nom": "Crousty Tenders + Boisson",
+    "description": "Crousty Tenders Original avec boisson",
+    "prix_ttc": "10.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 6,
+  "fields": {
+    "nom": "Crousty Tenders + Boisson + Cookie",
+    "description": "Crousty Tenders Original avec boisson et cookie",
+    "prix_ttc": "12.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 7,
+  "fields": {
+    "nom": "Poulet Frit + Accompagnement + Boisson",
+    "description": "5 Tenders OU 5 Wings frits avec accompagnement et boisson",
+    "prix_ttc": "11.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 8,
+  "fields": {
+    "nom": "Poulet Frit + Accompagnement + Boisson + Cookie",
+    "description": "5 Tenders OU 5 Wings frits avec accompagnement, boisson et cookie",
+    "prix_ttc": "13.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 9,
+  "fields": {
+    "nom": "Poulet Josper + Accompagnement + Boisson",
+    "description": "5 Wings Grillés Josper avec accompagnement et boisson",
+    "prix_ttc": "13.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 10,
+  "fields": {
+    "nom": "Poulet Josper + Accompagnement + Boisson + Cookie",
+    "description": "5 Wings Grillés Josper avec accompagnement, boisson et cookie",
+    "prix_ttc": "15.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+}
+]

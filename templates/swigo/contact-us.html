@@ -1,0 +1,206 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block additional_css %}
+{% endblock %}
+
+{% block content %}
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    main {
+        flex: 1;
+    }
+
+    .banner {
+        background-color: white;
+        padding: 40px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .banner-side-img {
+        flex-shrink: 0;
+        margin-right: 20px;
+    }
+
+    .banner-side-img img {
+        max-height: 150px;
+        height: auto;
+        width: auto;
+    }
+
+    .banner-center {
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 32px;
+        color: #4CAF50;
+    }
+
+    .form-control {
+        width: 100%;
+    }
+
+    .option-grisee {
+        color: #999;
+    }
+
+    .no-slot-message, .fermeture-message {
+        color: red;
+        font-weight: 500;
+        text-align: center;
+        margin-top: 10px;
+    }
+    .icon-row i {
+        transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+        cursor: pointer;
+    }
+    .icon-row i:hover {
+        animation: shake 0.65s;
+        color: var(--primary, #7DA640);
+    }
+
+    @keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+</style>
+<section class="banner">
+    <div class="banner-center">
+        {% if message_fermeture %}
+            <div class="alert alert-warning mt-3" style="font-weight: 400; font-size: 14px;">
+                {{ message_fermeture }}
+            </div>
+        {% endif %}
+        <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef" style="max-height: 90px; width: auto;">
+        <div class="icon-row">
+            <i class="flaticon-burger"></i>
+            <i class="flaticon-salade"></i>
+            <i class="flaticon-tajine-1"></i>
+            <i class="flaticon-poulet-frit"></i>
+        </div>
+    </div>
+</section>
+
+<!-- Contact Section -->
+<section class="section-wrapper-8 content-inner-1">
+	<div class="container">
+		<div class="row g-4 justify-content-center text-center">
+			<div class="col-12 col-sm-6 col-lg-3">
+				<div class="icon-bx-wraper style-5 hover-aware h-100">
+					<div class="icon-bx">
+						<div class="icon-cell"><i class="fas fa-map-marker-alt"></i></div>
+					</div>
+					<div class="icon-content">
+						<h5 class="title">Adresse</h5>
+						<p>En Route Chef!<br>112 Rue de la Libération<br>27140 Gisors</p>
+						<div class="effect bg-primary"></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-sm-6 col-lg-3">
+				<div class="icon-bx-wraper style-5 hover-aware h-100">
+					<div class="icon-bx">
+						<div class="icon-cell"><i class="fas fa-phone"></i></div>
+					</div>
+					<div class="icon-content">
+						<h5 class="title">Téléphone</h5>
+						<p>+33 7 66 55 44 33<br>+33 1 23 45 67 89</p>
+						<div class="effect bg-primary"></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-sm-6 col-lg-3">
+				<div class="icon-bx-wraper style-5 hover-aware h-100">
+					<div class="icon-bx">
+						<div class="icon-cell"><i class="fas fa-envelope"></i></div>
+					</div>
+					<div class="icon-content">
+						<h5 class="title">Email</h5>
+						<p>contact@enroutechef.fr<br>support@enroutechef.fr</p>
+						<div class="effect bg-primary"></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-sm-6 col-lg-3">
+				<div class="icon-bx-wraper style-5 hover-aware h-100">
+					<div class="icon-bx">
+						<div class="icon-cell"><i class="fas fa-clock"></i></div>
+					</div>
+					<div class="icon-content">
+						<h5 class="title">Horaires</h5>
+						<p>Lun–Ven 11h30–14h30 / 18h30–22h30<br>Sam–Dim 18h30–22h30</p>
+						<div class="effect bg-primary"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="section-head text-center mt-5">
+			<h2 class="title">Contactez-Nous</h2>
+		</div>
+		<form class="dzForm dezPlaceAni" method="POST" action="/static/swigo/script/contact_smtp.php">
+			<div class="dzFormMsg"></div>
+			<input type="hidden" class="form-control" name="dzToDo" value="Contact">
+			<div class="row">
+				<div class="col-lg-6 col-md-6 m-b30 m-sm-b50">
+					<label class="form-label text-primary">Votre Nom</label>
+					<div class="input-group input-line input-black">
+						<input name="dzName" required type="text" class="form-control" placeholder="Jean Dupont">
+					</div>
+				</div>
+				<div class="col-lg-6 col-md-6 m-b30 m-sm-b50">
+					<label class="form-label text-primary">Votre Email</label>
+					<div class="input-group input-line input-black">
+						<input name="dzEmail" required type="text" class="form-control" placeholder="exemple@domaine.com">
+					</div>
+				</div>
+				<div class="col-lg-6 col-md-6 m-b30 m-sm-b50">
+					<label class="form-label text-primary">Votre Numéro</label>
+					<div class="input-group input-line input-black">
+						<input name="dzPhoneNumber" required type="text" class="form-control dz-number" placeholder="06 12 34 56 78">
+					</div>
+				</div>
+				<div class="col-sm-12 m-b40">
+					<label class="form-label text-primary">Votre Message</label>
+					<div class="input-group input-line input-black">
+						<textarea name="dzMessage" required class="form-control" placeholder="Bonjour, je voulais vous informer..."></textarea>
+					</div>
+				</div>
+				<div class="col-sm-12 m-b20">
+					<div class="input-recaptcha">
+					</div>
+				</div>
+				<div class="col-12 text-center">
+					<button name="submit" value="submit" type="submit" class="btn btn-primary btn-hover-1"><span>Envoyer votre message</span></button>
+				</div>
+			</div>
+		</form>		
+	</div>
+</section>
+{% endblock %}

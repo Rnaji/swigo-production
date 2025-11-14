@@ -1,0 +1,91 @@
+from django.core.management.base import BaseCommand
+from swigo.models import VilleDesservie
+
+class Command(BaseCommand):
+    help = 'Ajoute les villes desservies dans la base de données'
+
+    def handle(self, *args, **kwargs):
+        villes_data = [
+    {"ville": "Gisors", "code_postal": "27140", "nombre_habitants": 11369, "distance_gisors": 0, "temps_gisors": 0, "zone": 0, "panier_minimal": 15, "localisation": "0"},
+    {"ville": "Courcelles-lès-Gisors", "code_postal": "60240", "nombre_habitants": 838, "distance_gisors": 3.96, "temps_gisors": 4, "zone": 1, "panier_minimal": 15, "localisation": "SOO"},
+    {"ville": "Chambors", "code_postal": "60240", "nombre_habitants": 319, "distance_gisors": 3.62, "temps_gisors": 5, "zone": 1, "panier_minimal": 15, "localisation": "SE"},
+    {"ville": "Trie-la-Ville", "code_postal": "60590", "nombre_habitants": 322, "distance_gisors": 3.98, "temps_gisors": 6, "zone": 1, "panier_minimal": 15, "localisation": "NEE"},
+    {"ville": "Lattainville", "code_postal": "60240", "nombre_habitants": 155, "distance_gisors": 5.21, "temps_gisors": 6, "zone": 1, "panier_minimal": 15, "localisation": "SSE"},
+    {"ville": "Trie-Château", "code_postal": "60590", "nombre_habitants": 1563, "distance_gisors": 3.2, "temps_gisors": 7, "zone": 1, "panier_minimal": 15, "localisation": "NEE"},
+    {"ville": "Delincourt", "code_postal": "60240", "nombre_habitants": 489, "distance_gisors": 5.66, "temps_gisors": 7, "zone": 1, "panier_minimal": 15, "localisation": "SE"},
+    {"ville": "Vaudancourt", "code_postal": "60240", "nombre_habitants": 180, "distance_gisors": 5.69, "temps_gisors": 7, "zone": 1, "panier_minimal": 15, "localisation": "SSO"},
+    {"ville": "Dangu", "code_postal": "27720", "nombre_habitants": 590, "distance_gisors": 6.87, "temps_gisors": 7, "zone": 1, "panier_minimal": 15, "localisation": "SOO"},
+    {"ville": "Éragny-sur-Epte", "code_postal": "60590", "nombre_habitants": 608, "distance_gisors": 3.6, "temps_gisors": 8, "zone": 1, "panier_minimal": 15, "localisation": "N"},
+    {"ville": "Bézu-Saint-Éloi", "code_postal": "27660", "nombre_habitants": 1479, "distance_gisors": 5.89, "temps_gisors": 8, "zone": 1, "panier_minimal": 15, "localisation": "NO"},
+    {"ville": "Neaufles-Saint-Martin", "code_postal": "27830", "nombre_habitants": 1195, "distance_gisors": 4.22, "temps_gisors": 8, "zone": 1, "panier_minimal": 15, "localisation": "NOO"},
+    {"ville": "Boury-en-Vexin", "code_postal": "60240", "nombre_habitants": 337, "distance_gisors": 5.68, "temps_gisors": 8, "zone": 1, "panier_minimal": 15, "localisation": "SO"},
+    {"ville": "Énencourt-Léage", "code_postal": "60590", "nombre_habitants": 139, "distance_gisors": 5.26, "temps_gisors": 9, "zone": 1, "panier_minimal": 15, "localisation": "NE"},
+    {"ville": "Montjavoult", "code_postal": "60240", "nombre_habitants": 463, "distance_gisors": 7.41, "temps_gisors": 9, "zone": 1, "panier_minimal": 15, "localisation": "S"},
+    {"ville": "Montagny-en-Vexin", "code_postal": "60240", "nombre_habitants": 673, "distance_gisors": 9.77, "temps_gisors": 9, "zone": 1, "panier_minimal": 15, "localisation": "S"},
+    {"ville": "Boubiers", "code_postal": "60240", "nombre_habitants": 432, "distance_gisors": 9.39, "temps_gisors": 9, "zone": 1, "panier_minimal": 15, "localisation": "SE"},
+    {"ville": "Bazincourt-sur-Epte", "code_postal": "27140", "nombre_habitants": 757, "distance_gisors": 3.46, "temps_gisors": 10, "zone": 1, "panier_minimal": 15, "localisation": "N"},
+    {"ville": "Jaméricourt", "code_postal": "60240", "nombre_habitants": 316, "distance_gisors": 7.45, "temps_gisors": 10, "zone": 1, "panier_minimal": 15, "localisation": "NE"},
+    {"ville": "Bernouville", "code_postal": "27660", "nombre_habitants": 301, "distance_gisors": 6.38, "temps_gisors": 10, "zone": 1, "panier_minimal": 15, "localisation": "NOO"},
+    {"ville": "Reilly", "code_postal": "60240", "nombre_habitants": 117, "distance_gisors": 6.42, "temps_gisors": 10, "zone": 1, "panier_minimal": 15, "localisation": "SE"},
+    {"ville": "Chaumont-en-Vexin", "code_postal": "60240", "nombre_habitants": 3166, "distance_gisors": 7.81, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SEE"},
+    {"ville": "Villers-sur-Trie", "code_postal": "60590", "nombre_habitants": 330, "distance_gisors": 4.15, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "NNE"},
+    {"ville": "Flavacourt", "code_postal": "60590", "nombre_habitants": 670, "distance_gisors": 6.55, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "NNE"},
+    {"ville": "Boutencourt", "code_postal": "60590", "nombre_habitants": 240, "distance_gisors": 7.02, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "NE"},
+    {"ville": "Parnes", "code_postal": "60240", "nombre_habitants": 349, "distance_gisors": 9.28, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SSO"},
+    {"ville": "Hadancourt-le-Haut-Clocher", "code_postal": "60240", "nombre_habitants": 363, "distance_gisors": 12.12, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SE"},
+    {"ville": "Lierville", "code_postal": "60240", "nombre_habitants": 241, "distance_gisors": 12.77, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SE"},
+    {"ville": "Noyers", "code_postal": "27720", "nombre_habitants": 267, "distance_gisors": 8.42, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SOO"},
+    {"ville": "Guerny", "code_postal": "27720", "nombre_habitants": 171, "distance_gisors": 9.9, "temps_gisors": 11, "zone": 2, "panier_minimal": 25, "localisation": "SO"},
+    {"ville": "Serans", "code_postal": "60240", "nombre_habitants": 229, "distance_gisors": 11.26, "temps_gisors": 12, "zone": 2, "panier_minimal": 25, "localisation": "SSE"},
+    {"ville": "Liancourt-Saint-Pierre", "code_postal": "60240", "nombre_habitants": 572, "distance_gisors": 10.69, "temps_gisors": 13, "zone": 2, "panier_minimal": 25, "localisation": "SEE"},
+    {"ville": "Thibivillers", "code_postal": "60240", "nombre_habitants": 186, "distance_gisors": 8.92, "temps_gisors": 13, "zone": 2, "panier_minimal": 25, "localisation": "NEE"},
+    {"ville": "Vesly", "code_postal": "27870", "nombre_habitants": 678, "distance_gisors": 10.38, "temps_gisors": 13, "zone": 2, "panier_minimal": 25, "localisation": "SOO"},
+    {"ville": "Bouconvillers", "code_postal": "60240", "nombre_habitants": 380, "distance_gisors": 14.75, "temps_gisors": 13, "zone": 2, "panier_minimal": 25, "localisation": "SE"},
+    {"ville": "Saint-Clair-sur-Epte", "code_postal": "95770", "nombre_habitants": 981, "distance_gisors": 10.85, "temps_gisors": 13, "zone": 2, "panier_minimal": 25, "localisation": "SO"},
+    {"ville": "Loconville", "code_postal": "60240", "nombre_habitants": 351, "distance_gisors": 10.39, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "SEE"},
+    {"ville": "Tourly", "code_postal": "60240", "nombre_habitants": 178, "distance_gisors": 13.82, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "SEE"},
+    {"ville": "Saint-Denis-le-Ferment", "code_postal": "27140", "nombre_habitants": 498, "distance_gisors": 6.94, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "NNO"},
+    {"ville": "Sérifontaine", "code_postal": "60590", "nombre_habitants": 2867, "distance_gisors": 8.14, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "N"},
+    {"ville": "Le Vaumain", "code_postal": "60590", "nombre_habitants": 356, "distance_gisors": 8.81, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "NE"},
+    {"ville": "Chauvincourt-Provemont", "code_postal": "27150", "nombre_habitants": 355, "distance_gisors": 10.16, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "O"},
+    {"ville": "Buhy", "code_postal": "95770", "nombre_habitants": 320, "distance_gisors": 11.65, "temps_gisors": 14, "zone": 2, "panier_minimal": 25, "localisation": "SO"},
+    {"ville": "Hébécourt", "code_postal": "27150", "nombre_habitants": 579, "distance_gisors": 8.65, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "NNO"},
+    {"ville": "Énencourt-le-Sec", "code_postal": "60240", "nombre_habitants": 197, "distance_gisors": 10.38, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "NEE"},
+    {"ville": "Labosse", "code_postal": "60590", "nombre_habitants": 443, "distance_gisors": 11.2, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "NE"},
+    {"ville": "Porcheux", "code_postal": "60390", "nombre_habitants": 510, "distance_gisors": 11.78, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "NE"},
+    {"ville": "Gamaches-en-Vexin", "code_postal": "27150", "nombre_habitants": 316, "distance_gisors": 11.96, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "O"},
+    {"ville": "La Chapelle-en-Vexin", "code_postal": "95420", "nombre_habitants": 331, "distance_gisors": 11.31, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "SSO"},
+    {"ville": "Château-sur-Epte", "code_postal": "27420", "nombre_habitants": 615, "distance_gisors": 12.63, "temps_gisors": 15, "zone": 3, "panier_minimal": 35, "localisation": "SO"},
+    {"ville": "La Houssoye", "code_postal": "60390", "nombre_habitants": 613, "distance_gisors": 14.27, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "NE"},
+    {"ville": "Heudicourt", "code_postal": "27860", "nombre_habitants": 641, "distance_gisors": 10.71, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "O"},
+    {"ville": "Étrépagny", "code_postal": "27150", "nombre_habitants": 3911, "distance_gisors": 12.54, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "NOO"},
+    {"ville": "Authevernes", "code_postal": "27420", "nombre_habitants": 382, "distance_gisors": 12.51, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SO"},
+    {"ville": "Les Thilliers-en-Vexin", "code_postal": "27420", "nombre_habitants": 469, "distance_gisors": 13.42, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SOO"},
+    {"ville": "Saint-Gervais", "code_postal": "95420", "nombre_habitants": 954, "distance_gisors": 12.55, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "S"},
+    {"ville": "Lavilletertre", "code_postal": "60240", "nombre_habitants": 514, "distance_gisors": 14.49, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SE"},
+    {"ville": "Nucourt", "code_postal": "95420", "nombre_habitants": 726, "distance_gisors": 14.66, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SSE"},
+    {"ville": "Le Bellay-en-Vexin", "code_postal": "95750", "nombre_habitants": 246, "distance_gisors": 16.39, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SSE"},
+    {"ville": "Chars", "code_postal": "95750", "nombre_habitants": 2081, "distance_gisors": 17.85, "temps_gisors": 16, "zone": 3, "panier_minimal": 35, "localisation": "SE"},
+    {"ville": "Boissy-le-Bois", "code_postal": "60240", "nombre_habitants": 194, "distance_gisors": 11.65, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "E"},
+    {"ville": "Fleury", "code_postal": "60240", "nombre_habitants": 535, "distance_gisors": 14.46, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "SEE"},
+    {"ville": "Hardivillers-en-Vexin", "code_postal": "60240", "nombre_habitants": 135, "distance_gisors": 11.68, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "NEE"},
+    {"ville": "Magny-en-Vexin", "code_postal": "95420", "nombre_habitants": 5574, "distance_gisors": 13.55, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "S"},
+    {"ville": "Commeny", "code_postal": "95450", "nombre_habitants": 430, "distance_gisors": 19.02, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "SSE"},
+    {"ville": "Villers-en-Vexin", "code_postal": "27420", "nombre_habitants": 307, "distance_gisors": 14.22, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "O"},
+    {"ville": "Montreuil-sur-Epte", "code_postal": "95770", "nombre_habitants": 431, "distance_gisors": 13.75, "temps_gisors": 17, "zone": 3, "panier_minimal": 35, "localisation": "SO"}
+]
+
+
+        for ville_data in villes_data:
+            VilleDesservie.objects.create(
+                code_postal=ville_data["code_postal"],
+                ville=ville_data["ville"],
+                nombre_habitants=ville_data["nombre_habitants"],
+                distance_gisors=ville_data["distance_gisors"],
+                temps_gisors=ville_data["temps_gisors"],
+                zone=ville_data["zone"],
+                panier_minimal=ville_data["panier_minimal"],
+                localisation=ville_data["localisation"],
+            )
+        
+        self.stdout.write(self.style.SUCCESS('Données des villes ajoutées avec succès !'))

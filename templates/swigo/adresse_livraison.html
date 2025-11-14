@@ -1,0 +1,657 @@
+{% extends 'swigo/elements/layouts/layout.html' %}
+{% load static %}
+
+{% block additional_css %}
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    main {
+        flex: 1;
+    }
+
+    .banner {
+        background-color: white;
+        padding: 40px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .banner-side-img img {
+        max-height: 150px;
+        height: auto;
+        width: auto;
+    }
+
+    .banner-center {
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    .icon-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        font-size: 32px;
+        color: #4CAF50;
+
+    }
+
+    .form-control {
+        width: 100%;
+    }
+
+    .search-bx .input-group #id_adresse_livraison {
+        background-color: aliceblue !important;
+    }
+
+    #id_adresse_livraison {
+        font-family: inherit !important;
+        font-weight: 300 !important;
+        font-size: 14px !important;
+    }
+
+    #id_adresse_livraison::placeholder {
+        font-family: inherit !important;
+        font-weight: 300 !important;
+        font-size: 14px !important;
+    }
+
+    .btn-outline-success {
+        font-weight: 300 !important;
+    }
+
+    .btn-link {
+        cursor: pointer;
+    }
+
+    .alert {
+        margin-top: 20px;
+    }
+
+    .modal-dialog.modal-delivery-estimate {
+        margin: 1.75rem auto;
+        max-width: 320px;
+        width: 90%;
+    }
+
+    .modal-dialog.modal-delivery-estimate .modal-content {
+        max-width: 360px;
+        width: 100%;
+        font-size: 14px;
+        padding: 20px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        margin: auto;
+        text-align: center;
+    }
+
+    .modal-delivery-estimate .modal-title {
+        font-size: 16px;
+    }
+
+    .modal-delivery-estimate .btn {
+        font-size: 12px;
+        padding: 6px 10px;
+        white-space: nowrap;
+    }
+
+    .modal-options {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-options .btn {
+        font-size: 12px;
+        padding: 6px 8px;
+        text-align: center;
+    }
+
+    #deliveryEstimateMessage {
+        font-family: inherit !important;
+        font-weight: 300 !important;
+        font-size: 20px !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .hide-on-small {
+            display: none !important;
+        }
+    }
+
+    .container.d-flex {
+        align-items: stretch !important;
+        min-height: 500px;
+    }
+
+    .input-group.same-height {
+    align-items: stretch;
+}
+.input-group.same-height .form-control {
+    flex: 2 1 0%;
+    min-width: 0;
+}
+.input-group.same-height .input-group-append {
+    flex: 0 0 auto;
+}
+.input-group.same-height .btn {
+    min-width: 60px;   /* Largeur minimale très réduite */
+    max-width: 90px;   /* Largeur maximale pour éviter l’étirement */
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+    font-size: 15px;
+    white-space: nowrap; /* Pour ne jamais couper le texte */
+}
+
+/* Bloc images food mobile (visible uniquement < 768px) */
+.visuels-food-mobile {
+    margin-top: 0 !important;
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+}
+.img-food-mobile {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(60,60,60,0.11);
+    border: 2px solid #e6e6e6;
+}
+@media (min-width: 900px) {
+    .img-food-mobile {
+        width: 130px;
+        height: 130px;
+    }
+}
+
+/* Responsive visibility */
+@media (min-width: 768px) {
+    .visuels-food-mobile { display: none !important; }
+    .image-col.hide-on-small { display: flex !important; flex-direction: column !important; }
+}
+@media (max-width: 767.98px) {
+    .visuels-food-mobile { display: flex !important; }
+    .image-col.hide-on-small { display: none !important; }
+}
+
+.icon-row i {
+    transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+    cursor: pointer;
+}
+.icon-row i:hover {
+    animation: shake 0.65s;
+    color: var(--primary, #7DA640);
+}
+
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+
+
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="banner">
+    <div class="banner-center">
+        {% if message_fermeture %}
+            <div class="alert alert-warning mt-3" style="font-weight: 400; font-size: 14px;">
+                {{ message_fermeture }}
+            </div>
+        {% endif %}
+        <img src="{% static 'assets/images/logo-erc-noir1.png' %}" alt="En Route Chef" style="max-height: 90px; width: auto;">
+        <div class="icon-row">
+            <i class="flaticon-burger"></i>
+            <i class="flaticon-salade"></i>
+            <i class="flaticon-tajine-1"></i>
+            <i class="flaticon-poulet-frit"></i>
+        </div>
+    </div>
+</section>
+
+<main>
+    <section class="content-inner" style="padding: 20px 0; background-color: #f9f9f9;">
+        <div class="container d-flex flex-wrap flex-md-nowrap justify-content-center" style="gap: 20px;">
+          <!-- Colonne gauche : cheffe (desktop uniquement) -->
+          <div class="image-col text-center hide-on-small"
+            style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <img src="{% static 'assets/images/cheffe.png' %}" alt="Cheffe"
+              style="max-height: 500px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+              onmouseover="this.style.transform='scale(1.02)'"
+              onmouseout="this.style.transform='scale(1)'">
+          </div>
+      
+          <!-- Colonne centrale : texte + formulaire -->
+          <div class="content-col d-flex flex-column align-items-center justify-content-center text-center"
+            style="flex: 2; padding: 20px; max-width: 480px; width: 100%;">
+            <div class="search-description mb-4">
+              <h2 style="font-weight: 300;">
+                Bienvenue chez <span style="color: #28a745; font-weight: 400;">En Route Chef!</span>
+              </h2>
+              <p style="font-family: inherit; font-weight: 300; font-size: 14px;">
+                Commandez des plats savoureux préparés par nos chefs et livrés directement à votre porte.<br>
+                Découvrez une expérience gastronomique unique, simple et rapide.
+              </p>
+            </div>
+            <div class="search-form" style="width: 100%;">
+              <div class="widget search-bx text-start">
+                <div class="widget-title">
+                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
+                </div>
+                <form id="addressForm" method="post">
+                  {% csrf_token %}
+                  {% if form.errors %}
+                  <div class="alert alert-danger">
+                    {% for field in form %}
+                      {% for error in field.errors %}
+                        <p>{{ error }}</p>
+                      {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                      <p>{{ error }}</p>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                  <div class="input-group same-height">
+                    <input
+                      id="id_adresse_livraison"
+                      name="adresse_livraison"
+                      class="form-control"
+                      type="text"
+                      placeholder="Entrez l'adresse de livraison..."
+                      value="{{ form.adresse_livraison.value|default_if_none:'' }}"
+                      style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
+                      autocomplete="off"
+                    >
+                    <button type="submit"
+                      class="btn btn-outline-success"
+                      style="font-family: inherit; font-weight: 300; border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 2px 6px;">
+                      <img src="{% static 'assets/images/valid.png' %}" alt="OK" style="height: 40px; width: auto; display: block; margin: 0 auto;">
+                    </button>
+                  </div>
+                  <div style="margin-top: 0; text-align: center;">
+                    <button type="button" class="btn btn-link p-0" onclick="utiliserMaPosition()">
+                      📍 Utiliser ma position actuelle
+                    </button>
+                  </div>
+                  <input type="hidden" id="code_postal" name="code_postal" value="{{ form.code_postal.value }}">
+                  <input type="hidden" id="ville" name="ville" value="{{ form.ville.value }}">
+                  <input type="hidden" id="latitude" name="latitude">
+                  <input type="hidden" id="longitude" name="longitude">
+                  <input type="hidden" id="zone" name="zone">
+                </form>
+              </div>
+            </div>
+            <!-- Images food mobile uniquement (jamais desktop) -->
+            <div class="visuels-food-mobile d-md-none">
+              <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke Bowl" class="img-food-mobile">
+              <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger" class="img-food-mobile">
+            </div>
+          </div>
+      
+          <!-- Colonne droite : images food (desktop/tablette/paysage uniquement) -->
+          <div class="image-col text-center hide-on-small"
+            style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke"
+              style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+              onmouseover="this.style.transform='scale(1.05)'"
+              onmouseout="this.style.transform='scale(1)'">
+            <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger"
+              style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+              onmouseover="this.style.transform='scale(1.05)'"
+              onmouseout="this.style.transform='scale(1)'">
+          </div>
+        </div>
+      </section>
+      
+
+    <!-- MODALE -->
+    <div class="modal fade" id="deliveryEstimateModal" tabindex="-1" aria-labelledby="deliveryEstimateLabel" aria-hidden="true">
+        <div class="modal-dialog modal-delivery-estimate">
+            <div class="modal-content">
+                <h5 class="modal-title" id="deliveryEstimateLabel">Estimation de Livraison</h5>
+                <div class="modal-body">
+                    <p id="deliveryEstimateMessage">Chargement...</p>
+                    <input type="hidden" id="premiereDate">
+                    <input type="hidden" id="premiereHeure">
+                    <div class="modal-options" id="modalOptions">
+                        <button id="acceptNow" class="btn btn-outline-success">
+                            <strong>Livrer au plus tôt</strong>
+                        </button>                        
+                        <button id="scheduleLater" class="btn btn-outline-primary">Planifier plus tard</button>
+                        <button id="pickupOrder" class="btn btn-outline-secondary">Commander à emporter</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block additional_js %}
+<script>
+    function getComponent(place, type) {
+        const component = place.address_components.find(c => c.types.includes(type));
+        return component ? component.long_name : '';
+    }
+    
+    function initAutocomplete() {
+        const adresseInput = document.getElementById('id_adresse_livraison');
+        const autocomplete = new google.maps.places.Autocomplete(adresseInput);
+        autocomplete.addListener('place_changed', function () {
+            const place = autocomplete.getPlace();
+            if (place.geometry) {
+                document.getElementById('latitude').value = place.geometry.location.lat();
+                document.getElementById('longitude').value = place.geometry.location.lng();
+                document.getElementById('code_postal').value = getComponent(place, 'postal_code');
+                document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
+            }
+        });
+    }
+    
+    function utiliserMaPosition() {
+        const btnGeo = document.querySelector("button[onclick='utiliserMaPosition()']");
+        btnGeo.innerHTML = "⏳ Détection en cours...";
+        btnGeo.disabled = true;
+    
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const geocoder = new google.maps.Geocoder();
+                const latlng = { lat, lng };
+    
+                geocoder.geocode({ location: latlng }, function (results, status) {
+                    if (status === "OK" && results[0]) {
+                        document.getElementById("id_adresse_livraison").value = results[0].formatted_address;
+                        document.getElementById("latitude").value = lat;
+                        document.getElementById("longitude").value = lng;
+    
+                        const place = results[0];
+                        const getComp = type => place.address_components.find(c => c.types.includes(type))?.long_name || '';
+                        document.getElementById("code_postal").value = getComp("postal_code");
+                        document.getElementById("ville").value = getComp("locality") || getComp("administrative_area_level_2");
+    
+                        btnGeo.innerHTML = "✅ Position détectée";
+                        btnGeo.classList.remove("btn-link");
+                        btnGeo.classList.add("text-success");
+                    } else {
+                        btnGeo.innerHTML = "❌ Échec de la détection";
+                        btnGeo.classList.add("text-danger");
+                    }
+                });
+            }, function () {
+                btnGeo.innerHTML = "❌ Échec de la détection";
+                btnGeo.classList.add("text-danger");
+            });
+        } else {
+            btnGeo.innerHTML = "❌ Non supporté";
+            btnGeo.classList.add("text-danger");
+        }
+    }
+    
+    function afficherPlageHoraire(premiereHeureStr) {
+    const [heures, minutes] = premiereHeureStr.split(':').map(Number);
+    const milieu = new Date();
+    milieu.setHours(heures, minutes, 0, 0);
+    const debut = new Date(milieu.getTime() - 15 * 60 * 1000);
+    const fin = new Date(milieu.getTime() + 15 * 60 * 1000);
+    const format = date => date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+    return `Livraison au plus tôt estimée entre ${format(debut)} et ${format(fin)}.`;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('deliveryEstimateModal');
+    const msgEl = document.getElementById('deliveryEstimateMessage');
+    const optionsEl = document.getElementById('modalOptions');
+
+    const btnNow = document.getElementById('acceptNow');
+    const btnLater = document.getElementById('scheduleLater');
+    const btnPickup = document.getElementById('pickupOrder');
+
+    // Fonction pour mettre à jour l'état des boutons
+    function setBtnState(btn, disabled, text = null) {
+        if (disabled) {
+            btn.classList.add("disabled", "btn-disabled-state");
+            btn.setAttribute("disabled", "disabled");
+            btn.dataset.forceDisabled = "true";
+            if (text) btn.innerText = text;
+        } else {
+            btn.classList.remove("disabled", "btn-disabled-state");
+            btn.removeAttribute("disabled");
+            btn.dataset.forceDisabled = "false";
+            if (text) btn.innerText = text;
+        }
+    }
+
+    // Fonction pour afficher un message stylisé
+    function showMessage(message, type = 'info') {
+        msgEl.innerText = message;
+        msgEl.classList.remove('text-success', 'text-danger', 'text-warning');
+        
+        switch(type) {
+            case 'success':
+                msgEl.classList.add('text-success');
+                break;
+            case 'error':
+                msgEl.classList.add('text-danger');
+                break;
+            case 'warning':
+                msgEl.classList.add('text-warning');
+                break;
+            default:
+                msgEl.classList.add('text-success');
+        }
+    }
+
+    // Gestion de la soumission du formulaire
+    document.getElementById('addressForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        console.log("🟡 Envoi du formulaire...");
+
+        fetch('{% url "swigo:adresse_livraison" %}', {
+            method: 'POST',
+            body: new FormData(this),
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erreur serveur: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("✅ Réponse reçue:", data);
+            window._erc_last_estimation = data;
+
+            const modal = new bootstrap.Modal(modalEl);
+
+            // ✅ CAS HORS ZONE - Priorité haute
+            if (data.hors_zone === true) {
+                showMessage(data.error, 'warning');
+                
+                setBtnState(btnNow, true, "Livraison indisponible");
+                setBtnState(btnLater, true, "Planifier indisponible");
+                setBtnState(btnPickup, false, "Commander à emporter");
+                
+                // Style spécial pour le cas hors zone
+                btnPickup.classList.remove('btn-outline-secondary');
+                btnPickup.classList.add('btn-outline-success');
+                
+                optionsEl.style.display = 'flex';
+                modal.show();
+                return;
+            }
+
+            // ✅ CAS AVEC ERREUR (mais pas hors zone)
+            if (data.error) {
+                showMessage(data.error, 'error');
+                
+                setBtnState(btnNow, data.disable_livrer_au_plus_tot || false, "Livrer au plus tôt");
+                setBtnState(btnLater, data.disable_planifier || false, "Planifier plus tard");
+                setBtnState(btnPickup, data.disable_emporter || data.pickup_indispo || false, "Commander à emporter");
+                
+                optionsEl.style.display = 'flex';
+                modal.show();
+                return;
+            }
+
+            // ✅ CAS NORMAL - Livraison disponible
+            showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
+            
+            // Stocker les infos de créneau
+            document.getElementById('premiereDate').value = data.premiere_date;
+            document.getElementById('premiereHeure').value = data.premiere_heure;
+
+            // Activer tous les boutons
+            setBtnState(btnNow, false, "Livrer au plus tôt");
+            setBtnState(btnLater, false, "Planifier plus tard");
+            setBtnState(btnPickup, false, "Commander à emporter");
+            
+            // Réinitialiser les styles
+            btnPickup.classList.remove('btn-outline-success');
+            btnPickup.classList.add('btn-outline-secondary');
+
+            optionsEl.style.display = 'flex';
+            modal.show();
+        })
+        .catch(error => {
+            console.error('❌ Erreur:', error);
+            showMessage('Erreur de connexion. Veuillez réessayer.', 'error');
+            setBtnState(btnNow, true, "Erreur");
+            setBtnState(btnLater, true, "Erreur");
+            setBtnState(btnPickup, true, "Erreur");
+            optionsEl.style.display = 'flex';
+            new bootstrap.Modal(modalEl).show();
+        });
+    });
+
+    // Empêcher les clics sur les boutons désactivés
+    ['acceptNow', 'pickupOrder', 'scheduleLater'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('click', function (e) {
+                if (btn.dataset.forceDisabled === "true") {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            }, true);
+        }
+    });
+
+    // Gestion du bouton "Livrer au plus tôt"
+    btnNow.addEventListener('click', function () {
+        const data = window._erc_last_estimation;
+        
+        if (!data?.premiere_date || !data?.premiere_heure) {
+            setBtnState(btnNow, true, "⛔ Créneau indisponible");
+            return;
+        }
+
+        const originalText = btnNow.innerText;
+        setBtnState(btnNow, true, "⏳ Validation...");
+
+        fetch('{% url "swigo:accepter_livraison_asap" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({ 
+                'premiere_date': data.premiere_date, 
+                'premiere_heure': data.premiere_heure 
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.message || result.success) {
+                window.location.href = "{% url 'swigo:renseigner_commande' %}";
+            } else {
+                throw new Error(result.error || 'Erreur inconnue');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erreur validation:', error);
+            setBtnState(btnNow, true, "❌ Erreur");
+            setTimeout(() => {
+                setBtnState(btnNow, false, originalText);
+            }, 2000);
+        });
+    });
+
+    // Gestion du bouton "Planifier plus tard"
+    btnLater.addEventListener('click', function () {
+        window.location.href = "{% url 'swigo:programmer_livraison' %}";
+    });
+
+    // Gestion du bouton "Commander à emporter"
+    btnPickup.addEventListener('click', function () {
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+        
+        // Redirection vers la page de pickup
+        setTimeout(() => {
+            window.location.href = "{% url 'swigo:programmer_pick_up' %}";
+        }, 300);
+    });
+
+    // Fonction pour afficher la plage horaire
+    function afficherPlageHoraire(premiereHeureStr) {
+        if (!premiereHeureStr) return "Horaire non disponible";
+        
+        const [heures, minutes] = premiereHeureStr.split(':').map(Number);
+        const milieu = new Date();
+        milieu.setHours(heures, minutes, 0, 0);
+        const debut = new Date(milieu.getTime() - 15 * 60 * 1000);
+        const fin = new Date(milieu.getTime() + 15 * 60 * 1000);
+        
+        const format = date => 
+            date.getHours().toString().padStart(2, '0') + ':' + 
+            date.getMinutes().toString().padStart(2, '0');
+        
+        return `Livraison au plus tôt estimée entre ${format(debut)} et ${format(fin)}.`;
+    }
+});
+
+
+
+
+
+    
+    function getCookie(name) {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        }
+        return null;
+    }
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChxLP7_um9XUuGA3rHlUPTQuB7SRFuSNk&libraries=places&callback=initAutocomplete" async defer></script>
+
+{% endblock %}

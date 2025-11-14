@@ -1,0 +1,1001 @@
+[
+{
+  "model": "swigo.menu",
+  "pk": 1,
+  "fields": {
+    "nom": "Burger ERC + Accompagnement + Boisson",
+    "description": "Burger ERC avec accompagnement au choix et boisson",
+    "prix_ttc": "12.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 2,
+  "fields": {
+    "nom": "Burger ERC + Accompagnement + Boisson + Cookie",
+    "description": "Burger ERC avec accompagnement, boisson et cookie",
+    "prix_ttc": "14.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 3,
+  "fields": {
+    "nom": "Couscous + Boisson",
+    "description": "Couscous personnalisé avec boisson (Boulette/Poulet/Merguez)",
+    "prix_ttc": "16.30",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 4,
+  "fields": {
+    "nom": "Couscous + Boisson + Corne de Gazelle",
+    "description": "Couscous personnalisé avec boisson et corne de gazelle",
+    "prix_ttc": "18.30",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 5,
+  "fields": {
+    "nom": "Crousty Tenders + Boisson",
+    "description": "Crousty Tenders Original avec boisson",
+    "prix_ttc": "10.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 6,
+  "fields": {
+    "nom": "Crousty Tenders + Boisson + Cookie",
+    "description": "Crousty Tenders Original avec boisson et cookie",
+    "prix_ttc": "12.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 7,
+  "fields": {
+    "nom": "Poulet Frit + Accompagnement + Boisson",
+    "description": "5 Tenders OU 5 Wings frits avec accompagnement et boisson",
+    "prix_ttc": "11.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 8,
+  "fields": {
+    "nom": "Poulet Frit + Accompagnement + Boisson + Cookie",
+    "description": "5 Tenders OU 5 Wings frits avec accompagnement, boisson et cookie",
+    "prix_ttc": "13.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 9,
+  "fields": {
+    "nom": "Poulet Josper + Accompagnement + Boisson",
+    "description": "5 Wings Grillés Josper avec accompagnement et boisson",
+    "prix_ttc": "13.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.menu",
+  "pk": 10,
+  "fields": {
+    "nom": "Poulet Josper + Accompagnement + Boisson + Cookie",
+    "description": "5 Wings Grillés Josper avec accompagnement, boisson et cookie",
+    "prix_ttc": "15.90",
+    "taux_tva": "10.0",
+    "disponible": true,
+    "photo": ""
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 1,
+  "fields": {
+    "menu": 1,
+    "plat": 26,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 2,
+  "fields": {
+    "menu": 2,
+    "plat": 26,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 3,
+  "fields": {
+    "menu": 2,
+    "plat": 112,
+    "salade": false,
+    "couscous": false,
+    "role": "dessert"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 4,
+  "fields": {
+    "menu": 4,
+    "plat": 116,
+    "salade": false,
+    "couscous": false,
+    "role": "dessert"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 5,
+  "fields": {
+    "menu": 5,
+    "plat": 55,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 6,
+  "fields": {
+    "menu": 6,
+    "plat": 55,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 7,
+  "fields": {
+    "menu": 6,
+    "plat": 112,
+    "salade": false,
+    "couscous": false,
+    "role": "dessert"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 8,
+  "fields": {
+    "menu": 8,
+    "plat": 112,
+    "salade": false,
+    "couscous": false,
+    "role": "dessert"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 9,
+  "fields": {
+    "menu": 9,
+    "plat": 87,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 10,
+  "fields": {
+    "menu": 10,
+    "plat": 87,
+    "salade": false,
+    "couscous": false,
+    "role": "plat"
+  }
+},
+{
+  "model": "swigo.composantmenufixe",
+  "pk": 11,
+  "fields": {
+    "menu": 10,
+    "plat": 112,
+    "salade": false,
+    "couscous": false,
+    "role": "dessert"
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 1,
+  "fields": {
+    "menu": 1,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 2,
+  "fields": {
+    "menu": 1,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 3,
+  "fields": {
+    "menu": 2,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 5,
+  "fields": {
+    "menu": 3,
+    "role": "couscous",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": true,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": [
+      7,
+      8,
+      10
+    ]
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 6,
+  "fields": {
+    "menu": 3,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 7,
+  "fields": {
+    "menu": 4,
+    "role": "couscous",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": true,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": [
+      7,
+      8,
+      10
+    ]
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 9,
+  "fields": {
+    "menu": 5,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 11,
+  "fields": {
+    "menu": 7,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      78,
+      79
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 12,
+  "fields": {
+    "menu": 7,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 13,
+  "fields": {
+    "menu": 7,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 14,
+  "fields": {
+    "menu": 8,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      78,
+      79
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 15,
+  "fields": {
+    "menu": 8,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 17,
+  "fields": {
+    "menu": 9,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 18,
+  "fields": {
+    "menu": 9,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 19,
+  "fields": {
+    "menu": 10,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 21,
+  "fields": {
+    "menu": 2,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 22,
+  "fields": {
+    "menu": 2,
+    "role": "dessert",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 23,
+  "fields": {
+    "menu": 6,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 24,
+  "fields": {
+    "menu": 6,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 25,
+  "fields": {
+    "menu": 6,
+    "role": "dessert",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 26,
+  "fields": {
+    "menu": 5,
+    "role": "accompagnement",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      9,
+      35,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 27,
+  "fields": {
+    "menu": 5,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 28,
+  "fields": {
+    "menu": 4,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 29,
+  "fields": {
+    "menu": 4,
+    "role": "dessert",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 30,
+  "fields": {
+    "menu": 8,
+    "role": "dessert",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 31,
+  "fields": {
+    "menu": 8,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 32,
+  "fields": {
+    "menu": 10,
+    "role": "boisson",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      121
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 33,
+  "fields": {
+    "menu": 10,
+    "role": "dessert",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 34,
+  "fields": {
+    "menu": 10,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      39,
+      84,
+      87
+    ],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 35,
+  "fields": {
+    "menu": 1,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 36,
+  "fields": {
+    "menu": 2,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 37,
+  "fields": {
+    "menu": 3,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 38,
+  "fields": {
+    "menu": 4,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [],
+    "viandes_possibles": []
+  }
+},
+{
+  "model": "swigo.choixmenu",
+  "pk": 39,
+  "fields": {
+    "menu": 9,
+    "role": "plat",
+    "autorise_salade_personnalisee": false,
+    "autorise_couscous_personnalise": false,
+    "nombre_viandes_incluses": 1,
+    "nombre_elements_inclus": 1,
+    "plats_possibles": [
+      39,
+      84,
+      87
+    ],
+    "viandes_possibles": []
+  }
+}
+]

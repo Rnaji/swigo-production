@@ -1,0 +1,323 @@
+{% extends "assets/base.html" %}
+{% load static %}
+{% block title %}Commandes Payées{% endblock %}
+
+{% block content %}
+<div class="default-table-area style-two all-products mt-5">
+    <div class="d-flex justify-content-center align-items-center flex-wrap gap-2 mb-4">
+        <h3 class="mb-0 d-flex align-items-center gap-2">
+            <img src="{% static 'assets/flaticon/paiement.png' %}" alt="Icône Paiement" style="width: 64px; height: 64px;">
+            Commandes Payées
+        </h3>
+    </div>
+
+    <div class="mb-3 text-center">
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtreCommandesCollapse" aria-expanded="false" aria-controls="filtreCommandesCollapse">
+            Afficher / Masquer les filtres
+        </button>
+    </div>
+    
+    <div class="collapse mb-4" id="filtreCommandesCollapse" style="max-width:750px; margin:0 auto;">
+        <form id="filtre-commandes-form" class="p-2 floating-form">
+            <div class="row g-3">
+                <!-- Colonne gauche -->
+                <div class="col-12 col-md-6">
+                    <div class="accordion border-0" id="accordionFiltresCol1">
+                        <!-- Date précise -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingDate">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDate" aria-expanded="false" aria-controls="collapseDate">
+                                    Sélectionner une date
+                                </button>
+                            </h2>
+                            <div id="collapseDate" class="accordion-collapse collapse" aria-labelledby="headingDate" data-bs-parent="#accordionFiltresCol1">
+                                <div class="accordion-body py-2">
+                                    <input type="date" id="filter-date" class="form-control form-control-sm floating-input">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- N° Commande -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingId">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapseId" aria-expanded="false" aria-controls="collapseId">
+                                    Sélectionner un n° commande
+                                </button>
+                            </h2>
+                            <div id="collapseId" class="accordion-collapse collapse" aria-labelledby="headingId" data-bs-parent="#accordionFiltresCol1">
+                                <div class="accordion-body py-2">
+                                    <input type="text" id="filter-id" class="form-control form-control-sm floating-input" placeholder="ID">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Nom client -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingNom">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNom" aria-expanded="false" aria-controls="collapseNom">
+                                    Sélectionner le nom du client
+                                </button>
+                            </h2>
+                            <div id="collapseNom" class="accordion-collapse collapse" aria-labelledby="headingNom" data-bs-parent="#accordionFiltresCol1">
+                                <div class="accordion-body py-2">
+                                    <input type="text" id="filter-nom" class="form-control form-control-sm floating-input" placeholder="Nom, prénom…">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Colonne droite -->
+                <div class="col-12 col-md-6">
+                    <div class="accordion border-0" id="accordionFiltresCol2">
+                        <!-- Période -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingPeriode">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePeriode" aria-expanded="false" aria-controls="collapsePeriode">
+                                    Sélectionner une période
+                                </button>
+                            </h2>
+                            <div id="collapsePeriode" class="accordion-collapse collapse" aria-labelledby="headingPeriode" data-bs-parent="#accordionFiltresCol2">
+                                <div class="accordion-body py-2">
+                                    <div class="mb-2">
+                                        <label for="filter-date-start" class="form-label mb-0 small">Du</label>
+                                        <input type="date" id="filter-date-start" class="form-control form-control-sm floating-input">
+                                    </div>
+                                    <div>
+                                        <label for="filter-date-end" class="form-label mb-0 small">Au</label>
+                                        <input type="date" id="filter-date-end" class="form-control form-control-sm floating-input">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Téléphone -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingTel">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTel" aria-expanded="false" aria-controls="collapseTel">
+                                    Sélectionner le téléphone du client
+                                </button>
+                            </h2>
+                            <div id="collapseTel" class="accordion-collapse collapse" aria-labelledby="headingTel" data-bs-parent="#accordionFiltresCol2">
+                                <div class="accordion-body py-2">
+                                    <input type="text" id="filter-tel" class="form-control form-control-sm floating-input" placeholder="Téléphone">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Email -->
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header" id="headingMail">
+                                <button class="accordion-button collapsed py-2 floating-accordion" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMail" aria-expanded="false" aria-controls="collapseMail">
+                                    Sélectionner l'adresse e-mail du client
+                                </button>
+                            </h2>
+                            <div id="collapseMail" class="accordion-collapse collapse" aria-labelledby="headingMail" data-bs-parent="#accordionFiltresCol2">
+                                <div class="accordion-body py-2">
+                                    <input type="text" id="filter-email" class="form-control form-control-sm floating-input" placeholder="Adresse e-mail">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2 justify-content-center mt-3">
+                <button id="btn-filtrer-commandes" type="button" class="btn btn-primary btn-sm">Filtrer</button>
+                <button id="btn-reset-filtre" type="button" class="btn btn-secondary btn-sm">Réinitialiser</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive" style="max-width: 1200px; margin: 0 auto;">
+        <table id="commandes-payees-table" class="table align-middle table-hover table-sm" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Client</th>
+                    <th>Montant</th>
+                    <th>Date Paiement</th>
+                    <th>Mode de Paiement</th>
+                    <th>Facture</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Détails -->
+<div class="modal fade" id="modalDetailsCommande" tabindex="-1" aria-labelledby="modalDetailsLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDetailsLabel">Détails de la Commande</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body" id="modalDetailsContent"></div>
+      <div class="modal-footer">
+        <input type="hidden" id="commande-id-cachee">
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        function chargerCommandes(filters={}) {
+            let apiUrl = "{% url 'swigo:api_commandes_payees' %}";
+            let params = [];
+            if (filters.date) params.push("date=" + filters.date);
+            if (filters.date_start) params.push("date_min=" + filters.date_start);
+            if (filters.date_end) params.push("date_max=" + filters.date_end);
+            if (filters.id) params.push("id=" + filters.id);
+            if (filters.nom) params.push("nom=" + encodeURIComponent(filters.nom));
+            if (filters.tel) params.push("tel=" + encodeURIComponent(filters.tel));
+            if (filters.email) params.push("email=" + encodeURIComponent(filters.email));
+            if (params.length > 0) apiUrl += "?" + params.join("&");
+
+            $.getJSON(apiUrl, function (data) {
+                const tbody = $('#commandes-payees-table tbody');
+                tbody.empty();
+
+                let totalCommandes = 0;
+                let totalMontant = 0;
+
+                if (data.length === 0) {
+                    tbody.append('<tr><td colspan="6" class="text-center">Aucune commande payée</td></tr>');
+                } else {
+                    data.forEach(function (commande) {
+                        const nom = `${commande.client__prenom || ''} ${commande.client__nom || ''}`.trim() || 'N/A';
+                        const montantNum = parseFloat(commande.montant_total || 0);
+                        const montant = montantNum.toFixed(2).replace('.', ',') + ' €';
+                        const datePaiement = commande.date_paiement || 'N/A';
+                        const moyen = commande.moyen_paiement || 'Non renseigné';
+
+                        let factureBtn = '';
+                        if (commande.facture_url) {
+                            factureBtn = `<a href="${commande.facture_url}" class="btn btn-success btn-sm" target="_blank">Voir la facture</a>`;
+                        } else if (commande.generer_facture_url) {
+                            factureBtn = `<a href="${commande.generer_facture_url}" class="btn btn-outline-primary btn-sm" target="_blank">Générer la facture</a>`;
+                        } else {
+                            factureBtn = '<span class="text-muted small">N/A</span>';
+                        }
+
+                        const row = $(`
+                            <tr class="ligne-commande" style="cursor: pointer;">
+                                <td>${commande.id}</td>
+                                <td>${nom}</td>
+                                <td>${montant}</td>
+                                <td>${datePaiement}</td>
+                                <td>${moyen}</td>
+                                <td>${factureBtn}</td>
+                            </tr>
+                        `);
+
+                        row.data('id', commande.id);
+                        row.data('client', nom);
+                        row.data('telephone', commande.client__numero_telephone);
+                        row.data('details', commande.details);
+
+                        tbody.append(row);
+
+                        totalCommandes++;
+                        totalMontant += montantNum;
+                    });
+                }
+                // Ligne de total en bas du tableau
+                const totalRow = $(`
+                    <tr style="font-weight: bold; background: #f4f6fa;">
+                        <td colspan="2" class="text-end">Total</td>
+                        <td>${totalMontant.toFixed(2).replace('.', ',')} €</td>
+                        <td colspan="3">Nb: ${totalCommandes}</td>
+                    </tr>
+                `);
+                tbody.append(totalRow);
+            });
+        }
+
+        $('#btn-filtrer-commandes').on('click', function () {
+            const date_start = $('#filter-date-start').val();
+            const date_end = $('#filter-date-end').val();
+            const date = $('#filter-date').val();
+            let filters = {
+                id: $('#filter-id').val(),
+                nom: $('#filter-nom').val(),
+                tel: $('#filter-tel').val(),
+                email: $('#filter-email').val()
+            };
+            if (date_start && date_end) {
+                filters.date_start = date_start;
+                filters.date_end = date_end;
+            } else if (date) {
+                filters.date = date;
+            }
+            chargerCommandes(filters);
+        });
+
+        $('#btn-reset-filtre').on('click', function () {
+            $('#filtre-commandes-form input').val('');
+            $('#commandes-payees-table tbody').empty();
+        });
+
+        $(document).on('click', '.ligne-commande', function () {
+            const id = $(this).data('id');
+            const client = $(this).data('client');
+            const telephone = $(this).data('telephone');
+            let details = $(this).data('details');
+            $('#commande-id-cachee').val(id);
+
+            let html = `<p><strong>Client :</strong> ${client}</p>`;
+            html += `<p><strong>Téléphone :</strong> ${telephone}</p>`;
+            html += `<p><strong>Articles :</strong></p><ul>`;
+            if (!Array.isArray(details)) details = [];
+            if (details.length > 0) {
+                details.forEach(item => {
+                    html += `<li>${item.quantite} x ${item.plat_nom}</li>`;
+                });
+            } else {
+                html += '<li>Aucun détail disponible</li>';
+            }
+            html += '</ul>';
+            $('#modalDetailsContent').html(html);
+            $('#modalDetailsCommande').modal('show');
+        });
+
+        // Chargement initial
+        chargerCommandes();
+    });
+</script>
+
+<style>
+/* Champs flottants sans fond */
+.floating-input {
+    background: transparent !important;
+    border: 1px solid #c8c8c8;
+    border-radius: 8px;
+    box-shadow: none;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.floating-input:focus {
+    border-color: #007bff;
+    background: transparent !important;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.05);
+}
+.floating-accordion,
+.accordion-button.floating-accordion {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-weight: 500;
+    color: #343a40;
+    padding-left: 0.75rem;
+}
+.accordion-body {
+    background: transparent !important;
+    border: none !important;
+}
+.floating-form {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0;
+    padding: 0 !important;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,46 @@
+# Environnements virtuels
+env/
+venv/
+.venv/
+
+# Base de données
+*.sqlite3
+db.sqlite3
+
+# Fichiers de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de log
+*.log
+debug.log
+logs/
+
+# Fichiers sensibles
+.env
+.env.production
+.envx
+
+# Fichiers temporaires et backups
+*.tar.gz
+nohup.out
+backup_*
+*_backup.*
+*_dump.json
+*_prod_*.json
+*_data.json
+*_final.json
+*_clean.json
+
+# Node modules
+node_modules/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers spécifiques au projet
+production_explorer/
+quit.
+0

@@ -1,0 +1,212 @@
+{% extends "assets/base.html" %}
+{% load static %}
+{% block title %}Commandes à Payer{% endblock %}
+
+{% block content %}
+<div class="default-table-area style-two all-products mt-5">
+    <div class="d-flex justify-content-center align-items-center flex-wrap gap-2 mb-4">
+        <h3 class="mb-0 d-flex align-items-center gap-2">
+            <img src="{% static 'assets/flaticon/paiement.png' %}" alt="Icône Paiement" style="width: 64px; height: 64px;">
+            Commandes à Payer
+        </h3>
+    </div>
+
+    <div class="table-responsive" style="max-width: 1200px; margin: 0 auto;">
+        <table id="commandes-a-payer-table" class="table align-middle table-hover table-sm" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Client</th>
+                    <th>Montant</th>
+                    <th>Statut</th>
+                    <th>Mode de Paiement</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Détails -->
+<div class="modal fade" id="modalDetailsCommande" tabindex="-1" aria-labelledby="modalDetailsLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDetailsLabel">Détails de la Commande</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body" id="modalDetailsContent"></div>
+      <div class="modal-footer">
+        <input type="hidden" id="commande-id-cachee">
+        <button type="button" class="btn btn-success" id="ouvrirPaiementBtn">Enregistrer un Paiement</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Paiement -->
+<div class="modal fade" id="modalPaiement" tabindex="-1" aria-labelledby="modalPaiementLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="paiement-form">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalPaiementLabel">Type de Paiement</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="commande-id-paiement">
+          <div class="mb-3">
+            <label for="paiement-type" class="form-label">Type de paiement</label>
+            <select id="paiement-type" class="form-select">
+              <option value="">-- Sélectionner --</option>
+              <option value="stripe">Stripe (en ligne)</option>
+              <option value="especes_livraison">Espèces à la livraison</option>
+              <option value="ticket_livraison">Ticket resto à la livraison</option>
+              <option value="especes_retrait">Espèces au retrait</option>
+              <option value="ticket_retrait">Ticket resto au retrait</option>
+              <option value="mixte">Mixte (plusieurs paiements)</option>
+            </select>
+          </div>
+          <div id="paiement-mixte-section" style="display: none;">
+            <label class="form-label">Montants par type</label>
+            <input type="number" class="form-control mb-2" step="0.01" placeholder="Espèces" id="montant-especes">
+            <input type="number" class="form-control mb-2" step="0.01" placeholder="Ticket resto" id="montant-ticket">
+            <input type="number" class="form-control mb-2" step="0.01" placeholder="Stripe (CB en ligne)" id="montant-stripe">
+          </div>
+          <div id="paiement-error-message" class="alert alert-danger mt-3" style="display:none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Valider le Paiement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function () {
+    const apiUrl = "{% url 'swigo:api_commandes_a_payer' %}";
+
+    $.getJSON(apiUrl, function (data) {
+        const tbody = $('#commandes-a-payer-table tbody');
+        tbody.empty();
+
+        if (data.length === 0) {
+            tbody.append('<tr><td colspan="5" class="text-center">Aucune commande à payer</td></tr>');
+            return;
+        }
+
+        data.forEach(function (commande) {
+            const nom = `${commande.client__prenom || ''} ${commande.client__nom || ''}`.trim() || 'N/A';
+            const montant = parseFloat(commande.montant_total || 0).toFixed(2).replace('.', ',') + ' €';
+            const statut = commande.statut || 'En attente';
+            const moyen = commande.moyen_paiement || 'Non renseigné';
+
+            const row = $(`
+    <tr class="ligne-commande"
+        style="cursor: pointer;">
+        <td>${commande.id}</td>
+        <td>${nom}</td>
+        <td>${montant}</td>
+        <td>${statut}</td>
+        <td>${moyen}</td>
+    </tr>
+`);
+
+row.data('id', commande.id);
+row.data('client', nom);
+row.data('telephone', commande.client__numero_telephone);
+row.data('details', commande.details);
+
+tbody.append(row);
+
+        });
+    });
+
+    // Afficher détails commande
+    $(document).on('click', '.ligne-commande', function () {
+    const id = $(this).data('id');
+    const client = $(this).data('client');
+    const telephone = $(this).data('telephone');
+    let details = $(this).data('details');
+
+    $('#commande-id-cachee').val(id);
+
+    let html = `<p><strong>Client :</strong> ${client}</p>`;
+    html += `<p><strong>Téléphone :</strong> ${telephone}</p>`;
+    html += `<p><strong>Articles :</strong></p><ul>`;
+
+    if (!Array.isArray(details)) {
+        details = [];
+    }
+
+    if (details.length > 0) {
+        details.forEach(item => {
+            html += `<li>${item.quantite} x ${item.plat_nom}</li>`;
+        });
+    } else {
+        html += '<li>Aucun détail disponible</li>';
+    }
+
+    html += '</ul>';
+    $('#modalDetailsContent').html(html);
+    $('#modalDetailsCommande').modal('show');
+});
+
+
+    // Ouvrir modal de paiement
+    $('#ouvrirPaiementBtn').on('click', function () {
+        const id = $('#commande-id-cachee').val();
+        $('#commande-id-paiement').val(id);
+        $('#paiement-type').val('');
+        $('#paiement-mixte-section').hide();
+        $('#paiement-error-message').hide();
+        $('#modalDetailsCommande').modal('hide');
+        $('#modalPaiement').modal('show');
+    });
+
+    // Afficher champs mixte
+    $('#paiement-type').on('change', function () {
+        $('#paiement-mixte-section').toggle(this.value === 'mixte');
+    });
+
+    // Valider paiement
+    $('#paiement-form').on('submit', function (e) {
+        e.preventDefault();
+
+        const data = {
+            commande_id: $('#commande-id-paiement').val(),
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        };
+
+        const type = $('#paiement-type').val();
+        if (!type) {
+            $('#paiement-error-message').text('Veuillez sélectionner un type de paiement.').show();
+            return;
+        }
+
+        if (type === 'mixte') {
+            data.mixte = true;
+            data.montant_especes = $('#montant-especes').val();
+            data.montant_ticket = $('#montant-ticket').val();
+            data.montant_stripe = $('#montant-stripe').val();
+        } else {
+            data.moyen_paiement = type;
+        }
+
+        $.post("{% url 'swigo:enregistrer_paiement' %}", data)
+            .done(() => {
+                alert('✅ Paiement enregistré');
+                $('#modalPaiement').modal('hide');
+                location.reload();
+            })
+            .fail(xhr => {
+                const msg = xhr.responseJSON?.error || 'Erreur inconnue';
+                $('#paiement-error-message').text("❌ " + msg).show();
+            });
+    });
+});
+</script>
+{% endblock %}

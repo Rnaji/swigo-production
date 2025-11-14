@@ -1,0 +1,281 @@
+{% extends 'assets/base.html' %}
+{% load static %}
+
+{% block title %}Détail de la Tournée {{ tournee.nom }}{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <img src="{% static 'assets/flaticon/tour.png' %}" alt="Icône Tournée" style="width: 96px; height: 96px;">
+    <h3>{{ tournee.nom }}</h3>
+</div>
+<p>
+    <img src="{% static 'assets/flaticon/drapeau-a-damier.png' %}" alt="Départ" style="width: 24px; height: 24px; vertical-align: middle;">
+    <strong>Départ :</strong> {{ tournee.heure_depart|default:"Non spécifiée" }}
+</p>
+<ul class="commandes-list">
+    <li class="fixed-item" style="font-weight: bold;">
+        Départ - En Route Chef!
+    </li>
+
+    {% for commande in commandes %}
+        <li id="commande-{{ commande.commande_id }}" 
+            class="commande-item" 
+            style="cursor: pointer;" 
+            onclick="ouvrirModalCommande(
+                '{{ commande.commande_id }}',
+                '{{ commande.latitude }}',
+                '{{ commande.longitude }}',
+                '{{ commande.telephone }}',
+                '{{ commande.heure_passage }}',
+                '{{ commande.has_message_for_livreur }}',
+                '{{ commande.message_pour_livreur|escapejs }}',
+                '{{ commande.paiement_a_recevoir }}',
+                '{{ commande.montant }}',
+                '{{ commande.mode_paiement }}')">
+            
+            {% if commande.is_delivered %}
+                <span class="text-success">&#10004;</span>
+            {% endif %}
+            
+            <strong>Commande #{{ commande.commande_id }}</strong> - 
+            {{ commande.adresse }},
+            <span class="trajet-duree"></span>
+        </li>
+    {% empty %}
+        <li>Aucune commande associée à cette tournée.</li>
+    {% endfor %}
+
+    <li class="fixed-item" style="font-weight: bold; cursor: pointer;" onclick="ouvrirModalArrivee()">
+        Arrivée - En Route Chef!
+    </li>
+</ul>
+
+
+<!-- Modal de commande avec les icônes d'actions -->
+<div class="modal fade" id="commandeModal" tabindex="-1" aria-labelledby="commandeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="commandeModalLabel">Commande #</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Icônes d'actions en tant que boutons -->
+                <div class="action-icons d-flex justify-content-around mt-3">
+                    <button type="button" class="btn btn-outline-secondary" onclick="envoyerSMS()" id="smsButton">
+                        <img src="{% static 'assets/flaticon/039-messages.png' %}" alt="SMS" style="width: 24px; height: 24px;"> SMS
+                    </button>
+                    <button id="gpsButton" type="button" class="btn btn-outline-secondary">
+                        <img src="{% static 'assets/flaticon/waze.png' %}" alt="GPS" style="width: 24px; height: 24px;"> GPS
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="appelerTelephone()">
+                        <img src="{% static 'assets/flaticon/038-appel-telephonique.png' %}" alt="Appeler" style="width: 24px; height: 24px;"> CALL
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-success" id="livraisonButton" onclick="ouvrirModalConfirmation()">
+                    Livrée ✅
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation pour marquer la commande comme livrée -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmationModalLabel">Confirmer la Livraison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Êtes-vous sûr de vouloir marquer cette commande comme livrée ?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-success" onclick="confirmerLivraison()">
+                    Livrée ✅
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentCommandeId;
+
+function ouvrirModalCommande(
+    id,
+    latitude,
+    longitude,
+    numeroTelephone,
+    heurePassage,
+    hasMessage,
+    messagePourLivreur,
+    paiementARecevoir,
+    montant,
+    modePaiement
+) {
+    console.log("paiementARecevoir =", paiementARecevoir);
+    currentCommandeId = id;
+
+    // Mettre à jour le titre de la modal
+    const modalLabel = document.getElementById('commandeModalLabel');
+    modalLabel.textContent = `Commande #${id}`;
+
+    // Configurer le bouton SMS
+    const smsButton = document.getElementById('smsButton');
+    if (smsButton) {
+        smsButton.onclick = () => envoyerSMS(heurePassage);
+    }
+
+    // Configurer le bouton GPS
+    const gpsButton = document.getElementById('gpsButton');
+    if (gpsButton) {
+        gpsButton.onclick = () => ouvrirGPS(latitude, longitude);
+    }
+
+    // Configurer le bouton d'appel
+    const callButton = document.querySelector('button[onclick^="appelerTelephone"]');
+    if (callButton) {
+        callButton.onclick = () => appelerTelephone(numeroTelephone);
+    }
+
+    const modalFooter = document.querySelector('#commandeModal .modal-footer');
+
+    // Nettoyer les anciens boutons si présents
+    const existingMessageButton = document.getElementById('messageLivreurButton');
+    if (existingMessageButton) existingMessageButton.remove();
+
+    const existingPaiementButton = document.getElementById('paiementButton');
+    if (existingPaiementButton) existingPaiementButton.remove();
+
+    // Bouton "Message pour le livreur"
+    if (hasMessage === 'true' || hasMessage === true) {
+        const messageButton = document.createElement('button');
+        messageButton.type = 'button';
+        messageButton.className = 'btn btn-warning';
+        messageButton.id = 'messageLivreurButton';
+        messageButton.textContent = 'Message 💬';
+        messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur);
+
+        const fermerButton = modalFooter.querySelector('button.btn-danger');
+        modalFooter.insertBefore(messageButton, fermerButton);
+    }
+
+    // Bouton "Paiement à recevoir"
+    if (paiementARecevoir === 'true') {
+        const paiementButton = document.createElement('button');
+        paiementButton.type = 'button';
+        paiementButton.className = 'btn btn-outline-danger';
+        paiementButton.id = 'paiementButton';
+        paiementButton.textContent = 'Paiement 💸';
+        paiementButton.onclick = () => {
+            const mode = modePaiement || 'non précisé';
+            alert(`Le livreur doit récupérer un paiement de ${montant} € (${mode}).`);
+        };
+
+        const fermerButton = modalFooter.querySelector('button.btn-danger');
+        modalFooter.insertBefore(paiementButton, fermerButton);
+    }
+
+    // Afficher la modal
+    const commandeModal = new bootstrap.Modal(document.getElementById('commandeModal'));
+    commandeModal.show();
+}
+
+
+
+
+    function ouvrirModalConfirmation() {
+        const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+        confirmationModal.show();
+    }
+
+    function confirmerLivraison() {
+        const confirmationModal = bootstrap.Modal.getInstance(document.getElementById('confirmationModal'));
+        confirmationModal.hide();
+
+        const commandeModal = bootstrap.Modal.getInstance(document.getElementById('commandeModal'));
+        commandeModal.hide();
+
+        $.ajax({
+            url: `/api/commande/${currentCommandeId}/set-delivered/`,
+            type: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            success: function() {
+                ajouterTickVert(currentCommandeId);
+            },
+            error: function() {
+                console.error("Erreur lors de la validation de la livraison.");
+            }
+        });
+    }
+
+    function ajouterTickVert(commandeId) {
+        const commandeItem = document.querySelector(`#commande-${commandeId}`);
+        if (commandeItem) {
+            commandeItem.innerHTML = `<span class="text-success">&#10004;</span> ` + commandeItem.innerHTML;
+        }
+    }
+
+    function appelerTelephone(numeroTelephone) {
+        window.location.href = `tel:${numeroTelephone}`;
+    }
+
+    function ouvrirGPS(latitude, longitude) {
+        if (typeof latitude === 'string') {
+            latitude = latitude.replace(',', '.');
+        }
+        if (typeof longitude === 'string') {
+            longitude = longitude.replace(',', '.');
+        }
+
+        const wazeUrl = `https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`;
+        window.open(wazeUrl, '_blank');
+    }
+
+    function envoyerSMS(heurePassage) {
+        const message = `Votre livreur a pris la route, vous devriez être livré à ${heurePassage}. Merci pour votre patience et votre confiance. L'équipe de En Route Chef!`;
+        alert(message);  // Afficher le message simulé
+        console.log("SMS simulé :", message);
+    }
+
+    function ouvrirModalArrivee() {
+        currentCommandeId = null;
+
+        const modalLabel = document.getElementById('commandeModalLabel');
+        modalLabel.textContent = "Arrivée - En Route Chef!";
+
+        const boutonSMS = document.getElementById('smsButton');
+        if (boutonSMS) {
+            boutonSMS.style.display = 'none';
+        }
+
+        const livraisonButton = document.getElementById('livraisonButton');
+        if (livraisonButton) {
+            livraisonButton.style.display = 'none';
+        }
+
+        const latitude = 49.27153667708692;
+        const longitude = 1.7812730971414836;
+        const gpsButton = document.getElementById('gpsButton');
+        gpsButton.onclick = () => ouvrirGPS(latitude, longitude);
+
+        const numeroTelephone = '0695599859';
+        const callButton = document.querySelector('button[onclick="appelerTelephone()"]');
+        callButton.onclick = () => appelerTelephone(numeroTelephone);
+
+        const commandeModal = new bootstrap.Modal(document.getElementById('commandeModal'));
+        commandeModal.show();
+    }
+
+    function afficherMessageLivreur(message) {
+    // Afficher le message dans une alerte ou une modal
+    alert(`Message pour le livreur:\n\n${message}`);
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,119 @@
+/*!
+*    ______ _       _   _
+*    |  ____| |     | | (_)
+*    | |__  | | __ _| |_ _  ___ ___  _ __
+*    |  __| | |/ _` | __| |/ __/ _ \| '_ \
+*    | |    | | (_| | |_| | (_| (_) | | | |
+*    |_|    |_|\__,_|\__|_|\___\___/|_| |_|
+*
+*         https://www.flaticon.com
+*/
+
+@font-face {
+    font-family: "flaticon_mycollection";
+    src: url("./flaticon_mycollection.woff2?0bc462aa9168f05f320789c28871ed6a") format("woff2"),
+url("./flaticon_mycollection.woff?0bc462aa9168f05f320789c28871ed6a") format("woff"),
+url("./flaticon_mycollection.eot?0bc462aa9168f05f320789c28871ed6a#iefix") format("embedded-opentype"),
+url("./flaticon_mycollection.ttf?0bc462aa9168f05f320789c28871ed6a") format("truetype"),
+url("./flaticon_mycollection.svg?0bc462aa9168f05f320789c28871ed6a#flaticon_mycollection") format("svg")
+}
+
+i[class^="flaticon-"]:before, i[class*=" flaticon-"]:before {
+    font-family: flaticon_mycollection !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.flaticon-boisson-non-alcoolisee:before {
+    content: "\f101";
+}
+.flaticon-menu:before {
+    content: "\f102";
+}
+.flaticon-burger:before {
+    content: "\f103";
+}
+.flaticon-sushi:before {
+    content: "\f104";
+}
+.flaticon-rouleau-de-sushi:before {
+    content: "\f105";
+}
+.flaticon-sushi-1:before {
+    content: "\f106";
+}
+.flaticon-dessert:before {
+    content: "\f107";
+}
+.flaticon-dessert-1:before {
+    content: "\f108";
+}
+.flaticon-salade:before {
+    content: "\f109";
+}
+.flaticon-salade-1:before {
+    content: "\f10a";
+}
+.flaticon-tajine:before {
+    content: "\f10b";
+}
+.flaticon-tajine-1:before {
+    content: "\f10c";
+}
+.flaticon-tajine-2:before {
+    content: "\f10d";
+}
+.flaticon-pates:before {
+    content: "\f10e";
+}
+.flaticon-spaghetti:before {
+    content: "\f10f";
+}
+.flaticon-farfalle:before {
+    content: "\f110";
+}
+.flaticon-fusilli:before {
+    content: "\f111";
+}
+.flaticon-poulet-frit:before {
+    content: "\f112";
+}
+.flaticon-dinde:before {
+    content: "\f113";
+}
+.flaticon-riz-au-poulet:before {
+    content: "\f114";
+}
+.flaticon-riz-saute:before {
+    content: "\f115";
+}
+.flaticon-riz-au-poulet-1:before {
+    content: "\f116";
+}
+.flaticon-plateau-repas:before {
+    content: "\f117";
+}
+.flaticon-paquet-alimentaire:before {
+    content: "\f118";
+}
+.flaticon-des-legumes:before {
+    content: "\f119";
+}
+.flaticon-livreur-1:before {
+    content: "\f11a";
+}
+.flaticon-appel-telephonique:before {
+    content: "\f11b";
+}
+.flaticon-fried-potatoes:before {
+    content: "\f11c";
+}
+.flaticon-catering:before {
+    content: "\f11d";
+}
+
