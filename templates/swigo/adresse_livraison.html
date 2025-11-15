@@ -95,6 +95,32 @@
         font-size: 16px;
     }
 
+
+    /* Style pour le texte de description */
+    .description-text {
+        font-family: inherit;
+        font-weight: 300;
+        font-size: 14px;
+        line-height: 1.5;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .contact-info {
+        font-family: inherit;
+        font-weight: 300;
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .contact-info strong {
+    font-weight: 600;
+    color: #333;
+}
+
+
     .modal-delivery-estimate .btn {
         font-size: 12px;
         padding: 6px 10px;
@@ -143,7 +169,7 @@
 }
 .input-group.same-height .btn {
     min-width: 60px;   /* Largeur minimale très réduite */
-    max-width: 90px;   /* Largeur maximale pour éviter l'étirement */
+    max-width: 90px;   /* Largeur maximale pour éviter l’étirement */
     padding-left: 0.6em;
     padding-right: 0.6em;
     font-size: 15px;
@@ -206,24 +232,7 @@
   100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
 
-/* Style pour le texte de description */
-.description-text {
-    font-family: inherit;
-    font-weight: 300;
-    font-size: 14px;
-    line-height: 1.5;
-    text-align: center;
-    margin-bottom: 20px;
-}
 
-.contact-info {
-    font-family: inherit;
-    font-weight: 300;
-    font-size: 12px;
-    color: #666;
-    margin-top: 10px;
-    text-align: center;
-}
 
 </style>
 {% endblock %}
@@ -274,10 +283,10 @@
             <div class="search-form" style="width: 100%;">
               <div class="widget search-bx text-start">
                 <div class="widget-title">
-                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous</h5>
-                  <div class="contact-info">
-                    (En cas de soucis vous pouvez nous joindre au 06 95 59 98 59)
-                  </div>
+                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
+                </div>
+                <div class="contact-info">
+                    (En cas de soucis vous pouvez nous joindre au <strong>06 95 59 98 59</strong>)
                 </div>
                 <form id="addressForm" method="post">
                   {% csrf_token %}
