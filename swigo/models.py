@@ -1426,7 +1426,7 @@ class ArticlePanier(models.Model):
         verbose_name="Options Poulet"
     )
     
-    # 🆕 NOUVEAU CHAMP POUR STOCKER LES OPTIONS AVEC DOUBLONS
+    # 🆕 CHAMP POUR STOCKER LES OPTIONS AVEC DOUBLONS
     options_poulet_avec_quantites = models.JSONField(
         default=list,
         blank=True,
@@ -1440,6 +1440,13 @@ class ArticlePanier(models.Model):
         null=True, 
         blank=True,
         verbose_name="Accompagnement"
+    )
+    
+    # 🆕 AJOUT DU CHAMP MANQUANT
+    supplements_menu = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Suppléments menu"
     )
     
     quantite = models.PositiveIntegerField(default=1)
@@ -1460,14 +1467,33 @@ class ArticlePanier(models.Model):
         return f'{self.quantite} x {nom_article} (Total: {self.prix_total})'
 
     def calculate_total_price(self):
+        """Calcule ET SAUVEGARDE le prix total avec toutes les options"""
         prix_total = self.calculate_base_price() * self.quantite
         self.prix_total = prix_total
-        self.save()
+        self.save(update_fields=['prix_total'])  # ⭐ Important : sauvegarder explicitement
+        
+        # 🔥 FORCER LE RECHARGEMENT depuis la base de données
+        self.refresh_from_db()
+        
+        print(f"💰 Article {self.id} - Prix sauvegardé: {self.prix_total}€")
         return self.prix_total
 
     def calculate_base_price(self):
+        """Calcule le prix unitaire de base avec toutes les options et suppléments"""
         if self.menu:
-            return self.menu.prix_ttc
+            prix_base = self.menu.prix_ttc
+            
+            # 🆕 CORRECTION : AJOUTER LES SUPPLÉMENTS SAUVEGARDÉS
+            if hasattr(self, 'supplements_menu') and self.supplements_menu and self.supplements_menu.get('total_supplements'):
+                try:
+                    supplement_total = Decimal(str(self.supplements_menu['total_supplements']))
+                    prix_base += supplement_total
+                    print(f"🔍 Menu {self.menu.nom} - Prix base: {self.menu.prix_ttc}€ + Suppléments: {supplement_total}€ = {prix_base}€")
+                except (ValueError, TypeError) as e:
+                    print(f"❌ Erreur calcul supplément menu: {e}")
+            
+            return prix_base
+            
         elif self.plat:
             prix_total = self.plat.prix_unitaire_ttc
             
@@ -1499,10 +1525,13 @@ class ArticlePanier(models.Model):
                 prix_total += self.accompagnement.prix_supplement
             
             return prix_total
+            
         elif self.salade_personnalisee:
-            return self.salade_personnalisee.prix_total
+            return self.salade_personnalisee.prix_total or self.salade_personnalisee.calculate_prix_total()
+            
         elif self.couscous_personnalise:
             return self.couscous_personnalise.prix_total or self.couscous_personnalise.calculate_prix_total()
+            
         else:
             return Decimal('0.00')
 

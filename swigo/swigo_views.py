@@ -1403,118 +1403,140 @@ def options_par_plat_ajax(request, plat_id):
         return JsonResponse({'success': False, 'message': 'Plat non trouvé'})
 
 
+def get_cart_totals(request):
+    """Calcule les totaux du panier basé sur la session"""
+    try:
+        # Récupérer le panier avec session_key
+        if request.user.is_authenticated:
+            session_key = str(request.user.id)
+        else:
+            if not request.session.session_key:
+                request.session.create()
+            session_key = request.session.session_key
+        
+        panier = Panier.objects.get(session_key=session_key)
+        
+        # Calculer les totaux
+        panier.calculate_total_price()
+        
+        return {
+            'sous_total': float(panier.sous_total),
+            'frais_livraison': float(panier.frais_livraison_effectif),
+            'frais_gestion': float(panier.frais_gestion),
+            'reduction': float(panier.promotion or 0),
+            'prix_total': float(panier.prix_total)
+        }
+        
+    except Panier.DoesNotExist:
+        return {
+            'sous_total': 0.0,
+            'frais_livraison': 0.0,
+            'frais_gestion': 0.0,
+            'reduction': 0.0,
+            'prix_total': 0.0
+        }
 
-
-@csrf_exempt
 def ajouter_au_panier(request):
     if request.method == 'POST':
-        if not request.session.session_key:
-            request.session.create()
-
-        data = json.loads(request.body)
-        plat_id = data.get('plat_id')
-        options_ids = data.get('options', [])
-        accompagnement_id = data.get('accompagnement')
-
-        print(f"🎯 Données reçues - Plat: {plat_id}, Options: {options_ids}, Accompagnement: {accompagnement_id}")
-
+        article_panier = None
         try:
-            plat = Plat.objects.get(id=plat_id)
+            data = json.loads(request.body)
+            plat_id = data.get('plat_id')
+            options_selectionnees = data.get('options', [])
+            accompagnement_id = data.get('accompagnement')
 
-            # RÉCUPÉRER L'ACCOMPAGNEMENT SI PRÉSENT
-            accompagnement = None
-            if accompagnement_id and accompagnement_id != 'null' and accompagnement_id != '':
+            print(f"📥 Données reçues - Plat: {plat_id}, Options: {options_selectionnees}, Accompagnement: {accompagnement_id}")
+
+            # Validation
+            if not plat_id:
+                return JsonResponse({'success': False, 'message': 'Plat ID manquant'}, status=400)
+
+            # Récupérer le plat
+            try:
+                plat = Plat.objects.get(id=plat_id)
+                print(f"✅ Plat trouvé: {plat.nom}")
+            except Plat.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Plat non trouvé'}, status=404)
+
+            # Récupérer ou créer le panier avec session_key
+            if request.user.is_authenticated:
+                session_key = str(request.user.id)
+            else:
+                if not request.session.session_key:
+                    request.session.create()
+                session_key = request.session.session_key
+
+            print(f"🔑 Session key: {session_key}")
+
+            panier, created = Panier.objects.get_or_create(session_key=session_key)
+            print(f"✅ Panier: {panier.id} (créé: {created})")
+
+            # ÉTAPE 1: Créer l'article de base SANS prix_unitaire
+            article_panier = ArticlePanier(
+                panier=panier,
+                plat=plat,
+                quantite=1,
+                prix_total=plat.prix_unitaire_ttc  # Prix initial basé sur le plat
+            )
+            
+            # SAUVEGARDER pour obtenir l'ID
+            article_panier.save()
+            print(f"✅ Article créé avec ID: {article_panier.id}")
+
+            # ÉTAPE 2: Ajouter les options (many-to-many)
+            if options_selectionnees:
+                print(f"🔄 Ajout des options: {options_selectionnees}")
+                options_objets = Option.objects.filter(id__in=options_selectionnees)
+                if options_objets.exists():
+                    article_panier.options.add(*options_objets)
+                    print(f"✅ Options ajoutées: {options_objets.count()}")
+
+            # ÉTAPE 3: Gérer l'accompagnement
+            if accompagnement_id and accompagnement_id != 'undefined':
                 try:
                     accompagnement = Accompagnement.objects.get(id=accompagnement_id)
-                    print(f"🍟 Accompagnement trouvé: {accompagnement.nom} (+{accompagnement.prix_supplement}€)")
+                    article_panier.accompagnement = accompagnement
+                    article_panier.save(update_fields=['accompagnement'])
+                    print(f"✅ Accompagnement ajouté: {accompagnement.nom}")
                 except Accompagnement.DoesNotExist:
-                    print("❌ Accompagnement non trouvé")
-                    accompagnement = None
+                    print(f"❌ Accompagnement ID {accompagnement_id} non trouvé")
 
-            # Gérer la commande et le panier
-            commande_id = request.session.get('commande_id')
-            if not commande_id:
-                commande = Commande.objects.create(client=None, is_paid=False)
-                request.session['commande_id'] = commande.id
-                panier = Panier.objects.create(commande=commande)
-            else:
-                commande = Commande.objects.get(id=commande_id)
-                panier = commande.panier or Panier.objects.create(commande=commande)
+            # ÉTAPE 4: Calculer le prix final avec la méthode du modèle
+            article_panier.calculate_total_price()
+            print(f"💰 Prix final calculé: {article_panier.prix_total}€")
 
-            # 🆕 CORRECTION : RECHERCHE D'ARTICLE EXISTANT AVEC CONVERSION DES TYPES
-            article_qs = ArticlePanier.objects.filter(panier=panier, plat=plat)
-
-            article_found = None
-            for article in article_qs:
-                article_options_ids = set(article.options.values_list('id', flat=True))
-                # Convertir options_ids en set d'integers pour la comparaison
-                frontend_options_ids = set(int(opt_id) for opt_id in options_ids) if options_ids else set()
-                
-                article_accompagnement_id = article.accompagnement.id if article.accompagnement else None
-                frontend_accompagnement_id = int(accompagnement_id) if accompagnement_id and accompagnement_id != 'null' and accompagnement_id != '' else None
-                
-                print(f"🔍 Comparaison article #{article.id}:")
-                print(f"   - Options article: {article_options_ids}")
-                print(f"   - Options frontend: {frontend_options_ids}")
-                print(f"   - Accompagnement article: {article_accompagnement_id}")
-                print(f"   - Accompagnement frontend: {frontend_accompagnement_id}")
-                
-                if (article_options_ids == frontend_options_ids and 
-                    article_accompagnement_id == frontend_accompagnement_id):
-                    article_found = article
-                    print(f"✅ Article existant trouvé: #{article.id}")
-                    break
-
-            if article_found:
-                article_found.quantite += 1
-                article_found.calculate_total_price()
-                article_found.save()
-                print(f"✅ Article existant mis à jour - Quantité: {article_found.quantite}, Accompagnement: {article_found.accompagnement.nom if article_found.accompagnement else 'Aucun'}")
-            else:
-                # CRÉER LE NOUVEL ARTICLE AVEC ACCOMPAGNEMENT
-                article = ArticlePanier.objects.create(
-                    panier=panier, 
-                    plat=plat, 
-                    quantite=1,
-                    accompagnement=accompagnement  # ASSOCIER L'ACCOMPAGNEMENT
-                )
-                
-                # Ajouter les options avec conversion en integers
-                if options_ids:
-                    options_ids_int = [int(opt_id) for opt_id in options_ids if str(opt_id).isdigit()]
-                    article.options.set(Option.objects.filter(id__in=options_ids_int))
-                
-                article.calculate_total_price()
-                article.save()
-                print(f"✅ Nouvel article créé avec accompagnement: {accompagnement.nom if accompagnement else 'Aucun'}")
-
-            # Appliquer le code promo si présent
-            code_promo_code = request.session.get('code_promo')
-            code_promo = panier.apply_code_promo(code_promo_code)
+            # ÉTAPE 5: Mettre à jour les totaux du panier
+            panier.calculate_total_price()
+            
+            # ÉTAPE 6: Récupérer les données mises à jour
+            cart_items = get_cart_items(panier)
+            totals = get_cart_totals(request)
 
             return JsonResponse({
                 'success': True,
                 'message': 'Article ajouté au panier',
-                'cart_items': get_cart_items(panier),
-                'totals': {
-                    'sous_total': f"{panier.sous_total:.2f}",
-                    'frais_livraison': f"{panier.frais_livraison_effectif:.2f}",
-                    'promotion': f"{panier.promotion:.2f}",
-                    'prix_total': f"{panier.prix_total:.2f}"
-                }
+                'cart_items': cart_items,
+                'totals': totals,
+                'article_id': article_panier.id
             })
-
-        except Plat.DoesNotExist:
-            return JsonResponse({'success': False, 'message': 'Plat non trouvé'}, status=404)
+            
         except Exception as e:
-            print(f"❌ Erreur lors de l'ajout au panier: {str(e)}")
-            return JsonResponse({'success': False, 'message': f'Erreur: {str(e)}'}, status=500)
-
-    return JsonResponse({'success': False, 'message': 'Méthode non autorisée'}, status=405)
-
-
-
-
+            print(f"❌ Erreur ajouter_au_panier: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Nettoyer en cas d'erreur
+            if article_panier and article_panier.id:
+                try:
+                    article_panier.delete()
+                    print("🧹 Article nettoyé après erreur")
+                except:
+                    pass
+            
+            return JsonResponse({
+                'success': False, 
+                'message': f'Erreur lors de l\'ajout au panier: {str(e)}'
+            }, status=500)
 
 
 
@@ -1688,6 +1710,12 @@ from decimal import Decimal
 from .models import ArticlePanier
 
 from collections import Counter  # Import global pour éviter les problèmes de portée
+
+from collections import Counter
+from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 from collections import Counter
 from decimal import Decimal
@@ -1886,7 +1914,20 @@ def get_cart_items(panier):
             # 🆕 CONSTRUCTION OPTIONS ORGANISÉES PAR RÔLE
             # Ordre d'affichage préférentiel
             ordre_roles = ['viande', 'accompagnement', 'boisson', 'dessert', 'entree', 'plat', 'option']
-            
+
+            # 🆕 MAPPING COMPLET DES RÔLES
+            role_labels = {
+                'plat': 'Plat',
+                'accompagnement': 'Accompagnement', 
+                'boisson': 'Boisson',
+                'dessert': 'Dessert',
+                'entree': 'Entrée',
+                'viande': 'Viande',
+                'cookie': 'Cookie',
+                'option': 'Option',
+                'supplement': 'Supplément'
+            }
+
             for role in ordre_roles:
                 if role in choix_par_role:
                     noms = choix_par_role[role]
@@ -1903,19 +1944,19 @@ def get_cart_items(panier):
                     elif role == 'viande':
                         options_list.extend(noms)
                     else:
-                        # Rôles génériques
-                        label = dict(ChoixMenu.ROLE_CHOICES).get(role, role.capitalize())
+                        # Rôles génériques avec label sécurisé
+                        label = role_labels.get(role, role.capitalize())
                         for nom in noms:
                             options_list.append(f"{label}: {nom}")
-            
+
             # Ajouter les rôles non traités dans l'ordre préférentiel
             roles_restants = [r for r in choix_par_role.keys() if r not in ordre_roles]
             for role in roles_restants:
                 noms = choix_par_role[role]
-                label = dict(ChoixMenu.ROLE_CHOICES).get(role, role.capitalize())
+                label = role_labels.get(role, role.capitalize())
                 for nom in noms:
                     options_list.append(f"{label}: {nom}")
-            
+
             print(f"   ✅ Options finales menu: {options_list}")
 
         # 🧂 SALADE
@@ -2232,6 +2273,7 @@ def preparer_items_stripe(panier, commande=None):
         print(f"🛒 [DEBUG] --- Article {index + 1} ---")
         print(f"🛒 [DEBUG] Article ID: {article.id}")
         print(f"🛒 [DEBUG] Quantité: {article.quantite}")
+        print(f"🛒 [DEBUG] Prix total article: {article.prix_total}")
         
         nom_produit = ""
         prix_unitaire = None
@@ -2242,7 +2284,11 @@ def preparer_items_stripe(panier, commande=None):
             print(f"🛒 [DEBUG] Plat: {article.plat.nom}")
             print(f"🛒 [DEBUG] Prix plat: {article.plat.prix_unitaire_ttc}")
             nom_produit = article.plat.nom
-            prix_unitaire = article.plat.prix_unitaire_ttc
+            
+            # 🆕 CORRECTION : UTILISER LE PRIX TOTAL DE L'ARTICLE
+            prix_unitaire = article.prix_total / article.quantite
+            print(f"🛒 [DEBUG] Prix unitaire final (avec options): {prix_unitaire}")
+            
             options_text = ', '.join(option.nom_option for option in article.options.all())
             if options_text:
                 nom_produit += f" ({options_text})"
@@ -2252,9 +2298,12 @@ def preparer_items_stripe(panier, commande=None):
         elif article.menu:
             print(f"🛒 [DEBUG] Type: Menu personnalisé")
             print(f"🛒 [DEBUG] Menu: {article.menu.nom}")
-            print(f"🛒 [DEBUG] Prix menu: {article.menu.prix_ttc}")
+            print(f"🛒 [DEBUG] Prix menu de base: {article.menu.prix_ttc}")
             nom_produit = article.menu.nom
-            prix_unitaire = article.menu.prix_ttc
+            
+            # 🆕 CORRECTION : UTILISER LE PRIX TOTAL DE L'ARTICLE (AVEC SUPPLÉMENTS)
+            prix_unitaire = article.prix_total / article.quantite
+            print(f"🛒 [DEBUG] Prix unitaire final (avec suppléments): {prix_unitaire}")
 
             # On reconstitue le détail
             details = []
@@ -2271,32 +2320,46 @@ def preparer_items_stripe(panier, commande=None):
                     details.append(f"{choix.get_role_display()} : Salade personnalisée")
                 elif choix.couscous:
                     details.append(f"{choix.get_role_display()} : Couscous personnalisé")
+            
             if details:
                 nom_produit += " (" + "; ".join(details) + ")"
                 print(f"🛒 [DEBUG] Détails menu: {details}")
+            
+            # 🆕 AJOUTER LES SUPPLÉMENTS DANS LA DESCRIPTION
+            if hasattr(article, 'supplements_menu') and article.supplements_menu:
+                total_supplements = Decimal(article.supplements_menu.get('total_supplements', 0))
+                if total_supplements > 0:
+                    nom_produit += f" [Supplément: +{total_supplements}€]"
+                    print(f"🛒 [DEBUG] Suppléments appliqués: +{total_supplements}€")
 
         # ========== SALADE PERSONNALISÉE ==========
         elif article.salade_personnalisee:
             print(f"🛒 [DEBUG] Type: Salade personnalisée")
             print(f"🛒 [DEBUG] Prix salade: {article.salade_personnalisee.prix_total}")
             nom_produit = "Salade personnalisée"
-            prix_unitaire = article.salade_personnalisee.prix_total
+            
+            # 🆕 CORRECTION : UTILISER LE PRIX TOTAL
+            prix_unitaire = article.prix_total / article.quantite
 
         # ========== COUSCOUS PERSONNALISÉ ==========
         elif article.couscous_personnalise:
             print(f"🛒 [DEBUG] Type: Couscous personnalisé")
             print(f"🛒 [DEBUG] Prix couscous: {article.couscous_personnalise.prix_total}")
             nom_produit = "Couscous personnalisé"
-            prix_unitaire = article.couscous_personnalise.prix_total
+            
+            # 🆕 CORRECTION : UTILISER LE PRIX TOTAL
+            prix_unitaire = article.prix_total / article.quantite
 
         else:
             print(f"🛒 [DEBUG] Type: Produit générique")
             print(f"🛒 [DEBUG] Prix total: {article.prix_total}")
             nom_produit = "Produit"
-            prix_unitaire = article.prix_total
+            
+            # 🆕 CORRECTION : UTILISER LE PRIX TOTAL
+            prix_unitaire = article.prix_total / article.quantite
 
         # Sécurité : ne pas envoyer à Stripe un produit à 0€
-        print(f"🛒 [DEBUG] Prix unitaire final: {prix_unitaire}")
+        print(f"🛒 [DEBUG] Prix unitaire final pour Stripe: {prix_unitaire}")
         if not prix_unitaire or prix_unitaire <= 0:
             print(f"❌ [DEBUG] Article ignoré car prix nul : {nom_produit}")
             continue
@@ -2315,7 +2378,6 @@ def preparer_items_stripe(panier, commande=None):
         line_items.append(line_item)
 
     # ========== FRAIS DE LIVRAISON ==========
-    # NE PAS ajouter les frais de livraison si c'est une commande à emporter
     print(f"🛒 [DEBUG] Vérification frais de livraison...")
     
     # Vérifier si c'est une commande à emporter
@@ -2324,7 +2386,6 @@ def preparer_items_stripe(panier, commande=None):
         is_emporter = commande.is_commande_a_emporter
         print(f"🛒 [DEBUG] Commande à emporter: {is_emporter}")
     else:
-        # Fallback: vérifier via le panier ou autre méthode
         print(f"🛒 [DEBUG] Aucune commande fournie, vérification alternative...")
     
     print(f"🛒 [DEBUG] Frais de livraison disponibles: {panier.frais_livraison}")
@@ -6789,11 +6850,11 @@ def ajouter_menu_personnalise(request):
             from swigo.models import Commande, Panier
             commande = Commande.objects.create(client=None, is_paid=False)
             request.session['commande_id'] = commande.id
-            panier = Panier.objects.create(commande=commande)
+            panier = Panier.objects.create(commande=commande, session_key=request.session.session_key)
         else:
             from swigo.models import Commande, Panier
             commande = Commande.objects.get(id=commande_id)
-            panier = getattr(commande, 'panier', None) or Panier.objects.create(commande=commande)
+            panier = getattr(commande, 'panier_associe', None) or Panier.objects.create(commande=commande, session_key=request.session.session_key)
 
         menu = Menu.objects.get(id=menu_id)
         if menu.prix_ttc is None:
@@ -6832,6 +6893,7 @@ def ajouter_menu_personnalise(request):
         def calculer_supplement(choix_utilisateur):
             """Calcule le supplément total pour les desserts et boissons"""
             supplement_total = Decimal('0.00')
+            supplements_detail = {}
             
             # Supplément desserts
             if 'dessert' in choix_utilisateur:
@@ -6841,6 +6903,11 @@ def ajouter_menu_personnalise(request):
                         for dessert_info in DESSERTS_AVEC_SUPPLEMENTS:
                             if dessert_info[0] == dessert_id and dessert_info[4]:
                                 supplement_total += dessert_info[3]
+                                supplements_detail['dessert'] = {
+                                    'nom': dessert_info[1],
+                                    'prix': str(dessert_info[3]),
+                                    'id': dessert_id
+                                }
                                 print(f"🍰 Supplément dessert: {dessert_info[1]} +{dessert_info[3]}€")
             
             # Supplément boissons  
@@ -6851,13 +6918,19 @@ def ajouter_menu_personnalise(request):
                         for boisson_info in BOISSONS_AVEC_SUPPLEMENTS:
                             if boisson_info[0] == boisson_id and boisson_info[4]:
                                 supplement_total += boisson_info[3]
+                                supplements_detail['boisson'] = {
+                                    'nom': boisson_info[1],
+                                    'prix': str(boisson_info[3]),
+                                    'id': boisson_id
+                                }
                                 print(f"🥤 Supplément boisson: {boisson_info[1]} +{boisson_info[3]}€")
             
-            return supplement_total
+            return supplement_total, supplements_detail
 
         # ==================== GESTION COUSCOUS PERSONNALISÉ ====================
         couscous_perso_id = None
         supplement_couscous = Decimal('0.00')
+        supplements_couscous_detail = {}
 
         # Vérifier si c'est un menu couscous
         choix_couscous_menu = menu.choix.filter(autorise_couscous_personnalise=True).first()
@@ -6903,6 +6976,11 @@ def ajouter_menu_personnalise(request):
                 # Calculer le supplément si la viande n'est pas incluse
                 if not est_incluse:
                     supplement_couscous += viande.supplement_inclus
+                    supplements_couscous_detail[f'viande_{viande.id}'] = {
+                        'nom': viande.nom,
+                        'prix': str(viande.supplement_inclus),
+                        'type': 'supplément'
+                    }
                     print(f"🥩 Supplément viande: {viande.nom} +{viande.supplement_inclus}€")
                 
                 viandes_ajoutees += 1
@@ -6925,15 +7003,23 @@ def ajouter_menu_personnalise(request):
             choix['couscous'].append(f"couscous_{couscous_perso_id}")
             print(f"✅ Couscous ajouté aux choix: couscous_{couscous_perso_id}")
 
-        # ==================== CALCUL DU PRIX FINAL ====================
-        supplement_desserts_boissons = calculer_supplement(choix)
+        # ==================== CALCUL DU PRIX FINAL ET SUPPLÉMENTS ====================
+        supplement_desserts_boissons, supplements_db_detail = calculer_supplement(choix)
         prix_final = menu.prix_ttc + supplement_desserts_boissons + supplement_couscous
+        
+        # 🆕 CONSTRUIRE L'OBJET SUPPLÉMENTS COMPLET
+        total_supplements = supplement_desserts_boissons + supplement_couscous
+        supplements_complet = {
+            'total_supplements': str(total_supplements),
+            'details': {**supplements_db_detail, **supplements_couscous_detail}
+        }
         
         print(f"💰 CALCUL DU PRIX FINAL:")
         print(f"   - Prix menu de base: {menu.prix_ttc}€")
         print(f"   - Supplément desserts/boissons: {supplement_desserts_boissons}€")
         print(f"   - Supplément couscous: {supplement_couscous}€")
         print(f"   - Prix final: {prix_final}€")
+        print(f"   - Suppléments sauvegardés: {supplements_complet}")
 
         # ==================== FONCTIONS UTILITAIRES ====================
         def detect_type_id(val):
@@ -6992,70 +7078,76 @@ def ajouter_menu_personnalise(request):
 
         articles_existants = ArticlePanier.objects.filter(panier=panier, menu=menu)
         found = False
+        article = None
         
-        for article in articles_existants:
-            if article_correspond(article, choix_utiles, viandes):
+        for art in articles_existants:
+            if article_correspond(art, choix_utiles, viandes):
                 # Article existant trouvé - incrémenter la quantité
-                article.quantite += 1
-                article.prix_total = prix_final * article.quantite
-                article.save()
-                logger.debug(f"[MENU PERSONNALISÉ] Article existant trouvé → incrémenté (ID {article.id})")
-                print(f"Article existant trouvé, incrémenté (ID {article.id})")
+                art.quantite += 1
+                art.supplements_menu = supplements_complet  # 🆕 METTRE À JOUR LES SUPPLÉMENTS
+                art.calculate_total_price()  # 🔥 RECALCULER LE PRIX
+                logger.debug(f"[MENU PERSONNALISÉ] Article existant trouvé → incrémenté (ID {art.id})")
+                print(f"✅ Article existant trouvé, incrémenté (ID {art.id})")
                 found = True
+                article = art
                 break
 
         # ==================== CRÉATION D'UN NOUVEL ARTICLE ====================
         if not found:
+            # Créer l'article avec le prix initial
             article = ArticlePanier.objects.create(
                 panier=panier,
                 menu=menu,
                 quantite=1,
-                prix_total=prix_final
+                supplements_menu=supplements_complet,  # 🆕 SAUVEGARDER LES SUPPLÉMENTS
+                prix_total=prix_final  # Prix initial basé sur le calcul manuel
             )
-            print(f"Nouvel ArticlePanier créé : {article}")
+            print(f"✅ Nouvel ArticlePanier créé : {article.quantite} x {article.menu.nom} (Total initial: {article.prix_total})")
+            
+            # 🔥 CORRECTION CRITIQUE : FORCER LE RECALCUL POUR UTILISER calculate_base_price()
+            article.calculate_total_price()
+            print(f"💰 Prix après calculate_total_price(): {article.prix_total}€")
 
             # Enregistrement des choix
-            # Enregistrement des choix
-            # Enregistrement des choix
-        for role, vals in choix.items():
-            if not isinstance(vals, list):
-                vals = [vals]
-            for val in vals:
-                type_obj, obj_id = detect_type_id(val)
-                
-                if type_obj == "plat" and obj_id:
-                    plat = Plat.objects.get(id=obj_id)
-                    ChoixMenuArticle.objects.create(
-                        article_panier=article,
-                        role=role,
-                        plat_choisi=plat
-                    )
-                    print(f"✅ ChoixMenuArticle plat ajouté : role={role}, plat={plat.nom}")
-                
-                elif type_obj == "salade" and obj_id:
-                    from swigo.models import SaladePersonnalisee
-                    salade = SaladePersonnalisee.objects.get(id=obj_id)
-                    ChoixMenuArticle.objects.create(
-                        article_panier=article,
-                        role=role,
-                        salade=salade
-                    )
-                    print(f"✅ ChoixMenuArticle salade ajouté : role={role}, salade={salade.nom}")
-                
-                elif type_obj == "couscous" and obj_id:
-                    from swigo.models import CouscousPersonnalise
-                    couscous = CouscousPersonnalise.objects.get(id=obj_id)
-                    ChoixMenuArticle.objects.create(
-                        article_panier=article,
-                        role=role,
-                        couscous=couscous
-                    )
-                    print(f"✅ ChoixMenuArticle couscous ajouté : role={role}, couscous_id={couscous.id}")
-                
-                else:
-                    logger.warning(f"[MENU PERSONNALISÉ] Choix ignoré (role={role}, val={val}, type={type_obj}, id={obj_id})")
-                    ChoixMenuArticle.objects.create(article_panier=article, role=role)
-                    print(f"❌ ChoixMenuArticle ignoré : role={role}, val={val}, type={type_obj}, id={obj_id}")
+            for role, vals in choix.items():
+                if not isinstance(vals, list):
+                    vals = [vals]
+                for val in vals:
+                    type_obj, obj_id = detect_type_id(val)
+                    
+                    if type_obj == "plat" and obj_id:
+                        plat = Plat.objects.get(id=obj_id)
+                        ChoixMenuArticle.objects.create(
+                            article_panier=article,
+                            role=role,
+                            plat_choisi=plat
+                        )
+                        print(f"✅ ChoixMenuArticle plat ajouté : role={role}, plat={plat.nom}")
+                    
+                    elif type_obj == "salade" and obj_id:
+                        from swigo.models import SaladePersonnalisee
+                        salade = SaladePersonnalisee.objects.get(id=obj_id)
+                        ChoixMenuArticle.objects.create(
+                            article_panier=article,
+                            role=role,
+                            salade=salade
+                        )
+                        print(f"✅ ChoixMenuArticle salade ajouté : role={role}, salade={salade.nom}")
+                    
+                    elif type_obj == "couscous" and obj_id:
+                        from swigo.models import CouscousPersonnalise
+                        couscous = CouscousPersonnalise.objects.get(id=obj_id)
+                        ChoixMenuArticle.objects.create(
+                            article_panier=article,
+                            role=role,
+                            couscous=couscous
+                        )
+                        print(f"✅ ChoixMenuArticle couscous ajouté : role={role}, couscous_id={couscous.id}")
+                    
+                    else:
+                        logger.warning(f"[MENU PERSONNALISÉ] Choix ignoré (role={role}, val={val}, type={type_obj}, id={obj_id})")
+                        ChoixMenuArticle.objects.create(article_panier=article, role=role)
+                        print(f"❌ ChoixMenuArticle ignoré : role={role}, val={val}, type={type_obj}, id={obj_id}")
 
             # Enregistrement des accompagnements couscous
             accompagnements_ids = viandes.get("accompagnements", [])
@@ -7073,6 +7165,14 @@ def ajouter_menu_personnalise(request):
                     except Exception as e:
                         logger.warning(f"AccompagnementCouscous introuvable (id={acc_id}): {e}")
                         print(f"❌ AccompagnementCouscous introuvable (id={acc_id}): {e}")
+
+        # ==================== RECALCUL FINAL DU PANIER ====================
+        # 🔥 FORCER LE RECALCUL DE L'ARTICLE
+        article.calculate_total_price()
+        
+        # 🔥 RECALCULER LE PANIER COMPLET
+        panier.calculate_total_price()
+        panier.refresh_from_db()
 
         # ==================== APPLICATION PROMOTION ====================
         panier.apply_code_promo(request.session.get("code_promo"))

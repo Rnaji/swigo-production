@@ -3302,7 +3302,6 @@ let enCoursDeTraitement = false;
 
 
 async function confirmerPaiement() {
-    // DEBUG: Vérification initiale
     console.log('=== DÉBUT CONFIRMER PAIEMENT ===');
     
     if (enCoursDeTraitement) {
@@ -3371,7 +3370,6 @@ async function confirmerPaiement() {
             });
 
             console.log('📨 Réponse serveur reçue - Status:', response.status);
-            console.log('Headers:', response.headers);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -3393,16 +3391,19 @@ async function confirmerPaiement() {
             console.log('🎫 Session Stripe ID reçu:', res.stripe_session_id);
             console.log('🔄 Redirection vers Stripe...');
             
-            // Redirection vers Stripe
-            const result = await stripe.redirectToCheckout({ 
+            // 🎯 CORRECTION : redirectToCheckout est SYNCHRONE
+            const result = stripe.redirectToCheckout({ 
                 sessionId: res.stripe_session_id 
             });
 
-            console.log('Résultat de redirectToCheckout:', result);
-
             if (result.error) {
+                console.error('❌ Erreur Stripe redirectToCheckout:', result.error);
                 throw new Error(`Erreur Stripe: ${result.error.message}`);
             }
+
+            // ✅ Redirection initiée - le navigateur va quitter la page
+            console.log('✅ Redirection Stripe initiée avec succès');
+            return;
 
         } else {
             // Traitement pour les autres moyens de paiement
