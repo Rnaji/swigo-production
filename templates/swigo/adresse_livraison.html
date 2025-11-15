@@ -143,7 +143,7 @@
 }
 .input-group.same-height .btn {
     min-width: 60px;   /* Largeur minimale très réduite */
-    max-width: 90px;   /* Largeur maximale pour éviter l’étirement */
+    max-width: 90px;   /* Largeur maximale pour éviter l'étirement */
     padding-left: 0.6em;
     padding-right: 0.6em;
     font-size: 15px;
@@ -206,7 +206,24 @@
   100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
 
+/* Style pour le texte de description */
+.description-text {
+    font-family: inherit;
+    font-weight: 300;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    margin-bottom: 20px;
+}
 
+.contact-info {
+    font-family: inherit;
+    font-weight: 300;
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+    text-align: center;
+}
 
 </style>
 {% endblock %}
@@ -248,15 +265,19 @@
               <h2 style="font-weight: 300;">
                 Bienvenue chez <span style="color: #28a745; font-weight: 400;">En Route Chef!</span>
               </h2>
-              <p style="font-family: inherit; font-weight: 300; font-size: 14px;">
-                Commandez des plats savoureux préparés par nos chefs et livrés directement à votre porte.<br>
-                Découvrez une expérience gastronomique unique, simple et rapide.
-              </p>
+              <div class="description-text">
+                <p>Plats maison cuisinés avec passion & livrés à votre porte en 30 minutes.</p>
+                <p>Couscous, tajines, burgers smash, poulet crousty, desserts...</p>
+                <p><strong>100 % fait maison, 100 % plaisir ✅</strong></p>
+              </div>
             </div>
             <div class="search-form" style="width: 100%;">
               <div class="widget search-bx text-start">
                 <div class="widget-title">
-                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
+                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous</h5>
+                  <div class="contact-info">
+                    (En cas de soucis vous pouvez nous joindre au 06 95 59 98 59)
+                  </div>
                 </div>
                 <form id="addressForm" method="post">
                   {% csrf_token %}
