@@ -3969,28 +3969,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function openMenuModal(menuId, nom, imageUrl, description, prix) {
     console.log("🟢 openMenuModal appelée avec ID =", menuId);
-    console.log("📝 Nom du menu:", nom);
 
     fetch(`/api/choix_menu/${menuId}/`)
         .then(response => {
             console.log("📡 Statut de la réponse:", response.status);
-            console.log("📡 Headers de la réponse:", response.headers);
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
-            console.log("=== 🧪 DEBUG ULTRA COMPLET MENU ===");
-            console.log("📦 Données brutes reçues:", data);
-            
-            // Afficher TOUTES les propriétés de l'objet data
-            console.log("🔍 Inspection complète de data:");
-            for (const key in data) {
-                console.log(`   ${key}:`, data[key]);
-            }
-            
-            // Vérifier si data.choix existe et est un tableau
-            console.log("📋 data.choix existe?", 'choix' in data);
-            console.log("📋 data.choix est un tableau?", Array.isArray(data.choix));
-            console.log("📋 data.choix length:", data.choix ? data.choix.length : 'undefined');
+            console.log("=== ✅ DONNÉES MENU COMPLÈTES ===");
+            console.log("📦 Données reçues:", data);
             
             const container = document.getElementById("menu-modal-body");
             if (!container) {
@@ -4000,245 +3990,249 @@ function openMenuModal(menuId, nom, imageUrl, description, prix) {
             
             container.innerHTML = "";
             
-            // 🆕 GESTION PLUS ROBUSTE DE data.choix
             let roles = [];
             if (data.choix && Array.isArray(data.choix)) {
                 roles = data.choix;
-            } else {
-                console.warn("⚠️ data.choix n'est pas un tableau valide, utilisation d'un tableau vide");
-                roles = [];
+                console.log(`✅ ${roles.length} rôle(s) chargé(s)`);
             }
 
-            console.log("🎯 Rôles disponibles:", roles);
-            
-            // 🆕 VÉRIFICATION SI LE MENU A DES CHOIX CONFIGURÉS
             if (roles.length === 0) {
-                console.error("❌ AUCUN RÔLE TROUVÉ pour ce menu!");
                 const alert = document.createElement("div");
                 alert.className = "alert alert-warning";
                 alert.innerHTML = `
-                    <h6>⚠️ Configuration incomplète</h6>
-                    <p>Ce menu n'a pas de composants configurables.</p>
-                    <small>Menu ID: ${menuId} - Nom: "${nom}"</small>
+                    <h6>⚠️ Menu sans options configurables</h6>
+                    <p>Ce menu ne propose pas de personnalisation.</p>
                 `;
                 container.appendChild(alert);
             }
 
-            // 🆕 AFFICHER TOUS LES RÔLES AVEC LEURS DÉTAILS COMPLETS
-            console.log("📋 DÉTAILS COMPLETS DE TOUS LES RÔLES:");
-            roles.forEach((roleData, index) => {
-                console.log(`   ${index + 1}. Rôle: "${roleData.role}"`);
-                console.log(`      - ID: ${roleData.id}`);
-                console.log(`      - Nombre inclus: ${roleData.nombre_elements_inclus}`);
-                console.log(`      - Plats disponibles: ${roleData.plats ? roleData.plats.length : 0}`);
-                console.log(`      - Plats:`, roleData.plats ? roleData.plats.map(p => ({id: p.id, nom: p.nom})) : []);
-                console.log(`      - Autorise couscous: ${roleData.autorise_couscous_personnalise}`);
-                console.log(`      - Autorise salade: ${roleData.autorise_salade_personnalisee}`);
-                console.log(`      - Toutes les clés:`, Object.keys(roleData));
-            });
+            // 🏗️ CONSTRUCTION DE L'INTERFACE COMPLÈTE
+            let sectionsCrees = 0;
 
-            let hasPrincipalSection = false;
-
-            // === 1. RECHERCHE DES OPTIONS DE VIANDE/PLAT PRINCIPAL ===
-            let rolePrincipal = null;
-            
-            // Chercher spécifiquement un rôle couscous
-            rolePrincipal = roles.find(r => r.role === "couscous" && r.autorise_couscous_personnalise && r.viandes_possibles);
-            
-            if (rolePrincipal) {
-                console.log("🍛 Menu couscous personnalisable détecté");
-                hasPrincipalSection = true;
-                
-                let section = document.createElement("div");
-                section.classList.add("form-group", "mt-3");
-                let details = document.createElement("details");
-                details.open = true;
-                
-                const max = rolePrincipal.nombre_elements_inclus || 1;
-                details.innerHTML = `<summary><strong>Viandes au choix (${max} viande${max > 1 ? 's' : ''} incluse${max > 1 ? 's' : ''})</strong></summary>`;
-                
-                rolePrincipal.viandes_possibles.forEach(viande => {
-                    const div = document.createElement("div");
-                    div.classList.add("form-check", "ms-3", "mt-2");
-                    
-                    const input = document.createElement("input");
-                    input.type = "checkbox";
-                    input.classList.add("form-check-input", "viande-checkbox");
-                    input.name = "viandes_couscous";
-                    input.value = viande.id;
-                    input.id = `viande-${viande.id}`;
-                    
-                    const label = document.createElement("label");
-                    label.classList.add("form-check-label");
-                    label.setAttribute("for", `viande-${viande.id}`);
-                    label.innerHTML = `<strong>${viande.nom}</strong>`;
-                    
-                    div.appendChild(input);
-                    div.appendChild(label);
-                    details.appendChild(div);
-                });
-
-                // Gestion de la limite de sélection pour les viandes
-                details.addEventListener("change", () => {
-                    const checkboxes = details.querySelectorAll('input[name="viandes_couscous"]');
-                    const checked = details.querySelectorAll('input[name="viandes_couscous"]:checked');
-                    
-                    console.log(`📊 Viandes sélectionnées: ${checked.length}/${max}`);
-                    
-                    checkboxes.forEach(cb => {
-                        cb.disabled = !cb.checked && checked.length >= max;
-                    });
-                });
-
-                section.appendChild(details);
+            // === 1. GESTION COUSCOUS PERSONNALISÉ ===
+            const roleCouscous = roles.find(r => r.autorise_couscous_personnalise && r.viandes_possibles);
+            if (roleCouscous) {
+                console.log("🍛 Configuration couscous détectée");
+                const section = creerSectionCouscous(roleCouscous, data.accompagnements_couscous);
                 container.appendChild(section);
-
-                // === ACCOMPAGNEMENTS COUSCOUS ===
-                if (Array.isArray(data.accompagnements_couscous) && data.accompagnements_couscous.length > 0) {
-                    console.log("🍟 Affichage des accompagnements couscous");
-                    
-                    const accBlock = document.createElement("div");
-                    accBlock.classList.add("form-group", "mt-4");
-                    const accDetails = document.createElement("details");
-                    accDetails.open = true;
-                    accDetails.innerHTML = `<summary><strong>Accompagnements du couscous (inclus)</strong></summary>`;
-                    
-                    data.accompagnements_couscous.forEach(accompagnement => {
-                        const div = document.createElement("div");
-                        div.classList.add("form-check", "ms-3", "mt-2");
-                        const input = document.createElement("input");
-                        input.type = "checkbox";
-                        input.classList.add("form-check-input");
-                        input.name = "accompagnements_couscous";
-                        input.value = accompagnement.id;
-                        input.id = `acc-${accompagnement.id}`;
-                        input.checked = true;
-                        
-                        const label = document.createElement("label");
-                        label.classList.add("form-check-label");
-                        label.setAttribute("for", `acc-${accompagnement.id}`);
-                        label.innerHTML = `
-                            <span class="text-success">✓</span> ${accompagnement.nom}
-                        `;
-                        
-                        div.appendChild(input);
-                        div.appendChild(label);
-                        accDetails.appendChild(div);
-                    });
-                    
-                    accBlock.appendChild(accDetails);
-                    container.appendChild(accBlock);
-                }
+                sectionsCrees++;
             }
 
-            // === 2. AUTRES RÔLES (ACCOMPAGNEMENTS, BOISSONS, DESSERTS, etc.) ===
-            console.log("🔄 Affichage des autres rôles...");
-            
+            // === 2. GESTION DES AUTRES RÔLES ===
             roles.forEach(roleData => {
-                const role = roleData.role;
+                if (roleData.autorise_couscous_personnalise) return;
                 
-                // Passer le rôle couscous car déjà traité
-                if (role === "couscous") return;
-                
-                const max = roleData.nombre_elements_inclus || 1;
-                const plats = roleData.plats || [];
-                
-                if (plats.length === 0) {
-                    console.log(`⏭️ Rôle "${role}" ignoré: aucun plat disponible`);
-                    return;
+                const section = creerSectionRoleStandard(roleData);
+                if (section) {
+                    container.appendChild(section);
+                    sectionsCrees++;
                 }
-
-                console.log(`📝 Affichage rôle: "${role}" avec ${plats.length} options`);
-                
-                let section = document.createElement("div");
-                section.classList.add("form-group", "mt-4");
-                let details = document.createElement("details");
-                details.open = true;
-                
-                // Labels français selon le rôle
-                const labels = {
-                    'boisson': 'Boisson au choix',
-                    'dessert': 'Dessert au choix', 
-                    'entree': 'Entrée au choix',
-                    'accompagnement': 'Accompagnement au choix',
-                    'plat': 'Plat au choix',
-                    'viande': 'Viande au choix',
-                    'cookie': 'Cookie au choix'
-                };
-                
-                let roleLabel = labels[role] || `${role.charAt(0).toUpperCase() + role.slice(1)} au choix`;
-                details.innerHTML = `<summary><strong>${roleLabel} (${max} inclus)</strong></summary>`;
-                
-                plats.forEach(plat => {
-                    const div = document.createElement("div");
-                    div.classList.add("form-check", "ms-3", "mt-2");
-                    const input = document.createElement("input");
-                    input.type = "checkbox";
-                    input.classList.add("form-check-input");
-                    input.name = `choix_${role}`;
-                    input.value = plat.id;
-                    input.id = `${role}-${plat.id}`;
-                    
-                    const label = document.createElement("label");
-                    label.classList.add("form-check-label");
-                    label.setAttribute("for", `${role}-${plat.id}`);
-                    label.innerHTML = `<strong>${plat.nom}</strong>`;
-                    
-                    div.appendChild(input);
-                    div.appendChild(label);
-                    details.appendChild(div);
-                });
-
-                // Gestion de la limite de sélection
-                details.addEventListener("change", () => {
-                    const checkboxes = details.querySelectorAll(`input[name="choix_${role}"]`);
-                    const checked = details.querySelectorAll(`input[name="choix_${role}"]:checked`);
-                    
-                    checkboxes.forEach(cb => {
-                        cb.disabled = !cb.checked && checked.length >= max;
-                    });
-                });
-
-                section.appendChild(details);
-                container.appendChild(section);
-                
-                console.log(`✅ Rôle "${role}" affiché avec ${plats.length} options`);
             });
 
-            // === 3. MESSAGE SI AUCUN RÔLE N'EST AFFICHÉ ===
-            if (container.children.length === 0) {
-                console.error("❌ AUCUN RÔLE AFFICHÉ!");
-                const alert = document.createElement("div");
-                alert.className = "alert alert-danger";
-                alert.innerHTML = `
-                    <h6>❌ Erreur de configuration</h6>
-                    <p>Aucun composant n'a pu être affiché pour ce menu.</p>
-                    <small>Veuillez vérifier la configuration du menu dans l'administration.</small>
-                `;
-                container.appendChild(alert);
-            }
-
-            // === 4. OUVERTURE DE LA MODALE ===
             document.getElementById("menu-modal-title").innerText = nom;
             document.getElementById("menu-modal").dataset.menuId = menuId;
             
-            console.log("✅ Ouverture de la modale menu");
+            console.log(`✅ Modale prête avec ${sectionsCrees} section(s)`);
             new bootstrap.Modal(document.getElementById("menu-modal")).show();
 
         })
         .catch(error => {
-            console.error("❌ Erreur API menu :", error);
+            console.error("❌ Erreur chargement menu:", error);
             const container = document.getElementById("menu-modal-body");
             if (container) {
                 container.innerHTML = `
                     <div class="alert alert-danger">
-                        <h6>Erreur de chargement du menu</h6>
-                        <p class="mb-0">${error.message}</p>
-                        <small>Menu ID: ${menuId}</small>
+                        <h6>Erreur de chargement</h6>
+                        <p>Impossible de charger les options du menu.</p>
+                        <small>${error.message}</small>
                     </div>
                 `;
             }
         });
+
+    // 🎯 FONCTIONS HELPER AVEC AFFICHAGE COMPLET DES PRIX
+    
+    function creerSectionCouscous(roleCouscous, accompagnements) {
+        const section = document.createElement("div");
+        section.className = "menu-section couscous-section";
+        
+        // === VIANDES ===
+        const viandesSection = document.createElement("div");
+        viandesSection.className = "form-group";
+        
+        const viandesDetails = document.createElement("details");
+        viandesDetails.open = true;
+        
+        const maxViandes = roleCouscous.nombre_viandes_incluses || 1;
+        viandesDetails.innerHTML = `
+            <summary class="section-title">
+                <strong>🥩 Viandes au choix</strong>
+                <span class="badge bg-primary">${maxViandes} incluse(s)</span>
+            </summary>
+        `;
+        
+        const viandesContainer = document.createElement("div");
+        viandesContainer.className = "options-grid";
+        
+        roleCouscous.viandes_possibles.forEach(viande => {
+            const optionDiv = document.createElement("div");
+            optionDiv.className = "option-item";
+            
+            const prixSupplement = parseFloat(viande.prix_supplement) || 0;
+            const affichagePrix = prixSupplement > 0 ? 
+                `<span class="prix-supplement text-success">+${prixSupplement.toFixed(2)}€</span>` : 
+                '<span class="prix-inclus text-muted">Inclus</span>';
+            
+            optionDiv.innerHTML = `
+                <div class="form-check">
+                    <input type="checkbox" 
+                           class="form-check-input viande-checkbox" 
+                           name="viandes_couscous" 
+                           value="${viande.id}" 
+                           id="viande-${viande.id}">
+                    <label class="form-check-label" for="viande-${viande.id}">
+                        <span class="option-nom">${viande.nom}</span>
+                        ${affichagePrix}
+                    </label>
+                </div>
+            `;
+            viandesContainer.appendChild(optionDiv);
+        });
+        
+        viandesDetails.appendChild(viandesContainer);
+        viandesSection.appendChild(viandesDetails);
+        section.appendChild(viandesSection);
+        
+        viandesDetails.addEventListener("change", gererLimiteSelection.bind(null, 'viandes_couscous', maxViandes));
+        
+        // === ACCOMPAGNEMENTS COUSCOUS ===
+        if (accompagnements && accompagnements.length > 0) {
+            const accSection = document.createElement("div");
+            accSection.className = "form-group mt-4";
+            
+            const accDetails = document.createElement("details");
+            accDetails.open = true;
+            accDetails.innerHTML = `
+                <summary class="section-title">
+                    <strong>🍟 Accompagnements couscous</strong>
+                    <span class="badge bg-success">Inclus</span>
+                </summary>
+            `;
+            
+            const accContainer = document.createElement("div");
+            accContainer.className = "options-grid";
+            
+            accompagnements.forEach(acc => {
+                const accDiv = document.createElement("div");
+                accDiv.className = "option-item";
+                
+                // 🆕 AFFICHAGE DES PRIX POUR LES ACCOMPAGNEMENTS
+                const prixSupplement = parseFloat(acc.prix_supplement) || 0;
+                const affichagePrix = prixSupplement > 0 ? 
+                    `<span class="prix-supplement text-success">+${prixSupplement.toFixed(2)}€</span>` : 
+                    '<span class="prix-inclus text-muted">Inclus</span>';
+                
+                accDiv.innerHTML = `
+                    <div class="form-check">
+                        <input type="checkbox" 
+                               class="form-check-input" 
+                               name="accompagnements_couscous" 
+                               value="${acc.id}" 
+                               id="acc-${acc.id}"
+                               checked>
+                        <label class="form-check-label" for="acc-${acc.id}">
+                            <span class="option-nom">${acc.nom}</span>
+                            ${affichagePrix}
+                        </label>
+                    </div>
+                `;
+                accContainer.appendChild(accDiv);
+            });
+            
+            accDetails.appendChild(accContainer);
+            accSection.appendChild(accDetails);
+            section.appendChild(accSection);
+        }
+        
+        return section;
+    }
+    
+    function creerSectionRoleStandard(roleData) {
+        const role = roleData.role;
+        const plats = roleData.plats || [];
+        
+        if (plats.length === 0) return null;
+        
+        const section = document.createElement("div");
+        section.className = "menu-section role-section";
+        
+        const details = document.createElement("details");
+        details.open = true;
+        
+        const max = roleData.nombre_elements_inclus || 1;
+        const labels = {
+            'boisson': '🥤 Boisson',
+            'dessert': '🍰 Dessert', 
+            'entree': '🥗 Entrée',
+            'accompagnement': '🍟 Accompagnement',
+            'plat': '🍽️ Plat',
+            'viande': '🥩 Viande',
+            'cookie': '🍪 Cookie'
+        };
+        
+        const roleLabel = labels[role] || `📦 ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+        details.innerHTML = `
+            <summary class="section-title">
+                <strong>${roleLabel}</strong>
+                <span class="badge bg-primary">${max} inclus</span>
+            </summary>
+        `;
+        
+        const optionsContainer = document.createElement("div");
+        optionsContainer.className = "options-grid";
+        
+        plats.forEach(plat => {
+            const optionDiv = document.createElement("div");
+            optionDiv.className = "option-item";
+            
+            // 🆕 AFFICHAGE COMPLET DES PRIX
+            const prixSupplement = parseFloat(plat.prix_supplement) || 0;
+            const affichagePrix = prixSupplement > 0 ? 
+                `<span class="prix-supplement text-success">+${prixSupplement.toFixed(2)}€</span>` : 
+                '<span class="prix-inclus text-muted">Inclus</span>';
+            
+            optionDiv.innerHTML = `
+                <div class="form-check">
+                    <input type="checkbox" 
+                           class="form-check-input" 
+                           name="choix_${role}" 
+                           value="${plat.id}" 
+                           id="${role}-${plat.id}">
+                    <label class="form-check-label" for="${role}-${plat.id}">
+                        <span class="option-nom">${plat.nom}</span>
+                        ${affichagePrix}
+                    </label>
+                </div>
+            `;
+            optionsContainer.appendChild(optionDiv);
+        });
+        
+        details.appendChild(optionsContainer);
+        section.appendChild(details);
+        
+        details.addEventListener("change", gererLimiteSelection.bind(null, `choix_${role}`, max));
+        
+        return section;
+    }
+    
+    function gererLimiteSelection(nomGroupe, limiteMax) {
+        const checkboxes = document.querySelectorAll(`input[name="${nomGroupe}"]`);
+        const checked = document.querySelectorAll(`input[name="${nomGroupe}"]:checked`);
+        
+        checkboxes.forEach(cb => {
+            cb.disabled = !cb.checked && checked.length >= limiteMax;
+        });
+    }
 }
 
 // Fonction helper pour afficher le message d'absence de viandes
@@ -6670,6 +6664,212 @@ select {
         display: none !important;
     }
 }
+
+/* ===== STYLES ÉPURÉS POUR LES MENUS - VERSION CORRIGÉE ===== */
+.menu-section {
+    margin-bottom: 25px;
+    padding: 0;
+    background: transparent;
+    border: none;
+}
+
+.menu-section details {
+    background: transparent;
+    border: none;
+    margin-bottom: 15px;
+}
+
+.menu-section details[open] {
+    background: transparent;
+}
+
+.menu-section .section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #2d3748;
+    transition: all 0.3s ease;
+    list-style: none;
+    gap: 15px; /* Espace entre le texte et le badge */
+}
+
+.menu-section .section-title:hover {
+    background: linear-gradient(135deg, #e9ecef, #dee2e6);
+    border-color: #adb5bd;
+}
+
+.menu-section .section-title::-webkit-details-marker {
+    display: none;
+}
+
+.menu-section .section-title::after {
+    content: "▼";
+    font-size: 12px;
+    transition: transform 0.3s ease;
+    color: #6c757d;
+    flex-shrink: 0; /* Empêche la flèche de rétrécir */
+}
+
+.menu-section details[open] .section-title::after {
+    transform: rotate(180deg);
+}
+
+/* Conteneur pour le texte et le badge */
+.menu-section .section-title strong {
+    font-weight: 600;
+    font-size: 16px;
+    flex: 1; /* Prend tout l'espace disponible */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-right: 15px; /* Espace entre le badge et la flèche */
+}
+
+/* Badge aligné à droite près du texte */
+.menu-section .badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    margin-left: auto; /* Pousse le badge vers la droite */
+    flex-shrink: 0; /* Empêche le badge de rétrécir */
+    order: 2; /* S'assure que le badge soit après le texte */
+}
+
+/* Ajustement pour les écrans mobiles */
+@media (max-width: 768px) {
+    .menu-section .section-title {
+        padding: 12px 15px;
+        font-size: 14px;
+        gap: 10px;
+    }
+    
+    .menu-section .section-title strong {
+        font-size: 14px;
+        margin-right: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .menu-section .badge {
+        align-self: flex-end;
+        margin-top: -20px; /* Remonte le badge pour l'aligner */
+        margin-bottom: 5px;
+    }
+}
+
+/* Grille des options */
+.menu-section .options-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 15px;
+    padding: 0 10px;
+}
+
+.menu-section .option-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    margin: 0;
+}
+
+.menu-section .option-item:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.menu-section .form-check {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.menu-section .form-check-input {
+    margin-right: 12px;
+    transform: scale(1.1);
+    border: 2px solid #adb5bd;
+}
+
+.menu-section .form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.menu-section .form-check-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    font-weight: 400;
+    color: #495057;
+}
+
+.menu-section .option-nom {
+    flex: 1;
+    font-size: 14px;
+    color: #2d3748;
+}
+
+.menu-section .prix-supplement {
+    color: #28a745;
+    font-weight: 600;
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+.menu-section .prix-inclus {
+    color: #6c757d;
+    font-size: 13px;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* Animation d'ouverture */
+.menu-section details[open] {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* États désactivés */
+.menu-section .form-check-input:disabled {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+    cursor: not-allowed;
+}
+
+.menu-section .form-check-input:disabled + .form-check-label {
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
 
 </style>
     

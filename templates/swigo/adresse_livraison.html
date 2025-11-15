@@ -285,9 +285,6 @@
                 <div class="widget-title">
                   <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
                 </div>
-                <div class="contact-info">
-                    (En cas de soucis vous pouvez nous joindre au <strong>06 95 59 98 59</strong>)
-                </div>
                 <form id="addressForm" method="post">
                   {% csrf_token %}
                   {% if form.errors %}
@@ -308,7 +305,7 @@
                       name="adresse_livraison"
                       class="form-control"
                       type="text"
-                      placeholder="Entrez l'adresse de livraison..."
+                      placeholder="Entrez l'adresse de livraison complète ici..."
                       value="{{ form.adresse_livraison.value|default_if_none:'' }}"
                       style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
                       autocomplete="off"
@@ -331,6 +328,9 @@
                   <input type="hidden" id="zone" name="zone">
                 </form>
               </div>
+            </div>
+            <div class="contact-info">
+                (En cas de soucis vous pouvez nous joindre au <strong>06 95 59 98 59</strong>)
             </div>
             <!-- Images food mobile uniquement (jamais desktop) -->
             <div class="visuels-food-mobile d-md-none">

@@ -1492,6 +1492,11 @@ class ArticlePanier(models.Model):
                 except (ValueError, TypeError) as e:
                     print(f"❌ Erreur calcul supplément menu: {e}")
             
+            # �🆕 AJOUT CRITIQUE : PRIX DE L'ACCOMPAGNEMENT POUR LES MENUS
+            if self.accompagnement:
+                prix_base += self.accompagnement.prix_supplement
+                print(f"🥔 Ajout accompagnement menu: {self.accompagnement.nom} +{self.accompagnement.prix_supplement}€")
+            
             return prix_base
             
         elif self.plat:

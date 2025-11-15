@@ -7084,8 +7084,21 @@ def ajouter_menu_personnalise(request):
             if article_correspond(art, choix_utiles, viandes):
                 # Article existant trouvé - incrémenter la quantité
                 art.quantite += 1
-                art.supplements_menu = supplements_complet  # 🆕 METTRE À JOUR LES SUPPLÉMENTS
-                art.calculate_total_price()  # 🔥 RECALCULER LE PRIX
+                art.supplements_menu = supplements_complet
+                
+                # 🔥 CORRECTION : METTRE À JOUR L'ACCOMPAGNEMENT SI NÉCESSAIRE
+                if 'accompagnement' in choix and choix['accompagnement']:
+                    try:
+                        accompagnement_id = choix['accompagnement'][0]
+                        if isinstance(accompagnement_id, str) and accompagnement_id.isdigit():
+                            accompagnement_id = int(accompagnement_id)
+                            accompagnement = Accompagnement.objects.get(id=accompagnement_id)
+                            art.accompagnement = accompagnement
+                            print(f"✅ Accompagnement mis à jour: {accompagnement.nom}")
+                    except (Accompagnement.DoesNotExist, ValueError, IndexError) as e:
+                        print(f"❌ Erreur mise à jour accompagnement: {e}")
+                
+                art.calculate_total_price()
                 logger.debug(f"[MENU PERSONNALISÉ] Article existant trouvé → incrémenté (ID {art.id})")
                 print(f"✅ Article existant trouvé, incrémenté (ID {art.id})")
                 found = True
@@ -7094,22 +7107,69 @@ def ajouter_menu_personnalise(request):
 
         # ==================== CRÉATION D'UN NOUVEL ARTICLE ====================
         if not found:
-            # Créer l'article avec le prix initial
+            # 🔥 CORRECTION : MAPPING ENTRE Plat ID ET Accompagnement ID
+            accompagnement_obj = None
+            if 'accompagnement' in choix and choix['accompagnement']:
+                try:
+                    accompagnement_id = choix['accompagnement'][0]
+                    if isinstance(accompagnement_id, str) and accompagnement_id.isdigit():
+                        accompagnement_id = int(accompagnement_id)
+                        
+                        # 🔥 MAPPING CORRECT Plat ID -> Accompagnement ID
+                        mapping_plat_vers_accompagnement = {
+                            # ID Plat (vrai) -> ID Accompagnement (vrai)
+                            129: 1,   # Frites Maison Croustillantes -> Frites Classiques (ID 1)
+                            130: 6,   # Coleslaw Maison -> Coleslaw (ID 6)
+                            131: 7,   # Onion Rings Maison (6 pcs) -> Onion Rings (ID 7)
+                            132: 9,   # Mozzarella Sticks Maison (2 pcs) -> Mozzarella Sticks (2 pcs) (ID 9)
+                            133: 8,   # Galette Rösti Maison (1 pcs) -> Galette Rösti (ID 8) ⭐ CELUI-CI
+                            134: 4,   # Salade et Vinaigrette Maison -> Salade Verte (ID 4)
+                            135: 2,   # Riz et Sauce Maison -> Riz Basmati (ID 2)
+                            136: 3,   # Couscous et Sauce -> Couscous (ID 3)
+                        }
+                        
+                        if accompagnement_id in mapping_plat_vers_accompagnement:
+                            acc_id = mapping_plat_vers_accompagnement[accompagnement_id]
+                            accompagnement_obj = Accompagnement.objects.get(id=acc_id)
+                            print(f"✅ Accompagnement lié via mapping: {accompagnement_obj.nom} (+{accompagnement_obj.prix_supplement}€)")
+                        else:
+                            print(f"⚠️  Aucun mapping trouvé pour Plat ID {accompagnement_id}")
+                            # 🔥 DEBUG : Afficher les informations du Plat
+                            try:
+                                plat_info = Plat.objects.get(id=accompagnement_id)
+                                print(f"🔍 Plat trouvé: {plat_info.nom} (ID: {plat_info.id}, Prix: {plat_info.prix_unitaire_ttc}€)")
+                            except Plat.DoesNotExist:
+                                print(f"🔍 Plat ID {accompagnement_id} n'existe pas")
+                                
+                except (Accompagnement.DoesNotExist, ValueError, IndexError) as e:
+                    print(f"❌ Erreur récupération accompagnement: {e}")
+
+            # Créer l'article avec le prix initial ET l'accompagnement
             article = ArticlePanier.objects.create(
                 panier=panier,
                 menu=menu,
                 quantite=1,
-                supplements_menu=supplements_complet,  # 🆕 SAUVEGARDER LES SUPPLÉMENTS
-                prix_total=prix_final  # Prix initial basé sur le calcul manuel
+                supplements_menu=supplements_complet,
+                prix_total=prix_final,
+                accompagnement=accompagnement_obj  # 🔥 LIER L'ACCOMPAGNEMENT DIRECTEMENT
             )
             print(f"✅ Nouvel ArticlePanier créé : {article.quantite} x {article.menu.nom} (Total initial: {article.prix_total})")
-            
+            if accompagnement_obj:
+                print(f"✅ Accompagnement lié à la création: {accompagnement_obj.nom} (+{accompagnement_obj.prix_supplement}€)")
+            else:
+                print(f"⚠️  Aucun accompagnement lié à l'article")
+
             # 🔥 CORRECTION CRITIQUE : FORCER LE RECALCUL POUR UTILISER calculate_base_price()
             article.calculate_total_price()
             print(f"💰 Prix après calculate_total_price(): {article.prix_total}€")
 
-            # Enregistrement des choix
+            # Enregistrement des choix (sauf accompagnement qui est déjà géré)
             for role, vals in choix.items():
+                # 🔥 NE PAS CRÉER DE ChoixMenuArticle POUR L'ACCOMPAGNEMENT (déjà géré par le champ accompagnement)
+                if role == 'accompagnement':
+                    print(f"⏭️  Accompagnement ignoré dans ChoixMenuArticle (déjà lié directement)")
+                    continue
+                    
                 if not isinstance(vals, list):
                     vals = [vals]
                 for val in vals:
@@ -7158,10 +7218,10 @@ def ajouter_menu_personnalise(request):
                         acc = AccompagnementCouscous.objects.get(id=acc_id)
                         ChoixMenuArticle.objects.create(
                             article_panier=article,
-                            role="accompagnement",
+                            role="accompagnement_couscous",  # 🔥 CHANGER LE RÔLE POUR ÉVITER LA CONFUSION
                             info_text=acc.nom
                         )
-                        print(f"✅ Ajouté accompagnement : {acc.nom}")
+                        print(f"✅ Ajouté accompagnement couscous : {acc.nom}")
                     except Exception as e:
                         logger.warning(f"AccompagnementCouscous introuvable (id={acc_id}): {e}")
                         print(f"❌ AccompagnementCouscous introuvable (id={acc_id}): {e}")
@@ -7204,61 +7264,278 @@ def ajouter_menu_personnalise(request):
 from django.http import JsonResponse
 from .models import ChoixMenu
 
+@csrf_exempt
+@csrf_exempt
 def api_choix_menu(request, menu_id):
     try:
-        menu = Menu.objects.get(id=menu_id)
-    except Menu.DoesNotExist:
-        return JsonResponse({'error': 'Menu introuvable'}, status=404)
+        logger.info(f"🔍 API choix_menu appelée pour menu_id: {menu_id}")
+        
+        try:
+            menu = Menu.objects.get(id=menu_id)
+            logger.info(f"✅ Menu trouvé: {menu.nom}")
+        except Menu.DoesNotExist:
+            logger.error(f"❌ Menu introuvable: {menu_id}")
+            return JsonResponse({'error': 'Menu introuvable', 'menu_id': menu_id}, status=404)
 
-    choix_list = []
-    utilise_couscous = False
+        choix_list = []
+        utilise_couscous = False
 
-    for choix in menu.choix.all():
-        if choix.autorise_couscous_personnalise:
-            utilise_couscous = True
+        if not menu.choix.exists():
+            logger.warning(f"⚠️ Menu {menu_id} n'a aucun choix configuré")
+            return JsonResponse({
+                'menu_id': menu_id,
+                'menu_nom': menu.nom,
+                'choix': [],
+                'warning': 'Aucun choix configuré pour ce menu'
+            })
 
-        choix_data = {
-            "role": choix.role,
-            "nombre_elements_inclus": choix.nombre_elements_inclus,
-            "autorise_salade_personnalisee": choix.autorise_salade_personnalisee,
-            "autorise_couscous_personnalise": choix.autorise_couscous_personnalise,
-            "plats": [{"id": p.id, "nom": p.nom} for p in choix.plats_possibles.all()]
+        # 🆕 TOUS LES SUPPLÉMENTS CONFIGURÉS
+        DESSERTS_AVEC_SUPPLEMENTS = [
+            (111, 'Brownie Maison', Decimal('4.90'), Decimal('2.00'), True),
+            (112, 'Cookie Maison', Decimal('2.90'), Decimal('0.00'), False),
+            (113, 'Fondant Chocolat', Decimal('5.90'), Decimal('3.00'), True),
+            (114, 'Tiramisu Café Classique', Decimal('5.20'), Decimal('2.30'), True),
+            (115, 'Tiramisu Choco-Caramel', Decimal('5.50'), Decimal('2.60'), True),
+            (116, 'Corne De Gazelle', Decimal('2.50'), Decimal('0.00'), False),
+            (117, 'Chebakia Miel et Sésame', Decimal('2.50'), Decimal('0.00'), False),
+            (118, 'Makrout Datte', Decimal('2.50'), Decimal('0.00'), False),
+            (119, 'Briouate Amandes et Miel', Decimal('2.50'), Decimal('0.00'), False),
+            (120, 'Assortiment marocain (4 pièces)', Decimal('8.90'), Decimal('6.00'), True),
+        ]
+
+        BOISSONS_AVEC_SUPPLEMENTS = [
+            (99, 'Coca-Cola', Decimal('2.50'), Decimal('0.00'), False),
+            (100, 'Coca-Cola Zero', Decimal('2.50'), Decimal('0.00'), False),
+            (101, 'Fanta Orange', Decimal('2.50'), Decimal('0.00'), False),
+            (102, 'Fanta Citron', Decimal('2.50'), Decimal('0.00'), False),
+            (103, 'Ice Tea Pêche', Decimal('2.50'), Decimal('0.00'), False),
+            (104, 'Oasis Tropical', Decimal('2.50'), Decimal('0.00'), False),
+            (105, 'Sprite', Decimal('2.50'), Decimal('0.00'), False),
+            (106, 'Schweppes Agrumes', Decimal('2.50'), Decimal('0.00'), False),
+            (107, 'Hawai', Decimal('2.50'), Decimal('0.00'), False),
+            (108, 'Red Bull', Decimal('3.50'), Decimal('1.00'), True),
+            (109, 'Eau minérale', Decimal('2.00'), Decimal('0.00'), False),
+            (110, 'Eau Pétillante', Decimal('2.00'), Decimal('0.00'), False),
+            (121, 'Orangina', Decimal('2.50'), Decimal('0.00'), False),
+        ]
+
+        # 🆕 ACCOMPAGNEMENTS AVEC SUPPLÉMENTS (identique à accompagnements_burger_ajax)
+        ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS = [
+            (1001, 'Frites', Decimal('0.00')),
+            (1002, 'Riz', Decimal('0.00')),
+            (1003, 'Couscous', Decimal('1.00')),
+            (1004, 'Salade', Decimal('0.00')),
+            (1005, 'Kemia', Decimal('0.00')),
+            (1006, 'Coleslaw', Decimal('0.00')),
+            (1007, 'Onion Rings', Decimal('1.00')),
+            (1008, 'Galette Rösti', Decimal('0.70')),
+            (1009, 'Mozzarella Sticks (2 pcs)', Decimal('0.90')),
+        ]
+
+        for choix in menu.choix.all():
+            logger.info(f"📋 Traitement choix: {choix.role}")
+            
+            if choix.autorise_couscous_personnalise:
+                utilise_couscous = True
+                logger.info("🍛 Menu couscous détecté")
+
+            # 🆕 CONSTRUCTION DES DONNÉES AVEC TOUS LES PRIX
+            plats_data = []
+            for p in choix.plats_possibles.all():
+                prix_supplement = Decimal('0.00')
+                
+                # Chercher dans les desserts
+                for dessert_info in DESSERTS_AVEC_SUPPLEMENTS:
+                    if dessert_info[0] == p.id:
+                        prix_supplement = dessert_info[3] if dessert_info[4] else Decimal('0.00')
+                        break
+                
+                # Chercher dans les boissons si pas trouvé
+                if prix_supplement == 0:
+                    for boisson_info in BOISSONS_AVEC_SUPPLEMENTS:
+                        if boisson_info[0] == p.id:
+                            prix_supplement = boisson_info[3] if boisson_info[4] else Decimal('0.00')
+                            break
+                
+                # 🆕 CHERCHER DANS LES ACCOMPAGNEMENTS
+                if prix_supplement == 0:
+                    for acc_info in ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS:
+                        if acc_info[0] == p.id:
+                            prix_supplement = acc_info[2]
+                            break
+                
+                # Si non trouvé, vérifier par nom (fallback)
+                if prix_supplement == 0:
+                    nom_lower = p.nom.lower()
+                    if any(mot in nom_lower for mot in ['brownie', 'fondant', 'tiramisu', 'assortiment']):
+                        prix_supplement = Decimal('2.00')
+                    elif 'red bull' in nom_lower:
+                        prix_supplement = Decimal('1.00')
+                    # 🆕 FALLBACK POUR ACCOMPAGNEMENTS PAR NOM
+                    elif any(mot in nom_lower for mot in ['couscous', 'onion rings', 'onion']):
+                        prix_supplement = Decimal('1.00')
+                    elif 'rösti' in nom_lower or 'rosti' in nom_lower:
+                        prix_supplement = Decimal('0.70')
+                    elif 'mozzarella' in nom_lower:
+                        prix_supplement = Decimal('0.90')
+                
+                plat_data = {
+                    "id": p.id, 
+                    "nom": p.nom,
+                    "prix_unitaire_ttc": str(p.prix_unitaire_ttc) if p.prix_unitaire_ttc else "0.00",
+                    "prix_supplement": str(prix_supplement),
+                    "description_courte": getattr(p, 'description_courte', '') or "",
+                    "photo_url": p.photo.url if hasattr(p, 'photo') and p.photo else None
+                }
+                plats_data.append(plat_data)
+                logger.info(f"💰 Plat {p.nom}: supplément = {prix_supplement}€")
+
+            choix_data = {
+                "id": choix.id,
+                "role": choix.role,
+                "nombre_elements_inclus": choix.nombre_elements_inclus,
+                "autorise_salade_personnalisee": choix.autorise_salade_personnalisee,
+                "autorise_couscous_personnalise": choix.autorise_couscous_personnalise,
+                "plats": plats_data
+            }
+
+            if choix.autorise_couscous_personnalise:
+                choix_data["nombre_viandes_incluses"] = getattr(choix, 'nombre_viandes_incluses', 1)
+                
+                viandes_data = []
+                viandes_possibles = getattr(choix, 'viandes_possibles', None)
+                
+                if viandes_possibles:
+                    for v in viandes_possibles.all():
+                        viande_data = {
+                            "id": v.id, 
+                            "nom": v.nom,
+                            "prix_supplement": str(getattr(v, 'supplement_inclus', 0)) if getattr(v, 'supplement_inclus', None) else "0.00"
+                        }
+                        viandes_data.append(viande_data)
+                        logger.info(f"💰 Viande {v.nom}: supplément = {viande_data['prix_supplement']}€")
+                
+                choix_data["viandes_possibles"] = viandes_data
+
+            choix_list.append(choix_data)
+
+        response_data = {
+            "menu_id": menu_id,
+            "menu_nom": menu.nom,
+            "choix": choix_list,
+            # 🆕 AJOUTER LA LISTE DES ACCOMPAGNEMENTS POUR RÉFÉRENCE
+            "accompagnements_config": ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS
         }
 
-        if choix.autorise_couscous_personnalise:
-            choix_data["nombre_viandes_incluses"] = choix.nombre_viandes_incluses
-            choix_data["viandes_possibles"] = [
-                {"id": v.id, "nom": v.nom} for v in choix.viandes_possibles.all()
-            ]
+        if utilise_couscous:
+            try:
+                accompagnements = list(AccompagnementCouscous.objects.all().values("id", "nom"))
+                # 🆕 AJOUTER LES PRIX AUX ACCOMPAGNEMENTS COUSCOUS
+                accompagnements_avec_prix = []
+                for acc in accompagnements:
+                    prix_acc = Decimal('0.00')
+                    for acc_info in ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS:
+                        if acc_info[0] == acc['id']:
+                            prix_acc = acc_info[2]
+                            break
+                    accompagnements_avec_prix.append({
+                        'id': acc['id'],
+                        'nom': acc['nom'],
+                        'prix_supplement': str(prix_acc)
+                    })
+                
+                response_data["accompagnements_couscous"] = accompagnements_avec_prix
+                logger.info(f"🍟 {len(accompagnements_avec_prix)} accompagnements chargés avec prix")
+            except Exception as e:
+                logger.error(f"❌ Erreur chargement accompagnements: {e}")
+                response_data["accompagnements_couscous"] = []
 
-        choix_list.append(choix_data)
+        response_data["menu_type"] = detecter_type_menu(menu.nom)
+        
+        logger.info(f"✅ API choix_menu réussie pour {menu.nom}")
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        logger.exception(f"❌ Erreur critique dans api_choix_menu: {e}")
+        return JsonResponse({
+            "error": "Erreur interne du serveur",
+            "details": str(e),
+            "menu_id": menu_id
+        }, status=500)
 
-    response_data = {"choix": choix_list}
+def calculer_prix_supplement_plat(plat_id, plat_nom):
+    """
+    Calcule le prix supplémentaire réel d'un plat basé sur votre logique
+    """
+    # 🎯 UTILISER LA MÊME LOGIQUE QUE DANS ajouter_menu_personnalise
+    DESSERTS_AVEC_SUPPLEMENTS = [
+        (111, 'Brownie Maison', Decimal('4.90'), Decimal('2.00'), True),
+        (112, 'Cookie Maison', Decimal('2.90'), Decimal('0.00'), False),
+        (113, 'Fondant Chocolat', Decimal('5.90'), Decimal('3.00'), True),
+        (114, 'Tiramisu Café Classique', Decimal('5.20'), Decimal('2.30'), True),
+        (115, 'Tiramisu Choco-Caramel', Decimal('5.50'), Decimal('2.60'), True),
+        (116, 'Corne De Gazelle', Decimal('2.50'), Decimal('0.00'), False),
+        (117, 'Chebakia Miel et Sésame', Decimal('2.50'), Decimal('0.00'), False),
+        (118, 'Makrout Datte', Decimal('2.50'), Decimal('0.00'), False),
+        (119, 'Briouate Amandes et Miel', Decimal('2.50'), Decimal('0.00'), False),
+        (120, 'Assortiment marocain (4 pièces)', Decimal('8.90'), Decimal('6.00'), True),
+    ]
 
-    # Inclure les accompagnements pour les menus couscous
-    if utilise_couscous:
-        accompagnements = list(AccompagnementCouscous.objects.all().values("id", "nom"))
-        response_data["accompagnements_couscous"] = accompagnements
+    BOISSONS_AVEC_SUPPLEMENTS = [
+        (99, 'Coca-Cola', Decimal('2.50'), Decimal('0.00'), False),
+        (100, 'Coca-Cola Zero', Decimal('2.50'), Decimal('0.00'), False),
+        (101, 'Fanta Orange', Decimal('2.50'), Decimal('0.00'), False),
+        (102, 'Fanta Citron', Decimal('2.50'), Decimal('0.00'), False),
+        (103, 'Ice Tea Pêche', Decimal('2.50'), Decimal('0.00'), False),
+        (104, 'Oasis Tropical', Decimal('2.50'), Decimal('0.00'), False),
+        (105, 'Sprite', Decimal('2.50'), Decimal('0.00'), False),
+        (106, 'Schweppes Agrumes', Decimal('2.50'), Decimal('0.00'), False),
+        (107, 'Hawai', Decimal('2.50'), Decimal('0.00'), False),
+        (108, 'Red Bull', Decimal('3.50'), Decimal('1.00'), True),
+        (109, 'Eau minérale', Decimal('2.00'), Decimal('0.00'), False),
+        (110, 'Eau Pétillante', Decimal('2.00'), Decimal('0.00'), False),
+        (121, 'Orangina', Decimal('2.50'), Decimal('0.00'), False),
+    ]
 
-    # Ajouter des métadonnées spécifiques au menu
-    response_data["menu_type"] = detecter_type_menu(menu.nom)
+    # Chercher dans les desserts
+    for dessert_info in DESSERTS_AVEC_SUPPLEMENTS:
+        if dessert_info[0] == plat_id:
+            return dessert_info[3] if dessert_info[4] else Decimal('0.00')
     
-    return JsonResponse(response_data)
+    # Chercher dans les boissons
+    for boisson_info in BOISSONS_AVEC_SUPPLEMENTS:
+        if boisson_info[0] == plat_id:
+            return boisson_info[3] if boisson_info[4] else Decimal('0.00')
+    
+    # Si non trouvé, vérifier par nom (fallback)
+    nom_lower = plat_nom.lower()
+    if any(mot in nom_lower for mot in ['brownie', 'fondant', 'tiramisu', 'assortiment']):
+        # Ces desserts ont généralement un supplément
+        return Decimal('2.00')
+    elif 'red bull' in nom_lower:
+        return Decimal('1.00')
+    
+    # Par défaut, pas de supplément
+    return Decimal('0.00')
 
 def detecter_type_menu(nom_menu):
     """Détermine le type de menu pour l'interface frontend"""
-    if "Burger ERC" in nom_menu:
+    nom_lower = nom_menu.lower()
+    
+    if "burger" in nom_lower:
         return "burger"
-    elif "Couscous" in nom_menu:
+    elif "couscous" in nom_lower:
         return "couscous" 
-    elif "Crousty Tenders" in nom_menu:
+    elif "tenders" in nom_lower:
         return "tenders_simple"
-    elif "Poulet Frit" in nom_menu:
+    elif "poulet frit" in nom_lower:
         return "poulet_choix"
-    elif "Poulet Josper" in nom_menu:
+    elif "josper" in nom_lower:
         return "poulet_josper"
     else:
         return "standard"
+
+
 
 
 
