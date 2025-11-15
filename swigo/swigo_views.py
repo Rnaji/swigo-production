@@ -4515,16 +4515,17 @@ from .models import Commande, Tournee, TourneeCommande
 def cuisine_view(request):
     """
     Vue pour afficher les commandes en cuisine :
-    - payées OU à emporter validées manuellement,
+    - payées OU validées manuellement,
     - en cuisine (is_in_the_kitchen=True),
     - non cuites (is_cooked=False),
     regroupées par tournées fermées.
     """
 
     # Étape 1 : créer une tournée fermée pour chaque commande à emporter validée sans tournée
+    # CORRECTION: Utiliser le même filtre que get_commandes_cuisine
     commandes_sans_tournee = Commande.objects.filter(
+        Q(is_paid=True) | Q(commande_is_valid=True),  # ← Uniformisation du filtre
         is_commande_a_emporter=True,
-        commande_is_valid=True,
         is_in_the_kitchen=True,
         is_cooked=False
     ).exclude(
@@ -4554,9 +4555,9 @@ def cuisine_view(request):
         )
 
     # Étape 2 : récupérer toutes les commandes concernées
+    # CORRECTION: Utiliser le même filtre que get_commandes_cuisine
     commandes = Commande.objects.filter(
-        Q(is_paid=True) |
-        Q(is_commande_a_emporter=True, commande_is_valid=True),
+        Q(is_paid=True) | Q(commande_is_valid=True),  # ← Uniformisation du filtre
         is_in_the_kitchen=True,
         is_cooked=False
     )
@@ -4712,8 +4713,6 @@ def get_commandes_cuisine(request):
 
 
 
-from decimal import Decimal
-
 def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_cuisine=True):
     if aggregated_articles is None:
         aggregated_articles = {}
@@ -4828,7 +4827,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
                     option_lower = option.nom.lower()
                     if any(mot in option_lower for mot in ['mild', 'hot', 'épicé', 'doux']):
                         # 🆕 METTRE LES SAUCES EN PREMIER
-                        options_grouped['sauces'].unshift(option_text)
+                        options_grouped['sauces'].insert(0, option_text)  # unshift devient insert(0)
                     elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
                         options_grouped['sauces'].append(option_text)
                     elif any(mot in option_lower for mot in ['coleslaw', 'frites', 'riz', 'couscous']):
@@ -4902,7 +4901,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
         else:
             continue
 
-        # 🆕 CONSTRUCTION DE L'AFFICHAGE AVEC TIRETS
+        # 🆕 CONSTRUCTION DE L'AFFICHAGE AVEC TIRETS - CORRECTION ICI
         details_data = []
         
         # Ordre d'affichage des catégories avec couleurs
@@ -4916,8 +4915,8 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
         
         for cat_key, cat_label, color_class in categories_config:
             if options_grouped[cat_key]:
-                # 🆕 UTILISER DES TIRETS AU LIEU DES VIRGULES
-                items_with_dashes = options_grouped[cat_key].join(' --- ')
+                # 🆕 CORRECTION : Utiliser ' --- '.join() sur la liste
+                items_with_dashes = ' --- '.join(options_grouped[cat_key])  # ← CORRECTION ICI
                 details_data.append({
                     'label': cat_label,
                     'items': items_with_dashes,  # 🆕 CHAÎNE UNIQUE AVEC TIRETS

@@ -262,8 +262,12 @@
                                             if (optGroup.items && optGroup.items.length > 0) {
                                                 articleText += `<li class="${optGroup.color}" style="font-weight: 500;">`;
                                                 articleText += `${optGroup.label} `;
+                                            // CORRECTION : Vérifier si items est un tableau avant d'utiliser .join()
+                                            if (Array.isArray(optGroup.items)) {
                                                 articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items.join(', ')}</span>`;
-                                                articleText += `</li>`;
+                                            } else {
+                                                articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items}</span>`;
+                                            }                                                articleText += `</li>`;
                                             }
                                         });
                                         articleText += `</ul>`;

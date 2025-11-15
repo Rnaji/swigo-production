@@ -233,7 +233,15 @@
 }
 
 
+/* Ajoutez ceci dans votre block additional_css */
+#zone-error-message {
+    animation: fadeIn 0.3s ease-in;
+}
 
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 </style>
 {% endblock %}
 
@@ -387,19 +395,196 @@
     }
     
     function initAutocomplete() {
-        const adresseInput = document.getElementById('id_adresse_livraison');
-        const autocomplete = new google.maps.places.Autocomplete(adresseInput);
-        autocomplete.addListener('place_changed', function () {
-            const place = autocomplete.getPlace();
-            if (place.geometry) {
-                document.getElementById('latitude').value = place.geometry.location.lat();
-                document.getElementById('longitude').value = place.geometry.location.lng();
+    const adresseInput = document.getElementById('id_adresse_livraison');
+    
+    // Définir les limites autour de Gisors (approx. 20km de rayon)
+    const gisorsBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(49.15, 1.65),  // Sud-Ouest
+        new google.maps.LatLng(49.25, 1.85)   // Nord-Est
+    );
+    
+    // Options de l'autocomplete avec restriction
+    const autocompleteOptions = {
+        bounds: gisorsBounds,
+        strictBounds: true, // N'affiche que les résultats dans la zone
+        types: ['address'], // Seulement les adresses (pas les établissements)
+        componentRestrictions: { country: 'fr' } // Limite à la France
+    };
+    
+    const autocomplete = new google.maps.places.Autocomplete(adresseInput, autocompleteOptions);
+    
+    // Forcer le recentrage sur Gisors si l'utilisateur tape en dehors
+    
+    autocomplete.setComponentRestrictions({
+        country: 'fr'
+    });
+    
+    autocomplete.addListener('place_changed', function () {
+        const place = autocomplete.getPlace();
+        
+        if (place.geometry) {
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            
+            // Vérifier si l'adresse est dans la zone Gisors + 20km
+            if (isInDeliveryZone(lat, lng)) {
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lng;
                 document.getElementById('code_postal').value = getComponent(place, 'postal_code');
                 document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
+                document.getElementById('zone').value = 'gisors';
+            } else {
+                // Adresse hors zone
+                showOutOfZoneError();
+                document.getElementById('latitude').value = '';
+                document.getElementById('longitude').value = '';
+                document.getElementById('code_postal').value = '';
+                document.getElementById('ville').value = '';
+                document.getElementById('zone').value = 'hors_zone';
             }
-        });
+        } else {
+            // Adresse non reconnue
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
+            document.getElementById('code_postal').value = '';
+            document.getElementById('ville').value = '';
+            document.getElementById('zone').value = '';
+        }
+    });
+    
+    // Validation lors de la perte de focus
+    adresseInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            if (!document.getElementById('latitude').value && adresseInput.value.trim()) {
+                // Tentative de géocodage forcé avec vérification de zone
+                forceGeocodeWithZoneCheck(adresseInput.value.trim());
+            }
+        }, 500);
+    });
+}
+    
+
+function isInDeliveryZone(lat, lng) {
+    // Coordonnées du centre de Gisors
+    const gisorsCenter = { lat: 49.2771, lng: 1.7741 };
+    
+    // Rayon de livraison en kilomètres (20km)
+    const deliveryRadiusKm = 20;
+    
+    // Calcul de la distance en kilomètres (formule Haversine)
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat - gisorsCenter.lat) * Math.PI / 180;
+    const dLng = (lng - gisorsCenter.lng) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(gisorsCenter.lat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * 
+        Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    return distance <= deliveryRadiusKm;
+}
+
+function forceGeocodeWithZoneCheck(address) {
+    const geocoder = new google.maps.Geocoder();
+    
+    geocoder.geocode({ 
+        'address': address,
+        'componentRestrictions': { country: 'fr' }
+    }, function(results, status) {
+        if (status === 'OK' && results[0]) {
+            const place = results[0];
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            
+            if (isInDeliveryZone(lat, lng)) {
+                // Adresse dans la zone
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lng;
+                document.getElementById('code_postal').value = getComponent(place, 'postal_code');
+                document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
+                document.getElementById('zone').value = 'gisors';
+            } else {
+                // Adresse hors zone
+                showOutOfZoneError();
+                document.getElementById('latitude').value = '';
+                document.getElementById('longitude').value = '';
+                document.getElementById('code_postal').value = '';
+                document.getElementById('ville').value = '';
+                document.getElementById('zone').value = 'hors_zone';
+            }
+        } else {
+            // Échec du géocodage
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
+            document.getElementById('code_postal').value = '';
+            document.getElementById('ville').value = '';
+            document.getElementById('zone').value = '';
+        }
+    });
+}function showOutOfZoneError() {
+    const adresseInput = document.getElementById('id_adresse_livraison');
+    
+    // Message d'erreur temporaire
+    adresseInput.style.borderColor = '#dc3545';
+    adresseInput.style.boxShadow = '0 0 0 0.2rem rgba(220, 53, 69, 0.25)';
+    
+    // Tooltip ou message d'information
+    const existingError = document.getElementById('zone-error-message');
+    if (existingError) existingError.remove();
+    
+    const errorMessage = document.createElement('div');
+    errorMessage.id = 'zone-error-message';
+    errorMessage.innerHTML = `
+        <small class="text-danger mt-1 d-block">
+            ⚠️ Cette adresse est hors de notre zone de livraison (Gisors + 15 minutes). 
+            Vous pouvez toujours commander à emporter.
+        </small>
+    `;
+    
+    adresseInput.parentNode.appendChild(errorMessage);
+    
+    // Retirer le style après 5 secondes
+    setTimeout(() => {
+        adresseInput.style.borderColor = '';
+        adresseInput.style.boxShadow = '';
+    }, 5000);
+}
+
+
+function validateAddressBeforeSubmit() {
+    const adresse = document.getElementById('id_adresse_livraison').value.trim();
+    const latitude = document.getElementById('latitude').value;
+    const longitude = document.getElementById('longitude').value;
+    const zone = document.getElementById('zone').value;
+    
+    if (!adresse) {
+        alert('Veuillez entrer une adresse de livraison.');
+        return false;
     }
     
+    // Si l'adresse est marquée comme hors zone
+    if (zone === 'hors_zone') {
+        const confirmation = confirm(
+            'Cette adresse est hors de notre zone de livraison (Gisors + 20km).\n\n' +
+            'Souhaitez-vous continuer pour commander à emporter ?'
+        );
+        return confirmation;
+    }
+    
+    // Si l'adresse n'a pas été géocodée
+    if (!latitude || !longitude) {
+        const confirmation = confirm(
+            'L\'adresse que vous avez saisie n\'a pas été reconnue.\n\n' +
+            'Veuillez vérifier l\'orthographe ou essayer une adresse près de Gisors.'
+        );
+        return confirmation;
+    }
+    
+    return true;
+}
+
+
     function utiliserMaPosition() {
         const btnGeo = document.querySelector("button[onclick='utiliserMaPosition()']");
         btnGeo.innerHTML = "⏳ Détection en cours...";

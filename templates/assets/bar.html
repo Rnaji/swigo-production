@@ -168,21 +168,28 @@
     `;
 
     tournee.commandes.forEach(commande => {
-        let articlesHTML = '<ul>';
-        commande.articles.forEach(article => {
-            articlesHTML += `<li><strong>${article.nom}</strong> - ${article.quantite}x`;
-            if (article.options.length > 0) {
-                articlesHTML += `<ul>`;
-                article.options.forEach(option => {
+    let articlesHTML = '<ul>';
+    commande.articles.forEach(article => {
+        articlesHTML += `<li><strong>${article.nom}</strong> - ${article.quantite}x`;
+        if (article.options.length > 0) {
+            articlesHTML += `<ul>`;
+            article.options.forEach(option => {
+                // CORRECTION ICI
+                if (typeof option === 'object' && option.items) {
+                    articlesHTML += `<li>${option.items}</li>`;
+                } else if (typeof option === 'object') {
+                    articlesHTML += `<li>${JSON.stringify(option)}</li>`;
+                } else {
                     articlesHTML += `<li>${option}</li>`;
-                });
-                articlesHTML += `</ul>`;
-            }
-            articlesHTML += `</li>`;
-        });
-        articlesHTML += '</ul>';
-        tourneeHTML += `<tr><td>${commande.commande_id}</td><td>${articlesHTML}</td></tr>`;
+                }
+            });
+            articlesHTML += `</ul>`;
+        }
+        articlesHTML += `</li>`;
     });
+    articlesHTML += '</ul>';
+    tourneeHTML += `<tr><td>${commande.commande_id}</td><td>${articlesHTML}</td></tr>`;
+});
 
     tourneeHTML += `
                                             </tbody>
@@ -226,14 +233,70 @@
 
     container.innerHTML += tourneeHTML;
 
-    // Remplir les articles récap
-    const recapContainer = document.getElementById(`recapitulatif-${tourneeID}`);
-    for (const [categorie, articles] of Object.entries(tournee.aggregated_articles)) {
-        recapContainer.innerHTML += `<li class="list-group-item active">${categorie}</li>`;
-        for (const [articleKey, articleData] of Object.entries(articles)) {
-            recapContainer.innerHTML += `<li class="list-group-item">${articleData.nom} - ${articleData.quantite}x ${articleData.options ? ` (Options: ${articleData.options})` : ''}</li>`;
+// Remplir les articles récap - VERSION CORRIGEE
+// Remplir les articles récap - VERSION AVEC DEBUG
+const recapContainer = document.getElementById(`recapitulatif-${tourneeID}`);
+console.log("=== DEBUG RECAP ===");
+console.log("TourneeID:", tourneeID);
+console.log("Recap container trouvé:", !!recapContainer);
+console.log("Aggregated articles:", tournee.aggregated_articles);
+
+// VIDER le container d'abord
+recapContainer.innerHTML = '';
+
+for (const [categorie, articles] of Object.entries(tournee.aggregated_articles)) {
+    console.log("Categorie:", categorie);
+    console.log("Articles dans categorie:", articles);
+    
+    recapContainer.innerHTML += `<li class="list-group-item active">${categorie}</li>`;
+    
+    for (const [articleKey, articleData] of Object.entries(articles)) {
+        console.log("=== ARTICLE DATA ===");
+        console.log("ArticleData:", articleData);
+        console.log("Nom:", articleData.nom);
+        console.log("Quantite:", articleData.quantite);
+        console.log("Options:", articleData.options);
+        console.log("Type des options:", typeof articleData.options);
+        
+        let optionsText = '';
+        
+        if (articleData.options && Array.isArray(articleData.options)) {
+            console.log("Options est un tableau, longueur:", articleData.options.length);
+            
+            const optionDetails = [];
+            
+            articleData.options.forEach((option, index) => {
+                console.log(`Option ${index}:`, option);
+                console.log(`Type option ${index}:`, typeof option);
+                console.log(`Option ${index} keys:`, Object.keys(option));
+                
+                if (option && option.items) {
+                    console.log(`Option ${index} items:`, option.items);
+                    console.log(`Type items:`, typeof option.items);
+                    optionDetails.push(option.items);
+                } else {
+                    console.log(`Option ${index} n'a pas de propriété 'items'`);
+                }
+            });
+            
+            console.log("OptionDetails final:", optionDetails);
+            
+            if (optionDetails.length > 0) {
+                optionsText = ` (${optionDetails.join(' | ')})`;
+                console.log("OptionsText final:", optionsText);
+            }
+        } else {
+            console.log("Pas d'options ou options n'est pas un tableau");
         }
+        
+        const listItemHTML = `<li class="list-group-item">${articleData.nom} - ${articleData.quantite}x${optionsText}</li>`;
+        console.log("HTML généré:", listItemHTML);
+        
+        recapContainer.innerHTML += listItemHTML;
     }
+}
+
+console.log("=== FIN DEBUG RECAP ===");
 
     // Chrono seulement si pas pickup
     if (tournee.start_time && !tournee.is_pickup) {
