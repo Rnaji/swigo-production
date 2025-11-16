@@ -381,35 +381,24 @@
 
 {% block additional_js %}
 <script>
-    function getComponent(place, type) {
-        const component = place.address_components.find(c => c.types.includes(type));
-        return component ? component.long_name : '';
-    }
-    
-    function initAutocomplete() {
+function initAutocomplete() {
     const adresseInput = document.getElementById('id_adresse_livraison');
     
-    // Définir les limites autour de Gisors (approx. 20km de rayon)
+    // Élargir les limites autour de Gisors
     const gisorsBounds = new google.maps.LatLngBounds(
-        new google.maps.LatLng(49.15, 1.65),  // Sud-Ouest
-        new google.maps.LatLng(49.25, 1.85)   // Nord-Est
+        new google.maps.LatLng(49.10, 1.60),
+        new google.maps.LatLng(49.40, 1.95)
     );
     
-    // Options de l'autocomplete avec restriction
+    // ✅ MODIFICATION : Supprimer la restriction de type pour permettre tous les lieux
     const autocompleteOptions = {
         bounds: gisorsBounds,
-        strictBounds: true, // N'affiche que les résultats dans la zone
-        types: ['address'], // Seulement les adresses (pas les établissements)
-        componentRestrictions: { country: 'fr' } // Limite à la France
+        strictBounds: false,
+        // SUPPRIMER: types: ['address'], ← Cette ligne limite aux adresses seulement
+        componentRestrictions: { country: 'fr' }
     };
     
     const autocomplete = new google.maps.places.Autocomplete(adresseInput, autocompleteOptions);
-    
-    // Forcer le recentrage sur Gisors si l'utilisateur tape en dehors
-    
-    autocomplete.setComponentRestrictions({
-        country: 'fr'
-    });
     
     autocomplete.addListener('place_changed', function () {
         const place = autocomplete.getPlace();
@@ -418,24 +407,17 @@
             const lat = place.geometry.location.lat();
             const lng = place.geometry.location.lng();
             
-            // Vérifier si l'adresse est dans la zone Gisors + 20km
-            if (isInDeliveryZone(lat, lng)) {
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lng;
-                document.getElementById('code_postal').value = getComponent(place, 'postal_code');
-                document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
-                document.getElementById('zone').value = 'gisors';
-            } else {
-                // Adresse hors zone
-                showOutOfZoneError();
-                document.getElementById('latitude').value = '';
-                document.getElementById('longitude').value = '';
-                document.getElementById('code_postal').value = '';
-                document.getElementById('ville').value = '';
-                document.getElementById('zone').value = 'hors_zone';
-            }
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lng;
+            document.getElementById('code_postal').value = getComponent(place, 'postal_code');
+            document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
+            document.getElementById('zone').value = 'gisors';
+            
+            console.log("📍 Lieu sélectionné:", place.formatted_address);
+            console.log("📌 Coordonnées:", lat, lng);
+            console.log("🏷️ Types:", place.types); // Pour debug
+            
         } else {
-            // Adresse non reconnue
             document.getElementById('latitude').value = '';
             document.getElementById('longitude').value = '';
             document.getElementById('code_postal').value = '';
@@ -444,17 +426,21 @@
         }
     });
     
-    // Validation lors de la perte de focus
+    // Validation plus permissive
     adresseInput.addEventListener('blur', function() {
         setTimeout(() => {
-            if (!document.getElementById('latitude').value && adresseInput.value.trim()) {
-                // Tentative de géocodage forcé avec vérification de zone
-                forceGeocodeWithZoneCheck(adresseInput.value.trim());
+            const currentValue = adresseInput.value.trim();
+            if (currentValue && !document.getElementById('latitude').value) {
+                console.log("🔍 Tentative de géocodage pour:", currentValue);
             }
         }, 500);
     });
 }
-    
+
+function getComponent(place, type) {
+    const component = place.address_components.find(c => c.types.includes(type));
+    return component ? component.long_name : '';
+}
 
 
 
@@ -557,86 +543,91 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Gestion de la soumission du formulaire
     document.getElementById('addressForm').addEventListener('submit', function (event) {
-        event.preventDefault();
+    event.preventDefault();
 
-        console.log("🟡 Envoi du formulaire...");
+    const adresse = document.getElementById('id_adresse_livraison').value.trim();
+    const codePostal = document.getElementById('code_postal').value.trim();
+    const ville = document.getElementById('ville').value.trim();
 
-        fetch('{% url "swigo:adresse_livraison" %}', {
-            method: 'POST',
-            body: new FormData(this),
-            headers: { 'X-CSRFToken': getCookie('csrftoken') }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Erreur serveur: ' + response.status);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log("✅ Réponse reçue:", data);
-            window._erc_last_estimation = data;
+    // ✅ Validation : Adresse incomplète
+    if (!adresse || !codePostal || !ville) {
+        showAddressHelpModal(); // Message 1
+        return;
+    }
 
-            const modal = new bootstrap.Modal(modalEl);
+    console.log("🟡 Envoi du formulaire...");
 
-            // ✅ CAS HORS ZONE - Priorité haute
-            if (data.hors_zone === true) {
-                showMessage(data.error, 'warning');
-                
-                setBtnState(btnNow, true, "Livraison indisponible");
-                setBtnState(btnLater, true, "Planifier indisponible");
-                setBtnState(btnPickup, false, "Commander à emporter");
-                
-                // Style spécial pour le cas hors zone
-                btnPickup.classList.remove('btn-outline-secondary');
-                btnPickup.classList.add('btn-outline-success');
-                
-                optionsEl.style.display = 'flex';
-                modal.show();
-                return;
-            }
+    fetch('{% url "swigo:adresse_livraison" %}', {
+        method: 'POST',
+        body: new FormData(this),
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erreur serveur: ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("✅ Réponse reçue:", data);
+        window._erc_last_estimation = data;
 
-            // ✅ CAS AVEC ERREUR (mais pas hors zone)
-            if (data.error) {
-                showMessage(data.error, 'error');
-                
-                setBtnState(btnNow, data.disable_livrer_au_plus_tot || false, "Livrer au plus tôt");
-                setBtnState(btnLater, data.disable_planifier || false, "Planifier plus tard");
-                setBtnState(btnPickup, data.disable_emporter || data.pickup_indispo || false, "Commander à emporter");
-                
-                optionsEl.style.display = 'flex';
-                modal.show();
-                return;
-            }
+        const modal = new bootstrap.Modal(modalEl);
 
-            // ✅ CAS NORMAL - Livraison disponible
+        // ✅ CAS : Adresse complète mais hors zone
+        if (data.hors_zone === true) {
+            showOutOfZoneError(); // Message 2
+            return;
+        }
+
+        // ✅ CAS : Autre erreur
+        if (data.error) {
+            showMessage(data.error, 'error');
+            
+            setBtnState(btnNow, data.disable_livrer_au_plus_tot || false, "Livrer au plus tôt");
+            setBtnState(btnLater, data.disable_planifier || false, "Planifier plus tard");
+            setBtnState(btnPickup, data.disable_emporter || data.pickup_indispo || false, "Commander à emporter");
+            
+            optionsEl.style.display = 'flex';
+            modal.show();
+            return;
+        }
+
+        // ✅ CAS NORMAL - Livraison disponible
+        if (data.premiere_heure) {
             showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
             
-            // Stocker les infos de créneau
             document.getElementById('premiereDate').value = data.premiere_date;
             document.getElementById('premiereHeure').value = data.premiere_heure;
 
-            // Activer tous les boutons
             setBtnState(btnNow, false, "Livrer au plus tôt");
             setBtnState(btnLater, false, "Planifier plus tard");
             setBtnState(btnPickup, false, "Commander à emporter");
             
-            // Réinitialiser les styles
             btnPickup.classList.remove('btn-outline-success');
             btnPickup.classList.add('btn-outline-secondary');
 
             optionsEl.style.display = 'flex';
             modal.show();
-        })
-        .catch(error => {
-            console.error('❌ Erreur:', error);
-            showMessage('Erreur de connexion. Veuillez réessayer.', 'error');
-            setBtnState(btnNow, true, "Erreur");
-            setBtnState(btnLater, true, "Erreur");
-            setBtnState(btnPickup, true, "Erreur");
+        } else {
+            showMessage("Aucun créneau de livraison disponible pour le moment.", 'warning');
+            setBtnState(btnNow, true, "Indisponible");
+            setBtnState(btnLater, true, "Indisponible");
+            setBtnState(btnPickup, false, "Commander à emporter");
             optionsEl.style.display = 'flex';
-            new bootstrap.Modal(modalEl).show();
-        });
+            modal.show();
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erreur:', error);
+        showMessage('Erreur de connexion. Veuillez réessayer.', 'error');
+        setBtnState(btnNow, true, "Erreur");
+        setBtnState(btnLater, true, "Erreur");
+        setBtnState(btnPickup, true, "Erreur");
+        optionsEl.style.display = 'flex';
+        new bootstrap.Modal(modalEl).show();
     });
+});
 
     // Empêcher les clics sur les boutons désactivés
     ['acceptNow', 'pickupOrder', 'scheduleLater'].forEach(id => {
@@ -726,7 +717,210 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+function isInDeliveryZone(lat, lng) {
+    // Zone de livraison autour de Gisors (approx. 20km de rayon)
+    const gisorsLat = 49.2775;
+    const gisorsLng = 1.7750;
+    const radiusKm = 20;
+    
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat - gisorsLat) * Math.PI / 180;
+    const dLng = (lng - gisorsLng) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(gisorsLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * 
+        Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    return distance <= radiusKm;
+}
 
+function showAddressHelpModal() {
+    const modalEl = document.getElementById('deliveryEstimateModal');
+    const msgEl = document.getElementById('deliveryEstimateMessage');
+    const optionsEl = document.getElementById('modalOptions');
+    
+    const btnNow = document.getElementById('acceptNow');
+    const btnLater = document.getElementById('scheduleLater');
+    const btnPickup = document.getElementById('pickupOrder');
+    
+    // ✅ MESSAGE 1 : Adresse incomplète
+    msgEl.innerHTML = "Merci de saisir votre adresse complète.<br><br>" +
+                     "<small>Si elle n'apparaît pas dans la liste, indiquez l'adresse la plus proche. " +
+                     "Vous pourrez préciser votre adresse exacte au livreur quand vous remplirez vos coordonnées.</small>";
+    msgEl.classList.remove('text-success', 'text-danger', 'text-warning');
+    
+    // Désactiver tous les boutons sauf emporter
+    btnNow.classList.add("disabled", "btn-disabled-state");
+    btnNow.setAttribute("disabled", "disabled");
+    btnNow.dataset.forceDisabled = "true";
+    btnNow.innerText = "Livraison indisponible";
+    
+    btnLater.classList.add("disabled", "btn-disabled-state");
+    btnLater.setAttribute("disabled", "disabled");
+    btnLater.dataset.forceDisabled = "true";
+    btnLater.innerText = "Planifier indisponible";
+    
+    btnPickup.classList.remove("disabled", "btn-disabled-state");
+    btnPickup.removeAttribute("disabled");
+    btnPickup.dataset.forceDisabled = "false";
+    btnPickup.innerText = "Commander à emporter";
+    btnPickup.classList.remove('btn-outline-secondary');
+    btnPickup.classList.add('btn-outline-success');
+    
+    optionsEl.style.display = 'flex';
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+function showOutOfZoneError() {
+    const modalEl = document.getElementById('deliveryEstimateModal');
+    const msgEl = document.getElementById('deliveryEstimateMessage');
+    const optionsEl = document.getElementById('modalOptions');
+    
+    const btnNow = document.getElementById('acceptNow');
+    const btnLater = document.getElementById('scheduleLater');
+    const btnPickup = document.getElementById('pickupOrder');
+    
+    // ✅ MESSAGE 2 : Adresse complète mais hors zone
+    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
+                     "<small>Nous ne livrons pas encore à cette adresse. " +
+                     "Vous pouvez commander à emporter.</small><br><br>" +
+                     "<small style='color: #d63384;'><strong>Si vous commandez plus de 5 couscous, " +
+                     "appelez-nous au <span style='font-size: 1.1em;'>06 95 59 98 59</span></strong></small>";
+    msgEl.classList.remove('text-success', 'text-danger');
+    msgEl.classList.add('text-warning');
+    
+    // Désactiver livraison, activer emporter
+    btnNow.classList.add("disabled", "btn-disabled-state");
+    btnNow.setAttribute("disabled", "disabled");
+    btnNow.dataset.forceDisabled = "true";
+    btnNow.innerText = "Livraison indisponible";
+    
+    btnLater.classList.add("disabled", "btn-disabled-state");
+    btnLater.setAttribute("disabled", "disabled");
+    btnLater.dataset.forceDisabled = "true";
+    btnLater.innerText = "Planifier indisponible";
+    
+    btnPickup.classList.remove("disabled", "btn-disabled-state");
+    btnPickup.removeAttribute("disabled");
+    btnPickup.dataset.forceDisabled = "false";
+    btnPickup.innerText = "Commander à emporter";
+    btnPickup.classList.remove('btn-outline-secondary');
+    btnPickup.classList.add('btn-outline-success');
+    
+    optionsEl.style.display = 'flex';
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+function showOutOfZoneError() {
+    const modalEl = document.getElementById('deliveryEstimateModal');
+    const msgEl = document.getElementById('deliveryEstimateMessage');
+    const optionsEl = document.getElementById('modalOptions');
+    
+    const btnNow = document.getElementById('acceptNow');
+    const btnLater = document.getElementById('scheduleLater');
+    const btnPickup = document.getElementById('pickupOrder');
+    
+    // ✅ MESSAGE 2 : Adresse complète mais hors zone
+    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
+                     "<small>Nous ne livrons pas encore à cette adresse. " +
+                     "Vous pouvez commander à emporter.</small><br><br>" +
+                     "<small style='color: #d63384;'><strong>Si vous commandez plus de 5 couscous, " +
+                     "appelez-nous au <span style='font-size: 1.1em;'>06 95 59 98 59</span></strong></small>";
+    msgEl.classList.remove('text-success', 'text-danger');
+    msgEl.classList.add('text-warning');
+    
+    // Désactiver livraison, activer emporter
+    btnNow.classList.add("disabled", "btn-disabled-state");
+    btnNow.setAttribute("disabled", "disabled");
+    btnNow.dataset.forceDisabled = "true";
+    btnNow.innerText = "Livraison indisponible";
+    
+    btnLater.classList.add("disabled", "btn-disabled-state");
+    btnLater.setAttribute("disabled", "disabled");
+    btnLater.dataset.forceDisabled = "true";
+    btnLater.innerText = "Planifier indisponible";
+    
+    btnPickup.classList.remove("disabled", "btn-disabled-state");
+    btnPickup.removeAttribute("disabled");
+    btnPickup.dataset.forceDisabled = "false";
+    btnPickup.innerText = "Commander à emporter";
+    btnPickup.classList.remove('btn-outline-secondary');
+    btnPickup.classList.add('btn-outline-success');
+    
+    optionsEl.style.display = 'flex';
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+function forceGeocodeWithZoneCheck(address) {
+    const geocoder = new google.maps.Geocoder();
+    
+    geocoder.geocode({ address: address }, function(results, status) {
+        if (status === "OK" && results[0]) {
+            const place = results[0];
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            
+            if (isInDeliveryZone(lat, lng)) {
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lng;
+                document.getElementById('code_postal').value = getComponent(place, 'postal_code');
+                document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
+                document.getElementById('zone').value = 'gisors';
+                
+                // Soumettre le formulaire après géocodage réussi
+                document.getElementById('addressForm').dispatchEvent(new Event('submit'));
+            } else {
+                showOutOfZoneError();
+            }
+        } else {
+            // Adresse non reconnue - afficher l'aide
+            showAddressHelpModal();
+        }
+    });
+}
+
+function showOutOfZoneError() {
+    const modalEl = document.getElementById('deliveryEstimateModal');
+    const msgEl = document.getElementById('deliveryEstimateMessage');
+    const optionsEl = document.getElementById('modalOptions');
+    
+    const btnNow = document.getElementById('acceptNow');
+    const btnLater = document.getElementById('scheduleLater');
+    const btnPickup = document.getElementById('pickupOrder');
+    
+    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
+                     "<small>Nous ne livrons pas encore à cette adresse. " +
+                     "Vous pouvez commander à emporter ou vérifier votre adresse.</small>";
+    msgEl.classList.remove('text-success', 'text-danger');
+    msgEl.classList.add('text-warning');
+    
+    // Désactiver livraison, activer emporter
+    btnNow.classList.add("disabled", "btn-disabled-state");
+    btnNow.setAttribute("disabled", "disabled");
+    btnNow.dataset.forceDisabled = "true";
+    btnNow.innerText = "Livraison indisponible";
+    
+    btnLater.classList.add("disabled", "btn-disabled-state");
+    btnLater.setAttribute("disabled", "disabled");
+    btnLater.dataset.forceDisabled = "true";
+    btnLater.innerText = "Planifier indisponible";
+    
+    btnPickup.classList.remove("disabled", "btn-disabled-state");
+    btnPickup.removeAttribute("disabled");
+    btnPickup.dataset.forceDisabled = "false";
+    btnPickup.innerText = "Commander à emporter";
+    btnPickup.classList.remove('btn-outline-secondary');
+    btnPickup.classList.add('btn-outline-success');
+    
+    optionsEl.style.display = 'flex';
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
 
 
 
