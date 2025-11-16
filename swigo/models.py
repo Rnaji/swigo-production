@@ -1473,7 +1473,6 @@ class ArticlePanier(models.Model):
         self.save(update_fields=['prix_total'])  # ⭐ Important : sauvegarder explicitement
         
         # 🔥 FORCER LE RECHARGEMENT depuis la base de données
-        self.refresh_from_db()
         
         print(f"💰 Article {self.id} - Prix sauvegardé: {self.prix_total}€")
         return self.prix_total
