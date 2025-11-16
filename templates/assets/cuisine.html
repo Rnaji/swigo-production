@@ -243,40 +243,39 @@
                                                                 </thead>
                                                                 <tbody>`;
 
-                        // RÉCAPITULATIF DES COMMANDES AVEC COULEURS
-                        tournee.commandes.forEach(commande => {
-                            let articlesHTML = '<ul>';
-                            
-                            commande.articles
-                                .filter(article => !['boisson', 'dessert'].includes((article.categorie || '').toLowerCase()))
-                                .forEach(article => {
-                                    console.log("📋 Article à afficher:", article);
-                                    
-                                    // Article principal avec quantité
-                                    let articleText = `<strong>${article.nom}</strong> – ${article.quantite}x`;
-                                    
-                                    // Options avec couleurs
-                                    if (article.options && article.options.length > 0) {
-                                        articleText += `<ul class="text-muted small" style="margin-bottom: 0;">`;
-                                        article.options.forEach(optGroup => {
-                                            if (optGroup.items && optGroup.items.length > 0) {
-                                                articleText += `<li class="${optGroup.color}" style="font-weight: 500;">`;
-                                                articleText += `${optGroup.label} `;
-                                            // CORRECTION : Vérifier si items est un tableau avant d'utiliser .join()
-                                            if (Array.isArray(optGroup.items)) {
-                                                articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items.join(', ')}</span>`;
-                                            } else {
-                                                articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items}</span>`;
-                                            }                                                articleText += `</li>`;
-                                            }
-                                        });
-                                        articleText += `</ul>`;
-                                    }
-                                    
-                                    articlesHTML += `<li style="margin-bottom: 10px;">${articleText}</li>`;
-                                });
-                            
-                            articlesHTML += '</ul>';
+// RÉCAPITULATIF DES COMMANDES AVEC COULEURS
+tournee.commandes.forEach(commande => {
+    let articlesHTML = '<ul>';
+    
+    commande.articles
+        .filter(article => !['boisson', 'dessert'].includes((article.categorie || '').toLowerCase()))
+        .forEach(article => {
+            console.log("📋 Article à afficher:", article);
+            
+            // Article principal avec quantité
+            let articleText = `<strong>${article.nom}</strong> – ${article.quantite}x`;
+            
+            // Options avec couleurs
+            if (article.options && article.options.length > 0) {
+                articleText += `<ul class="text-muted small" style="margin-bottom: 0;">`;
+                article.options.forEach(optGroup => {
+                    if (optGroup.items) {
+                        articleText += `<li class="${optGroup.color}" style="font-weight: 500;">`;
+                        articleText += `${optGroup.label} `;
+                        
+                        // CORRECTION : optGroup.items est une STRING, pas un tableau
+                        articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items}</span>`;
+                        
+                        articleText += `</li>`;
+                    }
+                });
+                articleText += `</ul>`;
+            }
+            
+            articlesHTML += `<li style="margin-bottom: 10px;">${articleText}</li>`;
+        });
+    
+    articlesHTML += '</ul>';
 
                             tourneeHTML += `
                                 <tr>
@@ -342,6 +341,7 @@
                         container.innerHTML += tourneeHTML;
 
                         // RÉCAPITULATIF DES ARTICLES AGRÉGÉS
+                        // RÉCAPITULATIF DES ARTICLES AGRÉGÉS - PARTIE CORRIGÉE
                         const recapContainer = document.getElementById(`recapitulatif-${tournee.tournee_id}`);
                         for (const [categorie, articles] of Object.entries(tournee.aggregated_articles)) {
                             const cat = categorie.toLowerCase();
@@ -367,7 +367,8 @@
                                         if (optGroup.items && optGroup.items.length > 0) {
                                             optionsHTML += `<li class="${optGroup.color}" style="font-weight: 500;">`;
                                             optionsHTML += `${optGroup.label} `;
-                                            optionsHTML += `<span class="text-dark" style="font-weight: 400;">${optGroup.items.join(', ')}</span>`;
+                                            // CORRECTION : Utiliser optGroup.items directement (c'est une string)
+                                            optionsHTML += `<span class="text-dark" style="font-weight: 400;">${optGroup.items}</span>`;
                                             optionsHTML += `</li>`;
                                         }
                                     });
@@ -571,33 +572,49 @@
             const printWindow = window.open('', '_blank');
             printWindow.document.write('<html><head><title>Étiquettes de Commande</title></head><body><pre>');
 
-            tournee.commandes.forEach(commande => {
-                if (commande.articles) {
-                    commande.articles
-                        .filter(article => !['boisson', 'dessert'].includes((article.categorie || '').toLowerCase()))
-                        .forEach(article => {
-                            for (let i = 0; i < article.quantite; i++) {
-                                let etiquetteContent = `Commande n°${commande.commande_id} - Plat: ${article.nom}`;
-                                
-                                // Options groupées pour l'impression
-                                if (article.options && article.options.length > 0) {
-                                    let optionsText = [];
-                                    article.options.forEach(optGroup => {
-                                        if (optGroup.items && optGroup.items.length > 0) {
-                                            const label = optGroup.label.replace(/[🔴🟢🟡🔵🟣]/g, '').trim();
-                                            optionsText.push(`${label} ${optGroup.items.join(', ')}`);
-                                        }
-                                    });
-                                    if (optionsText.length > 0) {
-                                        etiquetteContent += ` (${optionsText.join(' | ')})`;
+                function printEtiquettes(tourneeId) {
+    const tournee = lastTournees.find(t => t.tournee_id === tourneeId);
+
+    if (tournee) {
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Étiquettes de Commande</title></head><body><pre>');
+
+        tournee.commandes.forEach(commande => {
+            if (commande.articles) {
+                commande.articles
+                    .filter(article => !['boisson', 'dessert'].includes((article.categorie || '').toLowerCase()))
+                    .forEach(article => {
+                        for (let i = 0; i < article.quantite; i++) {
+                            let etiquetteContent = `Commande n°${commande.commande_id} - Plat: ${article.nom}`;
+                            
+                            // Options groupées pour l'impression - CORRIGÉ
+                            if (article.options && article.options.length > 0) {
+                                let optionsText = [];
+                                article.options.forEach(optGroup => {
+                                    if (optGroup.items && optGroup.items.length > 0) {
+                                        const label = optGroup.label.replace(/[🔴🟢🟡🔵🟣]/g, '').trim();
+                                        optionsText.push(`${label} ${optGroup.items}`); // ← CORRECTION
                                     }
+                                });
+                                if (optionsText.length > 0) {
+                                    etiquetteContent += ` (${optionsText.join(' | ')})`;
                                 }
-                                etiquetteContent += '\n';
-                                printWindow.document.write(etiquetteContent);
                             }
-                        });
-                }
-            });
+                            etiquetteContent += '\n';
+                            printWindow.document.write(etiquetteContent);
+                        }
+                    });
+            }
+        });
+
+        printWindow.document.write('</pre></body></html>');
+        printWindow.document.close();
+        printWindow.print();
+        printWindow.close();
+    } else {
+        console.error('Tournée non trouvée pour l impression des étiquettes.');
+    }
+}
 
             printWindow.document.write('</pre></body></html>');
             printWindow.document.close();
