@@ -4626,8 +4626,7 @@ def get_commandes_cuisine(request):
 
             for tc in tournee_commandes:
                 commande = tc.commande
-                articles, aggregated_articles = extraire_articles_et_aggregats(commande, aggregated_articles)
-
+                articles, aggregated_articles = extraire_articles_et_aggregats(commande, aggregated_articles, filtrer_cuisine=False)
                 if commande.cuisson_en_cours and commande.heure_cuisson_en_cours:
                     cuisson_en_cours = True
                     cuisson_start_times.append(commande.heure_cuisson_en_cours)
@@ -4744,7 +4743,9 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             'couscous_personnalise__choixviandecouscous_set__viande',
             'choix_menu__plat_choisi',
             'choix_menu__salade',
-            'choix_menu__couscous'
+            'choix_menu__couscous',
+            'choix_menu__couscous__accompagnements',
+            'choix_menu__couscous__choixviandecouscous_set__viande'
         )
     )
 
@@ -4765,7 +4766,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
 
         # Récupérer l'accompagnement principal (sans prix)
         if article.accompagnement:
-            accompagnement_info = article.accompagnement.nom  # 🆕 ENLEVER LES PRIX
+            accompagnement_info = article.accompagnement.nom
             options_grouped['accompagnements'].append(accompagnement_info)
 
         # ----------- PLAT CLASSIQUE -----------
@@ -4784,8 +4785,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             if article.options.exists():
                 for option in article.options.all():
                     option_text = option.nom_option
-                    # 🆕 ENLEVER LES PRIX
-                    option_text = option_text.split(' (+')[0]  # Enlever tout après " (+"
+                    option_text = option_text.split(' (+')[0]
                     
                     # Catégorisation automatique
                     option_lower = option_text.lower()
@@ -4804,9 +4804,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             if article.plat.type_plat == 'crousty' and article.options_crousty.exists():
                 for option in article.options_crousty.all():
                     option_text = option.nom
-                    # 🆕 ENLEVER LES PRIX
                     
-                    # Catégorisation Crousty
                     option_lower = option.nom.lower()
                     if any(mot in option_lower for mot in ['fromage', 'emmental', 'cheddar', 'mozzarella']):
                         options_grouped['fromages'].append(option_text)
@@ -4818,19 +4816,16 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
                         options_grouped['supplements'].append(option_text)
             
             # Options Poulet (sans prix + priorité sauces)
-            if article.plat.type_plat == 'poulet' and article.options_poulet.exists():
+            if (article.plat.type_plat == 'poulet' or article.plat.categorie.nom.lower() == 'poulet') and article.options_poulet.exists():                
                 for option in article.options_poulet.all():
                     option_text = option.nom
-                    # 🆕 ENLEVER LES PRIX
                     
-                    # Catégorisation Poulet avec priorité pour Mild/Hot
                     option_lower = option.nom.lower()
                     if any(mot in option_lower for mot in ['mild', 'hot', 'épicé', 'doux']):
-                        # 🆕 METTRE LES SAUCES EN PREMIER
-                        options_grouped['sauces'].insert(0, option_text)  # unshift devient insert(0)
+                        options_grouped['sauces'].insert(0, option_text)
                     elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
                         options_grouped['sauces'].append(option_text)
-                    elif any(mot in option_lower for mot in ['coleslaw', 'frites', 'riz', 'couscous']):
+                    elif any(mot in option_lower for mot in ['coleslaw', 'frites', 'riz', 'couscous', 'galette']):
                         options_grouped['accompagnements'].append(option_text)
                     else:
                         options_grouped['supplements'].append(option_text)
@@ -4862,7 +4857,6 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             
             for choix in couscous.choixviandecouscous_set.select_related('viande'):
                 nom = choix.viande.nom
-                # 🆕 ENLEVER LES PRIX
                 nom = nom.split(' (+')[0]
                 options_grouped['viandes'].append(nom)
             
@@ -4876,6 +4870,9 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             nom_article = article.menu.nom
             categorie = "Menus"
             
+            # CORRECTION : Utiliser un set pour éviter les doublons
+            accompagnements_couscous_deja_vus = set()
+            
             for c in article.choix_menu.all():
                 role_lower = c.role.lower()
                 label = c.get_role_display() if hasattr(c, 'get_role_display') else c.role.capitalize()
@@ -4885,26 +4882,56 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
                 if filtrer_cuisine and (is_boisson or is_dessert):
                     continue
 
-                if c.role == "viande" and getattr(c, "info_text", None):
-                    options_grouped['viandes'].append(c.info_text.split(' (+')[0])  # 🆕 ENLEVER LES PRIX
+                # CORRECTION : Gestion du couscous personnalisé dans les menus
+                if c.couscous:
+                    # Extraire les viandes du couscous
+                    for choix_viande in c.couscous.choixviandecouscous_set.select_related('viande'):
+                        nom_viande = choix_viande.viande.nom.split(' (+')[0]
+                        options_grouped['viandes'].append(nom_viande)
+                    
+                    # Extraire les accompagnements du couscous et les mémoriser
+                    for accompagnement in c.couscous.accompagnements.all():
+                        accompagnements_couscous_deja_vus.add(accompagnement.nom)
+                        options_grouped['accompagnements'].append(accompagnement.nom)
+                    
+                    if c.couscous.option_xl:
+                        options_grouped['supplements'].append("Option XL")
+                                
+                # CORRECTION : Gestion des accompagnements couscous individuels - Éviter les doublons
+                elif c.role == "accompagnement_couscous" and getattr(c, "info_text", None):
+                    option_text = c.info_text.split(' (+')[0]
+                    # Vérifier si cet accompagnement n'a pas déjà été ajouté via le couscous
+                    if option_text not in accompagnements_couscous_deja_vus:
+                        options_grouped['accompagnements'].append(option_text)
+                                
+                elif c.role == "viande" and getattr(c, "info_text", None):
+                    option_text = c.info_text.split(' (+')[0]
+                    options_grouped['viandes'].append(option_text)
+                    
                 elif c.role == "accompagnement" and getattr(c, "info_text", None):
-                    options_grouped['accompagnements'].append(c.info_text.split(' (+')[0])  # 🆕 ENLEVER LES PRIX
+                    option_text = c.info_text.split(' (+')[0]
+                    options_grouped['accompagnements'].append(option_text)
+                    
+                elif c.role == "boisson" and getattr(c, "info_text", None):
+                    if not filtrer_cuisine:
+                        option_text = c.info_text.split(' (+')[0]
+                        options_grouped['supplements'].append(f"Boisson: {option_text}")
+                        
                 elif c.plat_choisi:
                     options_grouped['supplements'].append(f"{label}: {c.plat_choisi.nom}")
+                    
                 elif getattr(c, "info_text", None):
-                    options_grouped['supplements'].append(f"{label}: {c.info_text.split(' (+')[0]}")  # 🆕 ENLEVER LES PRIX
+                    options_grouped['supplements'].append(f"{label}: {c.info_text.split(' (+')[0]}")
+                    
                 elif c.salade:
                     options_grouped['supplements'].append(f"{label}: Salade personnalisée")
-                elif c.couscous:
-                    options_grouped['supplements'].append(f"{label}: Couscous personnalisé")
 
         else:
             continue
 
-        # 🆕 CONSTRUCTION DE L'AFFICHAGE AVEC TIRETS - CORRECTION ICI
+        # CONSTRUCTION DE L'AFFICHAGE
         details_data = []
         
-        # Ordre d'affichage des catégories avec couleurs
         categories_config = [
             ('viandes', '🔴 Viandes:', 'text-danger'),
             ('accompagnements', '🟢 Accompagnements:', 'text-success'), 
@@ -4915,15 +4942,13 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
         
         for cat_key, cat_label, color_class in categories_config:
             if options_grouped[cat_key]:
-                # 🆕 CORRECTION : Utiliser ' --- '.join() sur la liste
-                items_with_dashes = ' --- '.join(options_grouped[cat_key])  # ← CORRECTION ICI
                 details_data.append({
                     'label': cat_label,
-                    'items': items_with_dashes,  # 🆕 CHAÎNE UNIQUE AVEC TIRETS
+                    'items': options_grouped[cat_key],
                     'color': color_class
                 })
 
-        # ✅ Ajouter l'article avec options groupées
+        # Ajouter l'article avec options groupées
         articles.append({
             'nom': nom_article,
             'categorie': categorie,
@@ -4933,7 +4958,7 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             'prix_total': str(article.prix_total) if article.prix_total else '0.00'
         })
 
-        # ✅ Agrégation
+        # Agrégation
         if categorie not in aggregated_articles:
             aggregated_articles[categorie] = {}
 

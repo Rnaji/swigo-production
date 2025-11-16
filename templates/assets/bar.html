@@ -131,61 +131,88 @@
         chronometerHTML = `<span id="chronometer-tournee-${tourneeID}" class="ms-2">00h 00m 00s</span>`;
     }
 
-    let tourneeHTML = `
-        <div class="accordion my-3" id="accordion-${tourneeHtmlId}">
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading-${tourneeHtmlId}">
-                    <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-${tourneeHtmlId}">
-                        <span>
-                            ${
-                                tournee.is_pickup
-                                ? `Emporté #${tournee.commandes[0].commande_id} — Heure commande à emporter : ${tournee.heure_emport || '–'}`
-                                : `Tournée ${tournee.tournee_nom} <span class="text-muted small">(ID: ${tourneeID})</span> ${badgeHTML}`
-                            }
-                        </span>
-                        ${chronometerHTML}
-                    </button>
-                </h2>
-                <div id="collapse-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-${tourneeHtmlId}" data-bs-parent="#accordion-${tourneeHtmlId}">
-                    <div class="accordion-body">
-                        <div class="accordion" id="subAccordion-${tourneeHtmlId}">
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="heading-commande-${tourneeHtmlId}">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-commande-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-commande-${tourneeHtmlId}">
-                                        Récapitulatif de la commande
-                                    </button>
-                                </h2>
-                                <div id="collapse-commande-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-commande-${tourneeHtmlId}">
-                                    <div class="accordion-body">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th>ID Commande</th>
-                                                    <th>Articles du Panier</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-    `;
+// Récupérer tous les IDs de commandes de la tournée
+const commandeIds = tournee.commandes.map(commande => `#${commande.commande_id}`).join(', ');
+
+let tourneeHTML = `
+    <div class="accordion my-3" id="accordion-${tourneeHtmlId}">
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading-${tourneeHtmlId}">
+                <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-${tourneeHtmlId}">
+                    <span>
+                        ${
+                            tournee.is_pickup
+                            ? `🥡 Emporté ${commandeIds} — Heure : ${tournee.heure_emport || '–'}`
+                            : `🍹 Tournée ${tournee.tournee_nom} <span class="text-muted small">(Commandes: ${commandeIds})</span> ${badgeHTML}`
+                        }
+                    </span>
+                    ${chronometerHTML}
+                </button>
+            </h2>
+            <div id="collapse-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-${tourneeHtmlId}" data-bs-parent="#accordion-${tourneeHtmlId}">
+                <div class="accordion-body">
+                    <div class="accordion" id="subAccordion-${tourneeHtmlId}">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading-commande-${tourneeHtmlId}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-commande-${tourneeHtmlId}" aria-expanded="false" aria-controls="collapse-commande-${tourneeHtmlId}">
+                                    Récapitulatif de la commande
+                                </button>
+                            </h2>
+                            <div id="collapse-commande-${tourneeHtmlId}" class="accordion-collapse collapse" aria-labelledby="heading-commande-${tourneeHtmlId}">
+                                <div class="accordion-body">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Commande</th>
+                                                <th>Articles du Panier</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+`;
 
     tournee.commandes.forEach(commande => {
     let articlesHTML = '<ul>';
     commande.articles.forEach(article => {
-        articlesHTML += `<li><strong>${article.nom}</strong> - ${article.quantite}x`;
-        if (article.options.length > 0) {
-            articlesHTML += `<ul>`;
-            article.options.forEach(option => {
-                // CORRECTION ICI
-                if (typeof option === 'object' && option.items) {
-                    articlesHTML += `<li>${option.items}</li>`;
-                } else if (typeof option === 'object') {
-                    articlesHTML += `<li>${JSON.stringify(option)}</li>`;
-                } else {
-                    articlesHTML += `<li>${option}</li>`;
+        console.log("📋 Article bar à afficher:", article);
+        
+        // Article principal avec quantité
+        let articleText = `<strong>${article.nom}</strong> - ${article.quantite}x`;
+        
+        // Options avec couleurs
+        if (article.options && article.options.length > 0) {
+            articleText += `<ul class="text-muted small" style="margin-bottom: 0; list-style: none; padding-left: 0;">`;
+            article.options.forEach((optGroup, index) => {
+                const optionValue = optGroup.items || optGroup.value || optGroup.nom || optGroup.name || optGroup.label;
+                const optionLabel = optGroup.label || '';
+                const optionColor = optGroup.color || 'text-dark';
+                
+                console.log(`Option bar ${index}:`, { 
+                    label: optionLabel, 
+                    value: optionValue, 
+                    color: optionColor 
+                });
+                
+                if (optionValue && optionValue.length > 0) {
+                    // ✅ LABEL EN COULEUR + DÉTAILS EN NOIR AVEC "---"
+                    articleText += `<li style="margin-bottom: 2px;">`;
+                    articleText += `<span class="${optionColor}" style="font-weight: 500;">${optionLabel}</span> `;
+                    
+                    // Gérer à la fois les tableaux et les strings
+                    let formattedDetails;
+                    if (Array.isArray(optionValue)) {
+                        formattedDetails = optionValue.join('---');
+                    } else {
+                        formattedDetails = optionValue.replace(/,/g, '---');
+                    }
+                    
+                    articleText += `<span class="text-dark" style="font-weight: 400;">${formattedDetails}</span>`;
+                    articleText += `</li>`;
                 }
             });
-            articlesHTML += `</ul>`;
+            articleText += `</ul>`;
         }
-        articlesHTML += `</li>`;
+        
+        articlesHTML += `<li style="margin-bottom: 10px;">${articleText}</li>`;
     });
     articlesHTML += '</ul>';
     tourneeHTML += `<tr><td>${commande.commande_id}</td><td>${articlesHTML}</td></tr>`;
@@ -245,53 +272,62 @@ console.log("Aggregated articles:", tournee.aggregated_articles);
 recapContainer.innerHTML = '';
 
 for (const [categorie, articles] of Object.entries(tournee.aggregated_articles)) {
-    console.log("Categorie:", categorie);
-    console.log("Articles dans categorie:", articles);
+    console.log("📦 Catégorie:", categorie);
+    console.log("📋 Articles dans catégorie:", articles);
     
-    recapContainer.innerHTML += `<li class="list-group-item active">${categorie}</li>`;
+    recapContainer.innerHTML += `<li class="list-group-item active fw-bold">${categorie}</li>`;
     
     for (const [articleKey, articleData] of Object.entries(articles)) {
-        console.log("=== ARTICLE DATA ===");
+        console.log("=== DONNÉES ARTICLE ===");
         console.log("ArticleData:", articleData);
         console.log("Nom:", articleData.nom);
-        console.log("Quantite:", articleData.quantite);
+        console.log("Quantité:", articleData.quantite);
         console.log("Options:", articleData.options);
-        console.log("Type des options:", typeof articleData.options);
         
-        let optionsText = '';
+        let optionsHTML = '';
         
-        if (articleData.options && Array.isArray(articleData.options)) {
-            console.log("Options est un tableau, longueur:", articleData.options.length);
+        if (articleData.options && Array.isArray(articleData.options) && articleData.options.length > 0) {
+            console.log("🔄 Traitement des options...");
             
-            const optionDetails = [];
-            
-            articleData.options.forEach((option, index) => {
-                console.log(`Option ${index}:`, option);
-                console.log(`Type option ${index}:`, typeof option);
-                console.log(`Option ${index} keys:`, Object.keys(option));
+            articleData.options.forEach((optGroup, index) => {
+                console.log(`Option ${index}:`, optGroup);
                 
-                if (option && option.items) {
-                    console.log(`Option ${index} items:`, option.items);
-                    console.log(`Type items:`, typeof option.items);
-                    optionDetails.push(option.items);
-                } else {
-                    console.log(`Option ${index} n'a pas de propriété 'items'`);
+                if (optGroup && optGroup.items) {
+                    const optionValue = optGroup.items;
+                    const optionLabel = optGroup.label || '';
+                    const optionColor = optGroup.color || 'text-dark';
+                    
+                    console.log(`Option ${index} - Label: ${optionLabel}, Valeur: ${optionValue}, Couleur: ${optionColor}`);
+                    
+                    // Formater les détails
+                    let formattedDetails;
+                    if (Array.isArray(optionValue)) {
+                        formattedDetails = optionValue.join('---');
+                    } else {
+                        formattedDetails = optionValue.toString().replace(/,/g, '---');
+                    }
+                    
+                    if (formattedDetails) {
+                        // ✅ LABEL EN COULEUR + DÉTAILS EN NOIR
+                        optionsHTML += `<div class="ms-3 small">`;
+                        optionsHTML += `<span class="${optionColor} fw-medium">${optionLabel}</span> `;
+                        optionsHTML += `<span class="text-dark">${formattedDetails}</span>`;
+                        optionsHTML += `</div>`;
+                    }
                 }
             });
-            
-            console.log("OptionDetails final:", optionDetails);
-            
-            if (optionDetails.length > 0) {
-                optionsText = ` (${optionDetails.join(' | ')})`;
-                console.log("OptionsText final:", optionsText);
-            }
         } else {
-            console.log("Pas d'options ou options n'est pas un tableau");
+            console.log("ℹ️ Aucune option ou format d'options non valide");
         }
         
-        const listItemHTML = `<li class="list-group-item">${articleData.nom} - ${articleData.quantite}x${optionsText}</li>`;
-        console.log("HTML généré:", listItemHTML);
+        const listItemHTML = `
+            <li class="list-group-item">
+                <div class="fw-medium">${articleData.nom} - ${articleData.quantite}x</div>
+                ${optionsHTML}
+            </li>
+        `;
         
+        console.log("🎨 HTML généré:", listItemHTML);
         recapContainer.innerHTML += listItemHTML;
     }
 }

@@ -194,86 +194,106 @@
                             messageButtonHTML = `<button class="btn btn-warning mx-2" onclick="afficherMessagesTournee(${tournee.tournee_id})">Vous avez un message 📨</button>`;
                         }
 
-                        let tourneeHTML = `
-                            <div class="accordion my-3" id="accordion-${tourneeID}">
-                                <div class="accordion-item">
-                                    <h2 class="accordion-header" id="heading-${tourneeID}">
-                                        <button class="accordion-button collapsed d-flex align-items-center w-100"
-                                                type="button"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#collapse-${tourneeID}"
-                                                aria-expanded="false"
-                                                aria-controls="collapse-${tourneeID}">
-                                            <div class="d-flex align-items-center gap-3 flex-wrap">
-                                                ${tournee.recently_closed ? `
-                                                    <span class="badge bg-danger text-white" id="badge-${tourneeID}" style="font-size: 0.8rem; font-weight: normal;">New</span>
-                                                ` : ''}
-                                                <span>
-                                                    ${tournee.is_pickup
-                                                        ? `Emporté #${tournee.commandes[0].commande_id} — Heure commande à emporter : ${tournee.heure_emport || '–'}`
-                                                        : `Tournée ${tournee.tournee_nom} <span class="text-muted small">(ID: ${tournee.tournee_id})</span>`
-                                                    }
-                                                </span>
-                                                <span class="badge bg-success">✅ Réception cuisine</span>
-                                                <span id="chronometer-reception-${tourneeID}" class="text-dark small">00:00:00</span>
-                                                ${tournee.cuisson_en_cours && tournee.cuisson_start_time ? `
-                                                    <span class="badge bg-danger">🔥 Cuisson en cours</span>
-                                                    <span id="chronometer-cuisson-${tourneeID}" class="text-danger small">00:00:00</span>
-                                                ` : ''}
-                                            </div>
-                                        </button>
-                                    </h2>
-                                    <div id="collapse-${tourneeID}" class="accordion-collapse collapse" aria-labelledby="heading-${tourneeID}" data-bs-parent="#accordion-${tourneeID}">
-                                        <div class="accordion-body">
-                                            <div class="accordion" id="subAccordion-${tourneeID}">
-                                                <div class="accordion-item">
-                                                    <h2 class="accordion-header" id="heading-commande-${tourneeID}">
-                                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-commande-${tourneeID}" aria-expanded="false" aria-controls="collapse-commande-${tourneeID}">
-                                                            Récapitulatif de la commande
-                                                        </button>
-                                                    </h2>
-                                                    <div id="collapse-commande-${tourneeID}" class="accordion-collapse collapse" aria-labelledby="heading-commande-${tourneeID}">
-                                                        <div class="accordion-body">
-                                                            <table class="table table-striped">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>ID Commande</th>
-                                                                        <th>Articles du Panier</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>`;
+// Récupérer tous les IDs de commandes de la tournée
+const commandeIds = tournee.commandes.map(commande => `#${commande.commande_id}`).join(', ');
 
-// RÉCAPITULATIF DES COMMANDES AVEC COULEURS
+let tourneeHTML = `
+    <div class="accordion my-3" id="accordion-${tourneeID}">
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading-${tourneeID}">
+                <button class="accordion-button collapsed d-flex align-items-center w-100"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapse-${tourneeID}"
+                        aria-expanded="false"
+                        aria-controls="collapse-${tourneeID}">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        ${tournee.recently_closed ? `
+                            <span class="badge bg-danger text-white" id="badge-${tourneeID}" style="font-size: 0.8rem; font-weight: normal;">New</span>
+                        ` : ''}
+                        <span>
+                            ${tournee.is_pickup
+                                ? `📦 Emporté ${commandeIds} — Heure : ${tournee.heure_emport || '–'}`
+                                : `🚚 Tournée ${tournee.tournee_nom} <span class="text-muted small">(Commandes: ${commandeIds})</span>`
+                            }
+                        </span>
+                        <span class="badge bg-success">✅ Réception cuisine</span>
+                        <span id="chronometer-reception-${tourneeID}" class="text-dark small">00:00:00</span>
+                        ${tournee.cuisson_en_cours && tournee.cuisson_start_time ? `
+                            <span class="badge bg-danger">🔥 Cuisson en cours</span>
+                            <span id="chronometer-cuisson-${tourneeID}" class="text-danger small">00:00:00</span>
+                        ` : ''}
+                    </div>
+                </button>
+            </h2>
+            <div id="collapse-${tourneeID}" class="accordion-collapse collapse" aria-labelledby="heading-${tourneeID}" data-bs-parent="#accordion-${tourneeID}">
+                <div class="accordion-body">
+                    <div class="accordion" id="subAccordion-${tourneeID}">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading-commande-${tourneeID}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-commande-${tourneeID}" aria-expanded="false" aria-controls="collapse-commande-${tourneeID}">
+                                    Récapitulatif de la commande
+                                </button>
+                            </h2>
+                            <div id="collapse-commande-${tourneeID}" class="accordion-collapse collapse" aria-labelledby="heading-commande-${tourneeID}">
+                                <div class="accordion-body">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Commande</th>
+                                                <th>Articles du Panier</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+
+// RÉCAPITULATIF DES COMMANDES AVEC COULEURS - VERSION CORRIGÉE
 tournee.commandes.forEach(commande => {
     let articlesHTML = '<ul>';
     
-    commande.articles
-        .filter(article => !['boisson', 'dessert'].includes((article.categorie || '').toLowerCase()))
-        .forEach(article => {
-            console.log("📋 Article à afficher:", article);
-            
-            // Article principal avec quantité
-            let articleText = `<strong>${article.nom}</strong> – ${article.quantite}x`;
-            
-            // Options avec couleurs
-            if (article.options && article.options.length > 0) {
-                articleText += `<ul class="text-muted small" style="margin-bottom: 0;">`;
-                article.options.forEach(optGroup => {
-                    if (optGroup.items) {
-                        articleText += `<li class="${optGroup.color}" style="font-weight: 500;">`;
-                        articleText += `${optGroup.label} `;
-                        
-                        // CORRECTION : optGroup.items est une STRING, pas un tableau
-                        articleText += `<span class="text-dark" style="font-weight: 400;">${optGroup.items}</span>`;
-                        
-                        articleText += `</li>`;
-                    }
+    commande.articles.forEach(article => {
+        console.log("📋 Article à afficher:", article);
+        
+        // Article principal avec quantité
+        let articleText = `<strong>${article.nom}</strong> – ${article.quantite}x`;
+        
+        // Options avec couleurs
+        if (article.options && article.options.length > 0) {
+            articleText += `<ul class="text-muted small" style="margin-bottom: 0; list-style: none; padding-left: 0;">`;
+            article.options.forEach((optGroup, index) => {
+                const optionValue = optGroup.items || optGroup.value || optGroup.nom || optGroup.name || optGroup.label;
+                const optionLabel = optGroup.label || '';
+                const optionColor = optGroup.color || 'text-dark';
+                
+                console.log(`Option ${index}:`, { 
+                    label: optionLabel, 
+                    value: optionValue, 
+                    color: optionColor 
                 });
-                articleText += `</ul>`;
-            }
-            
-            articlesHTML += `<li style="margin-bottom: 10px;">${articleText}</li>`;
-        });
+                
+                if (optionValue && optionValue.length > 0) {
+                    // ✅ LABEL EN COULEUR + DÉTAILS EN NOIR AVEC "---"
+                    articleText += `<li style="margin-bottom: 2px;">`;
+                    articleText += `<span class="${optionColor}" style="font-weight: 500;">${optionLabel}</span> `;
+                    
+                    // CORRECTION : Gérer à la fois les tableaux et les strings
+                    let formattedDetails;
+                    if (Array.isArray(optionValue)) {
+                        // Si c'est un tableau, joindre avec "---"
+                        formattedDetails = optionValue.join('---');
+                    } else {
+                        // Si c'est une string, remplacer les virgules par "---"
+                        formattedDetails = optionValue.replace(/,/g, '---');
+                    }
+                    
+                    articleText += `<span class="text-dark" style="font-weight: 400;">${formattedDetails}</span>`;
+                    articleText += `</li>`;
+                }
+            });
+            articleText += `</ul>`;
+        }
+        
+        articlesHTML += `<li style="margin-bottom: 10px;">${articleText}</li>`;
+    });
     
     articlesHTML += '</ul>';
 
