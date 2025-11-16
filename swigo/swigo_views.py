@@ -4917,9 +4917,20 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
                         option_text = c.info_text.split(' (+')[0]
                         options_grouped['supplements'].append(f"Boisson: {option_text}")
                         
+                # CORRECTION : Les plats choisis de type viande vont dans viandes
                 elif c.plat_choisi:
-                    options_grouped['supplements'].append(f"{label}: {c.plat_choisi.nom}")
+                    plat_nom_lower = c.plat_choisi.nom.lower()
+                    # Déterminer si c'est un plat principal (viande)
+                    is_plat_principal = (
+                        c.role == "plat" or 
+                        any(mot in plat_nom_lower for mot in ['tenders', 'poulet', 'viande', 'agneau', 'merguez', 'boulette', 'burger', 'steak', 'wing', 'aile', 'frit'])
+                    )
                     
+                    if is_plat_principal:
+                        options_grouped['viandes'].append(f"Plat: {c.plat_choisi.nom}")
+                    else:
+                        options_grouped['supplements'].append(f"{label}: {c.plat_choisi.nom}")
+                        
                 elif getattr(c, "info_text", None):
                     options_grouped['supplements'].append(f"{label}: {c.info_text.split(' (+')[0]}")
                     
