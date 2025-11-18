@@ -40,7 +40,6 @@
         gap: 20px;
         font-size: 32px;
         color: #4CAF50;
-
     }
 
     .form-control {
@@ -95,7 +94,6 @@
         font-size: 16px;
     }
 
-
     /* Style pour le texte de description */
     .description-text {
         font-family: inherit;
@@ -116,10 +114,9 @@
     }
 
     .contact-info strong {
-    font-weight: 600;
-    color: #333;
-}
-
+        font-weight: 600;
+        color: #333;
+    }
 
     .modal-delivery-estimate .btn {
         font-size: 12px;
@@ -143,7 +140,8 @@
     #deliveryEstimateMessage {
         font-family: inherit !important;
         font-weight: 300 !important;
-        font-size: 20px !important;
+        font-size: 16px !important;
+        line-height: 1.4;
     }
 
     @media (max-width: 991.98px) {
@@ -158,82 +156,88 @@
     }
 
     .input-group.same-height {
-    align-items: stretch;
-}
-.input-group.same-height .form-control {
-    flex: 2 1 0%;
-    min-width: 0;
-}
-.input-group.same-height .input-group-append {
-    flex: 0 0 auto;
-}
-.input-group.same-height .btn {
-    min-width: 60px;   /* Largeur minimale très réduite */
-    max-width: 90px;   /* Largeur maximale pour éviter l’étirement */
-    padding-left: 0.6em;
-    padding-right: 0.6em;
-    font-size: 15px;
-    white-space: nowrap; /* Pour ne jamais couper le texte */
-}
-
-/* Bloc images food mobile (visible uniquement < 768px) */
-.visuels-food-mobile {
-    margin-top: 0 !important;
-    display: flex;
-    justify-content: center;
-    gap: 22px;
-}
-.img-food-mobile {
-    width: 100px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 2px 12px rgba(60,60,60,0.11);
-    border: 2px solid #e6e6e6;
-}
-@media (min-width: 900px) {
-    .img-food-mobile {
-        width: 130px;
-        height: 130px;
+        align-items: stretch;
     }
-}
+    .input-group.same-height .form-control {
+        flex: 2 1 0%;
+        min-width: 0;
+    }
+    .input-group.same-height .input-group-append {
+        flex: 0 0 auto;
+    }
+    .input-group.same-height .btn {
+        min-width: 60px;
+        max-width: 90px;
+        padding-left: 0.6em;
+        padding-right: 0.6em;
+        font-size: 15px;
+        white-space: nowrap;
+    }
 
-/* Responsive visibility */
-@media (min-width: 768px) {
-    .visuels-food-mobile { display: none !important; }
-    .image-col.hide-on-small { display: flex !important; flex-direction: column !important; }
-}
-@media (max-width: 767.98px) {
-    .visuels-food-mobile { display: flex !important; }
-    .image-col.hide-on-small { display: none !important; }
-}
+    /* Bloc images food mobile */
+    .visuels-food-mobile {
+        margin-top: 0 !important;
+        display: flex;
+        justify-content: center;
+        gap: 22px;
+    }
+    .img-food-mobile {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 2px 12px rgba(60,60,60,0.11);
+        border: 2px solid #e6e6e6;
+    }
+    @media (min-width: 900px) {
+        .img-food-mobile {
+            width: 130px;
+            height: 130px;
+        }
+    }
 
-.icon-row i {
-    transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
-    cursor: pointer;
-}
-.icon-row i:hover {
-    animation: shake 0.65s;
-    color: var(--primary, #7DA640);
-}
+    /* Responsive visibility */
+    @media (min-width: 768px) {
+        .visuels-food-mobile { display: none !important; }
+        .image-col.hide-on-small { display: flex !important; flex-direction: column !important; }
+    }
+    @media (max-width: 767.98px) {
+        .visuels-food-mobile { display: flex !important; }
+        .image-col.hide-on-small { display: none !important; }
+    }
 
-@keyframes shake {
-  0% { transform: translate(1px, 1px) rotate(0deg); }
-  10% { transform: translate(-1px, -2px) rotate(-1deg); }
-  20% { transform: translate(-3px, 0px) rotate(1deg); }
-  30% { transform: translate(3px, 2px) rotate(0deg); }
-  40% { transform: translate(1px, -1px) rotate(1deg); }
-  50% { transform: translate(-1px, 2px) rotate(-1deg); }
-  60% { transform: translate(-3px, 1px) rotate(0deg); }
-  70% { transform: translate(3px, 1px) rotate(-1deg); }
-  80% { transform: translate(-1px, -1px) rotate(1deg); }
-  90% { transform: translate(1px, 2px) rotate(0deg); }
-  100% { transform: translate(1px, -2px) rotate(-1deg); }
-}
+    .icon-row i {
+        transition: transform 0.22s cubic-bezier(.6,-0.01,.35,.99), color 0.28s;
+        cursor: pointer;
+    }
+    .icon-row i:hover {
+        animation: shake 0.65s;
+        color: var(--primary, #7DA640);
+    }
 
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      10% { transform: translate(-1px, -2px) rotate(-1deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      30% { transform: translate(3px, 2px) rotate(0deg); }
+      40% { transform: translate(1px, -1px) rotate(1deg); }
+      50% { transform: translate(-1px, 2px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      70% { transform: translate(3px, 1px) rotate(-1deg); }
+      80% { transform: translate(-1px, -1px) rotate(1deg); }
+      90% { transform: translate(1px, 2px) rotate(0deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
 
+    .btn-disabled-state {
+        opacity: 0.6;
+        cursor: not-allowed !important;
+    }
 
+    .text-warning-custom {
+        color: #856404 !important;
+    }
 </style>
 {% endblock %}
 
@@ -258,102 +262,101 @@
 <main>
     <section class="content-inner" style="padding: 20px 0; background-color: #f9f9f9;">
         <div class="container d-flex flex-wrap flex-md-nowrap justify-content-center" style="gap: 20px;">
-          <!-- Colonne gauche : cheffe (desktop uniquement) -->
-          <div class="image-col text-center hide-on-small"
-            style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <img src="{% static 'assets/images/cheffe.png' %}" alt="Cheffe"
-              style="max-height: 500px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
-              onmouseover="this.style.transform='scale(1.02)'"
-              onmouseout="this.style.transform='scale(1)'">
-          </div>
-      
-          <!-- Colonne centrale : texte + formulaire -->
-          <div class="content-col d-flex flex-column align-items-center justify-content-center text-center"
-            style="flex: 2; padding: 20px; max-width: 480px; width: 100%;">
-            <div class="search-description mb-4">
-              <h2 style="font-weight: 300;">
-                Bienvenue chez <span style="color: #28a745; font-weight: 400;">En Route Chef!</span>
-              </h2>
-              <div class="description-text">
-                <p>Plats maison cuisinés avec passion & livrés à votre porte en 30 minutes.</p>
-                <p>Couscous, tajines, burgers smash, poulet crousty, desserts...</p>
-                <p><strong>100 % fait maison, 100 % plaisir ✅</strong></p>
-              </div>
+            <!-- Colonne gauche : cheffe (desktop uniquement) -->
+            <div class="image-col text-center hide-on-small"
+                style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <img src="{% static 'assets/images/cheffe.png' %}" alt="Cheffe"
+                    style="max-height: 500px; max-width: 100%; width: auto; height: auto; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.02)'"
+                    onmouseout="this.style.transform='scale(1)'">
             </div>
-            <div class="search-form" style="width: 100%;">
-              <div class="widget search-bx text-start">
-                <div class="widget-title">
-                  <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
+        
+            <!-- Colonne centrale : texte + formulaire -->
+            <div class="content-col d-flex flex-column align-items-center justify-content-center text-center"
+                style="flex: 2; padding: 20px; max-width: 480px; width: 100%;">
+                <div class="search-description mb-4">
+                    <h2 style="font-weight: 300;">
+                        Bienvenue chez <span style="color: #28a745; font-weight: 400;">En Route Chef!</span>
+                    </h2>
+                    <div class="description-text">
+                        <p>Plats maison cuisinés avec passion & livrés à votre porte en 30 minutes.</p>
+                        <p>Couscous, tajines, burgers smash, poulet crousty, desserts...</p>
+                        <p><strong>100 % fait maison, 100 % plaisir ✅</strong></p>
+                    </div>
                 </div>
-                <form id="addressForm" method="post">
-                  {% csrf_token %}
-                  {% if form.errors %}
-                  <div class="alert alert-danger">
-                    {% for field in form %}
-                      {% for error in field.errors %}
-                        <p>{{ error }}</p>
-                      {% endfor %}
-                    {% endfor %}
-                    {% for error in form.non_field_errors %}
-                      <p>{{ error }}</p>
-                    {% endfor %}
-                  </div>
-                  {% endif %}
-                  <div class="input-group same-height">
-                    <input
-                      id="id_adresse_livraison"
-                      name="adresse_livraison"
-                      class="form-control"
-                      type="text"
-                      placeholder="Entrez l'adresse de livraison complète ici..."
-                      value="{{ form.adresse_livraison.value|default_if_none:'' }}"
-                      style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
-                      autocomplete="off"
-                    >
-                    <button type="submit"
-                      class="btn btn-outline-success"
-                      style="font-family: inherit; font-weight: 300; border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 2px 6px;">
-                      <img src="{% static 'assets/images/valid.png' %}" alt="OK" style="height: 40px; width: auto; display: block; margin: 0 auto;">
-                    </button>
-                  </div>
-                  <div style="margin-top: 0; text-align: center;">
-                    <button type="button" class="btn btn-link p-0" onclick="utiliserMaPosition()">
-                      📍 Utiliser ma position actuelle
-                    </button>
-                  </div>
-                  <input type="hidden" id="code_postal" name="code_postal" value="{{ form.code_postal.value }}">
-                  <input type="hidden" id="ville" name="ville" value="{{ form.ville.value }}">
-                  <input type="hidden" id="latitude" name="latitude">
-                  <input type="hidden" id="longitude" name="longitude">
-                  <input type="hidden" id="zone" name="zone">
-                </form>
-              </div>
+                <div class="search-form" style="width: 100%;">
+                    <div class="widget search-bx text-start">
+                        <div class="widget-title">
+                            <h5 class="title m-b30" style="font-weight: 300;">C'est à Vous :</h5>
+                        </div>
+                        <form id="addressForm" method="post">
+                            {% csrf_token %}
+                            {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <p>{{ error }}</p>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <p>{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="input-group same-height">
+                                <input
+                                    id="id_adresse_livraison"
+                                    name="adresse_livraison"
+                                    class="form-control"
+                                    type="text"
+                                    placeholder="Entrez l'adresse de livraison complète ici..."
+                                    value="{{ form.adresse_livraison.value|default_if_none:'' }}"
+                                    style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
+                                    autocomplete="off"
+                                >
+                                <button type="submit"
+                                    class="btn btn-outline-success"
+                                    style="font-family: inherit; font-weight: 300; border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 2px 6px;">
+                                    <img src="{% static 'assets/images/valid.png' %}" alt="OK" style="height: 40px; width: auto; display: block; margin: 0 auto;">
+                                </button>
+                            </div>
+                            <div style="margin-top: 0; text-align: center;">
+                                <button type="button" class="btn btn-link p-0" onclick="utiliserMaPosition()">
+                                    📍 Utiliser ma position actuelle
+                                </button>
+                            </div>
+                            <input type="hidden" id="code_postal" name="code_postal" value="{{ form.code_postal.value }}">
+                            <input type="hidden" id="ville" name="ville" value="{{ form.ville.value }}">
+                            <input type="hidden" id="latitude" name="latitude">
+                            <input type="hidden" id="longitude" name="longitude">
+                            <input type="hidden" id="zone" name="zone">
+                        </form>
+                    </div>
+                </div>
+                <div class="contact-info">
+                    (En cas de soucis vous pouvez nous joindre au <strong>06 95 59 98 59</strong>)
+                </div>
+                <!-- Images food mobile uniquement -->
+                <div class="visuels-food-mobile d-md-none">
+                    <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke Bowl" class="img-food-mobile">
+                    <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger" class="img-food-mobile">
+                </div>
             </div>
-            <div class="contact-info">
-                (En cas de soucis vous pouvez nous joindre au <strong>06 95 59 98 59</strong>)
+        
+            <!-- Colonne droite : images food (desktop uniquement) -->
+            <div class="image-col text-center hide-on-small"
+                style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke"
+                    style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.05)'"
+                    onmouseout="this.style.transform='scale(1)'">
+                <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger"
+                    style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
+                    onmouseover="this.style.transform='scale(1.05)'"
+                    onmouseout="this.style.transform='scale(1)'">
             </div>
-            <!-- Images food mobile uniquement (jamais desktop) -->
-            <div class="visuels-food-mobile d-md-none">
-              <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke Bowl" class="img-food-mobile">
-              <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger" class="img-food-mobile">
-            </div>
-          </div>
-      
-          <!-- Colonne droite : images food (desktop/tablette/paysage uniquement) -->
-          <div class="image-col text-center hide-on-small"
-            style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <img src="{% static 'assets/images/pokebowl.png' %}" alt="Poke"
-              style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
-              onmouseover="this.style.transform='scale(1.05)'"
-              onmouseout="this.style.transform='scale(1)'">
-            <img src="{% static 'assets/images/burgermmm.png' %}" alt="Burger"
-              style="max-height: 180px; max-width: 100%; width: auto; height: auto; margin-bottom: 24px; transition: transform 0.3s ease;"
-              onmouseover="this.style.transform='scale(1.05)'"
-              onmouseout="this.style.transform='scale(1)'">
-          </div>
         </div>
-      </section>
-      
+    </section>
 
     <!-- MODALE -->
     <div class="modal fade" id="deliveryEstimateModal" tabindex="-1" aria-labelledby="deliveryEstimateLabel" aria-hidden="true">
@@ -372,7 +375,6 @@
                         <button id="pickupOrder" class="btn btn-outline-secondary">Commander à emporter</button>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -381,24 +383,28 @@
 
 {% block additional_js %}
 <script>
+// Variables globales
+let modalEl, msgEl, optionsEl, btnNow, btnLater, btnPickup;
+
 function initAutocomplete() {
     const adresseInput = document.getElementById('id_adresse_livraison');
     
-    // Élargir les limites autour de Gisors
     const gisorsBounds = new google.maps.LatLngBounds(
         new google.maps.LatLng(49.10, 1.60),
         new google.maps.LatLng(49.40, 1.95)
     );
     
-    // ✅ MODIFICATION : Supprimer la restriction de type pour permettre tous les lieux
     const autocompleteOptions = {
         bounds: gisorsBounds,
         strictBounds: false,
-        // SUPPRIMER: types: ['address'], ← Cette ligne limite aux adresses seulement
         componentRestrictions: { country: 'fr' }
     };
     
     const autocomplete = new google.maps.places.Autocomplete(adresseInput, autocompleteOptions);
+    
+    // Initialisation des valeurs par défaut
+    document.getElementById('latitude').value = '0';
+    document.getElementById('longitude').value = '0';
     
     autocomplete.addListener('place_changed', function () {
         const place = autocomplete.getPlace();
@@ -413,27 +419,10 @@ function initAutocomplete() {
             document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
             document.getElementById('zone').value = 'gisors';
             
-            console.log("📍 Lieu sélectionné:", place.formatted_address);
-            console.log("📌 Coordonnées:", lat, lng);
-            console.log("🏷️ Types:", place.types); // Pour debug
-            
         } else {
-            document.getElementById('latitude').value = '';
-            document.getElementById('longitude').value = '';
-            document.getElementById('code_postal').value = '';
-            document.getElementById('ville').value = '';
-            document.getElementById('zone').value = '';
+            console.log("❌ Adresse non reconnue par Google");
+            resetGeolocationFields();
         }
-    });
-    
-    // Validation plus permissive
-    adresseInput.addEventListener('blur', function() {
-        setTimeout(() => {
-            const currentValue = adresseInput.value.trim();
-            if (currentValue && !document.getElementById('latitude').value) {
-                console.log("🔍 Tentative de géocodage pour:", currentValue);
-            }
-        }, 500);
     });
 }
 
@@ -442,52 +431,72 @@ function getComponent(place, type) {
     return component ? component.long_name : '';
 }
 
+function resetGeolocationFields() {
+    document.getElementById('latitude').value = '0';
+    document.getElementById('longitude').value = '0';
+    document.getElementById('code_postal').value = '';
+    document.getElementById('ville').value = '';
+    document.getElementById('zone').value = '';
+}
 
+function utiliserMaPosition() {
+    const btnGeo = document.querySelector("button[onclick='utiliserMaPosition()']");
+    const originalText = btnGeo.innerHTML;
+    btnGeo.innerHTML = "⏳ Détection en cours...";
+    btnGeo.disabled = true;
 
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function (position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const geocoder = new google.maps.Geocoder();
+            const latlng = { lat, lng };
 
+            geocoder.geocode({ location: latlng }, function (results, status) {
+                if (status === "OK" && results[0]) {
+                    document.getElementById("id_adresse_livraison").value = results[0].formatted_address;
+                    document.getElementById("latitude").value = lat;
+                    document.getElementById("longitude").value = lng;
 
-    function utiliserMaPosition() {
-        const btnGeo = document.querySelector("button[onclick='utiliserMaPosition()']");
-        btnGeo.innerHTML = "⏳ Détection en cours...";
-        btnGeo.disabled = true;
-    
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function (position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const geocoder = new google.maps.Geocoder();
-                const latlng = { lat, lng };
-    
-                geocoder.geocode({ location: latlng }, function (results, status) {
-                    if (status === "OK" && results[0]) {
-                        document.getElementById("id_adresse_livraison").value = results[0].formatted_address;
-                        document.getElementById("latitude").value = lat;
-                        document.getElementById("longitude").value = lng;
-    
-                        const place = results[0];
-                        const getComp = type => place.address_components.find(c => c.types.includes(type))?.long_name || '';
-                        document.getElementById("code_postal").value = getComp("postal_code");
-                        document.getElementById("ville").value = getComp("locality") || getComp("administrative_area_level_2");
-    
-                        btnGeo.innerHTML = "✅ Position détectée";
-                        btnGeo.classList.remove("btn-link");
-                        btnGeo.classList.add("text-success");
-                    } else {
-                        btnGeo.innerHTML = "❌ Échec de la détection";
-                        btnGeo.classList.add("text-danger");
-                    }
-                });
-            }, function () {
-                btnGeo.innerHTML = "❌ Échec de la détection";
-                btnGeo.classList.add("text-danger");
+                    const place = results[0];
+                    const getComp = type => place.address_components.find(c => c.types.includes(type))?.long_name || '';
+                    document.getElementById("code_postal").value = getComp("postal_code");
+                    document.getElementById("ville").value = getComp("locality") || getComp("administrative_area_level_2");
+
+                    btnGeo.innerHTML = "✅ Position détectée";
+                    btnGeo.classList.remove("btn-link");
+                    btnGeo.classList.add("text-success");
+                } else {
+                    btnGeo.innerHTML = "❌ Échec de la détection";
+                    btnGeo.classList.add("text-danger");
+                    setTimeout(() => {
+                        btnGeo.innerHTML = originalText;
+                        btnGeo.classList.remove("text-danger");
+                        btnGeo.disabled = false;
+                    }, 3000);
+                }
             });
-        } else {
-            btnGeo.innerHTML = "❌ Non supporté";
+        }, function () {
+            btnGeo.innerHTML = "❌ Géolocalisation refusée";
             btnGeo.classList.add("text-danger");
-        }
+            setTimeout(() => {
+                btnGeo.innerHTML = originalText;
+                btnGeo.classList.remove("text-danger");
+                btnGeo.disabled = false;
+            }, 3000);
+        });
+    } else {
+        btnGeo.innerHTML = "❌ Non supporté";
+        btnGeo.classList.add("text-danger");
+        setTimeout(() => {
+            btnGeo.innerHTML = originalText;
+            btnGeo.classList.remove("text-danger");
+            btnGeo.disabled = false;
+        }, 3000);
     }
-    
-    function afficherPlageHoraire(premiereHeureStr) {
+}
+
+function afficherPlageHoraire(premiereHeureStr) {
     const [heures, minutes] = premiereHeureStr.split(':').map(Number);
     const milieu = new Date();
     milieu.setHours(heures, minutes, 0, 0);
@@ -497,153 +506,218 @@ function getComponent(place, type) {
     return `Livraison au plus tôt estimée entre ${format(debut)} et ${format(fin)}.`;
 }
 
+function setBtnState(btn, disabled, text = null) {
+    if (disabled) {
+        btn.classList.add("disabled", "btn-disabled-state");
+        btn.setAttribute("disabled", "disabled");
+        btn.dataset.forceDisabled = "true";
+        if (text) btn.innerText = text;
+    } else {
+        btn.classList.remove("disabled", "btn-disabled-state");
+        btn.removeAttribute("disabled");
+        btn.dataset.forceDisabled = "false";
+        if (text) btn.innerText = text;
+    }
+}
+
+function showMessage(message, type = 'info') {
+    msgEl.innerHTML = message;
+    msgEl.classList.remove('text-success', 'text-danger', 'text-warning', 'text-warning-custom');
+    
+    switch(type) {
+        case 'success':
+            msgEl.classList.add('text-success');
+            break;
+        case 'error':
+            msgEl.classList.add('text-danger');
+            break;
+        case 'warning':
+            msgEl.classList.add('text-warning');
+            break;
+        case 'warning-custom':
+            msgEl.classList.add('text-warning-custom');
+            break;
+        default:
+            msgEl.classList.add('text-success');
+    }
+}
+
+// FONCTIONS D'AFFICHAGE DES MESSAGES
+function showAddressHelpModal() {
+    msgEl.innerHTML = "📝 <strong>Adresse incomplète</strong><br><br>" +
+                     "<small>Merci de saisir une adresse complète reconnue par Google Maps.</small><br><br>" +
+                     "<small><strong>Conseils :</strong></small><br>" +
+                     "<small>• Commencez à taper, des suggestions apparaîtront</small><br>" +
+                     "<small>• Sélectionnez une adresse dans la liste</small><br>" +
+                     "<small>• Utilisez '📍 Utiliser ma position'</small><br>" +
+                     "<small>• Besoin d'aide ? Appelez le </small><strong style='color: #d63384;'>06 95 59 98 59</strong>";
+    
+    msgEl.classList.add('text-warning-custom');
+    
+    // ✅ MODIFICATION : Désactiver TOUS les boutons
+    setBtnState(btnNow, true, "Livraison indisponible");
+    setBtnState(btnLater, true, "Planifier indisponible");
+    setBtnState(btnPickup, true, "À emporter indisponible"); // ← CHANGÉ ICI
+    
+    showModal();
+}
+
+function showAddressRecognitionError() {
+    msgEl.innerHTML = "🔍 <strong>Adresse non reconnue</strong><br><br>" +
+                     "<small>Désolé, nous n'avons pas pu valider votre adresse.</small><br><br>" +
+                     "<small><strong>Solutions :</strong></small><br>" +
+                     "<small>• Vérifiez l'orthographe de votre adresse</small><br>" +
+                     "<small>• Utilisez un point de repère proche</small><br>" +
+                     "<small>• Essayez '📍 Utiliser ma position'</small><br><br>" +
+                     "<small>Vous pouvez nous appeler au :</small><br>" +
+                     "<strong style='color: #d63384; font-size: 1.1em;'>06 95 59 98 59</strong><br><br>" +
+                     "<small style='color: #666;'>Nous vous aiderons à finaliser votre commande !</small>";
+    
+    msgEl.classList.add('text-warning-custom');
+    
+    // Désactiver TOUS les boutons
+    setBtnState(btnNow, true, "Livraison indisponible");
+    setBtnState(btnLater, true, "Planifier indisponible");
+    setBtnState(btnPickup, true, "À emporter indisponible");
+    
+    showModal();
+}
+
+function showOutOfZoneError() {
+    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
+                     "<small>Nous ne livrons pas encore à cette adresse.</small><br><br>" +
+                     "<small style='color: #d63384;'><strong>Pour les commandes de 5 plats et plus, contactez-nous !</strong></small><br><br>" +
+                     "<small>Vous pouvez nous appeler au :</small><br>" +
+                     "<strong style='color: #d63384; font-size: 1.1em;'>06 95 59 98 59</strong>";
+
+    msgEl.classList.add('text-warning');
+    
+    // Désactiver TOUS les boutons
+    setBtnState(btnNow, true, "Livraison indisponible");
+    setBtnState(btnLater, true, "Planifier indisponible");
+    setBtnState(btnPickup, true, "À emporter indisponible");
+    
+    showModal();
+}
+
+
+
+
+function setupButtonsForSuccess() {
+    setBtnState(btnNow, false, "Livrer au plus tôt");
+    setBtnState(btnLater, false, "Planifier plus tard");
+    setBtnState(btnPickup, false, "Commander à emporter");
+    btnPickup.classList.remove('btn-outline-success');
+    btnPickup.classList.add('btn-outline-secondary');
+}
+
+function showModal() {
+    optionsEl.style.display = 'flex';
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
-    const modalEl = document.getElementById('deliveryEstimateModal');
-    const msgEl = document.getElementById('deliveryEstimateMessage');
-    const optionsEl = document.getElementById('modalOptions');
-
-    const btnNow = document.getElementById('acceptNow');
-    const btnLater = document.getElementById('scheduleLater');
-    const btnPickup = document.getElementById('pickupOrder');
-
-    // Fonction pour mettre à jour l'état des boutons
-    function setBtnState(btn, disabled, text = null) {
-        if (disabled) {
-            btn.classList.add("disabled", "btn-disabled-state");
-            btn.setAttribute("disabled", "disabled");
-            btn.dataset.forceDisabled = "true";
-            if (text) btn.innerText = text;
-        } else {
-            btn.classList.remove("disabled", "btn-disabled-state");
-            btn.removeAttribute("disabled");
-            btn.dataset.forceDisabled = "false";
-            if (text) btn.innerText = text;
-        }
-    }
-
-    // Fonction pour afficher un message stylisé
-    function showMessage(message, type = 'info') {
-        msgEl.innerText = message;
-        msgEl.classList.remove('text-success', 'text-danger', 'text-warning');
-        
-        switch(type) {
-            case 'success':
-                msgEl.classList.add('text-success');
-                break;
-            case 'error':
-                msgEl.classList.add('text-danger');
-                break;
-            case 'warning':
-                msgEl.classList.add('text-warning');
-                break;
-            default:
-                msgEl.classList.add('text-success');
-        }
-    }
+    // Initialisation des éléments
+    modalEl = document.getElementById('deliveryEstimateModal');
+    msgEl = document.getElementById('deliveryEstimateMessage');
+    optionsEl = document.getElementById('modalOptions');
+    btnNow = document.getElementById('acceptNow');
+    btnLater = document.getElementById('scheduleLater');
+    btnPickup = document.getElementById('pickupOrder');
 
     // Gestion de la soumission du formulaire
     document.getElementById('addressForm').addEventListener('submit', function (event) {
-    event.preventDefault();
+        event.preventDefault();
 
-    const adresse = document.getElementById('id_adresse_livraison').value.trim();
-    const codePostal = document.getElementById('code_postal').value.trim();
-    const ville = document.getElementById('ville').value.trim();
+        const adresse = document.getElementById('id_adresse_livraison').value.trim();
+        const codePostal = document.getElementById('code_postal').value.trim();
+        const ville = document.getElementById('ville').value.trim();
+        const latitude = document.getElementById('latitude').value;
+        const longitude = document.getElementById('longitude').value;
 
-    // ✅ Validation : Adresse incomplète
-    if (!adresse || !codePostal || !ville) {
-        showAddressHelpModal(); // Message 1
-        return;
-    }
-
-    console.log("🟡 Envoi du formulaire...");
-
-    fetch('{% url "swigo:adresse_livraison" %}', {
-        method: 'POST',
-        body: new FormData(this),
-        headers: { 'X-CSRFToken': getCookie('csrftoken') }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Erreur serveur: ' + response.status);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("✅ Réponse reçue:", data);
-        window._erc_last_estimation = data;
-
-        const modal = new bootstrap.Modal(modalEl);
-
-        // ✅ CAS : Adresse complète mais hors zone
-        if (data.hors_zone === true) {
-            showOutOfZoneError(); // Message 2
+        // Validation de base
+        if (!adresse || !codePostal || !ville) {
+            showAddressHelpModal();
             return;
         }
 
-        // ✅ CAS : Autre erreur
-        if (data.error) {
-            showMessage(data.error, 'error');
-            
-            setBtnState(btnNow, data.disable_livrer_au_plus_tot || false, "Livrer au plus tôt");
-            setBtnState(btnLater, data.disable_planifier || false, "Planifier plus tard");
-            setBtnState(btnPickup, data.disable_emporter || data.pickup_indispo || false, "Commander à emporter");
-            
-            optionsEl.style.display = 'flex';
-            modal.show();
+        // Validation géolocation
+        if (latitude === '0' && longitude === '0') {
+            showAddressRecognitionError();
             return;
         }
 
-        // ✅ CAS NORMAL - Livraison disponible
-        if (data.premiere_heure) {
-            showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
-            
-            document.getElementById('premiereDate').value = data.premiere_date;
-            document.getElementById('premiereHeure').value = data.premiere_heure;
+        console.log("🟡 Envoi du formulaire...");
 
-            setBtnState(btnNow, false, "Livrer au plus tôt");
-            setBtnState(btnLater, false, "Planifier plus tard");
-            setBtnState(btnPickup, false, "Commander à emporter");
-            
-            btnPickup.classList.remove('btn-outline-success');
-            btnPickup.classList.add('btn-outline-secondary');
+        fetch('{% url "swigo:adresse_livraison" %}', {
+            method: 'POST',
+            body: new FormData(this),
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('SERVER_ERROR');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("✅ Réponse reçue:", data);
+            window._erc_last_estimation = data;
 
-            optionsEl.style.display = 'flex';
-            modal.show();
-        } else {
-            showMessage("Aucun créneau de livraison disponible pour le moment.", 'warning');
-            setBtnState(btnNow, true, "Indisponible");
-            setBtnState(btnLater, true, "Indisponible");
-            setBtnState(btnPickup, false, "Commander à emporter");
-            optionsEl.style.display = 'flex';
-            modal.show();
-        }
-    })
-    .catch(error => {
-        console.error('❌ Erreur:', error);
-        showMessage('Erreur de connexion. Veuillez réessayer.', 'error');
+            if (data.hors_zone === true) {
+                showOutOfZoneError();
+                return;
+            }
+
+            if (data.error) {
+                showMessage(data.error, 'error');
+                setupButtonsForHelp();
+                showModal();
+                return;
+            }
+
+            if (data.premiere_heure) {
+                showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
+                document.getElementById('premiereDate').value = data.premiere_date;
+                document.getElementById('premiereHeure').value = data.premiere_heure;
+                setupButtonsForSuccess();
+                showModal();
+            } else {
+                showMessage("Aucun créneau de livraison disponible pour le moment.", 'warning');
+                setBtnState(btnNow, true, "Indisponible");
+                setBtnState(btnLater, true, "Indisponible");
+                setBtnState(btnPickup, false, "Commander à emporter");
+                showModal();
+            }
+        })
+        .catch(error => {
+    console.error('❌ Erreur:', error);
+    if (error.message === 'SERVER_ERROR') {
+        showAddressRecognitionError();
+    } else {
+        // ✅ MODIFICATION : Désactiver tous les boutons pour les autres erreurs
+        showMessage('Erreur technique. Veuillez nous appeler au 06 95 59 98 59', 'error');
         setBtnState(btnNow, true, "Erreur");
         setBtnState(btnLater, true, "Erreur");
-        setBtnState(btnPickup, true, "Erreur");
-        optionsEl.style.display = 'flex';
-        new bootstrap.Modal(modalEl).show();
-    });
+        setBtnState(btnPickup, true, "Erreur"); // ← CHANGÉ ICI
+        showModal();
+    }
 });
+    });
 
     // Empêcher les clics sur les boutons désactivés
-    ['acceptNow', 'pickupOrder', 'scheduleLater'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener('click', function (e) {
-                if (btn.dataset.forceDisabled === "true") {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    return false;
-                }
-            }, true);
-        }
+    [btnNow, btnLater, btnPickup].forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            if (btn.dataset.forceDisabled === "true") {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            }
+        }, true);
     });
 
-    // Gestion du bouton "Livrer au plus tôt"
+    // Gestion des boutons de la modale
     btnNow.addEventListener('click', function () {
         const data = window._erc_last_estimation;
         
@@ -683,259 +757,29 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Gestion du bouton "Planifier plus tard"
     btnLater.addEventListener('click', function () {
         window.location.href = "{% url 'swigo:programmer_livraison' %}";
     });
 
-    // Gestion du bouton "Commander à emporter"
     btnPickup.addEventListener('click', function () {
         const modalInstance = bootstrap.Modal.getInstance(modalEl);
         modalInstance.hide();
-        
-        // Redirection vers la page de pickup
         setTimeout(() => {
             window.location.href = "{% url 'swigo:programmer_pick_up' %}";
         }, 300);
     });
-
-    // Fonction pour afficher la plage horaire
-    function afficherPlageHoraire(premiereHeureStr) {
-        if (!premiereHeureStr) return "Horaire non disponible";
-        
-        const [heures, minutes] = premiereHeureStr.split(':').map(Number);
-        const milieu = new Date();
-        milieu.setHours(heures, minutes, 0, 0);
-        const debut = new Date(milieu.getTime() - 15 * 60 * 1000);
-        const fin = new Date(milieu.getTime() + 15 * 60 * 1000);
-        
-        const format = date => 
-            date.getHours().toString().padStart(2, '0') + ':' + 
-            date.getMinutes().toString().padStart(2, '0');
-        
-        return `Livraison au plus tôt estimée entre ${format(debut)} et ${format(fin)}.`;
-    }
 });
 
-function isInDeliveryZone(lat, lng) {
-    // Zone de livraison autour de Gisors (approx. 20km de rayon)
-    const gisorsLat = 49.2775;
-    const gisorsLng = 1.7750;
-    const radiusKm = 20;
-    
-    const R = 6371; // Rayon de la Terre en km
-    const dLat = (lat - gisorsLat) * Math.PI / 180;
-    const dLng = (lng - gisorsLng) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(gisorsLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * 
-        Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    
-    return distance <= radiusKm;
-}
-
-function showAddressHelpModal() {
-    const modalEl = document.getElementById('deliveryEstimateModal');
-    const msgEl = document.getElementById('deliveryEstimateMessage');
-    const optionsEl = document.getElementById('modalOptions');
-    
-    const btnNow = document.getElementById('acceptNow');
-    const btnLater = document.getElementById('scheduleLater');
-    const btnPickup = document.getElementById('pickupOrder');
-    
-    // ✅ MESSAGE 1 : Adresse incomplète
-    msgEl.innerHTML = "Merci de saisir votre adresse complète.<br><br>" +
-                     "<small>Si elle n'apparaît pas dans la liste, indiquez l'adresse la plus proche. " +
-                     "Vous pourrez préciser votre adresse exacte au livreur quand vous remplirez vos coordonnées.</small>";
-    msgEl.classList.remove('text-success', 'text-danger', 'text-warning');
-    
-    // Désactiver tous les boutons sauf emporter
-    btnNow.classList.add("disabled", "btn-disabled-state");
-    btnNow.setAttribute("disabled", "disabled");
-    btnNow.dataset.forceDisabled = "true";
-    btnNow.innerText = "Livraison indisponible";
-    
-    btnLater.classList.add("disabled", "btn-disabled-state");
-    btnLater.setAttribute("disabled", "disabled");
-    btnLater.dataset.forceDisabled = "true";
-    btnLater.innerText = "Planifier indisponible";
-    
-    btnPickup.classList.remove("disabled", "btn-disabled-state");
-    btnPickup.removeAttribute("disabled");
-    btnPickup.dataset.forceDisabled = "false";
-    btnPickup.innerText = "Commander à emporter";
-    btnPickup.classList.remove('btn-outline-secondary');
-    btnPickup.classList.add('btn-outline-success');
-    
-    optionsEl.style.display = 'flex';
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-}
-
-function showOutOfZoneError() {
-    const modalEl = document.getElementById('deliveryEstimateModal');
-    const msgEl = document.getElementById('deliveryEstimateMessage');
-    const optionsEl = document.getElementById('modalOptions');
-    
-    const btnNow = document.getElementById('acceptNow');
-    const btnLater = document.getElementById('scheduleLater');
-    const btnPickup = document.getElementById('pickupOrder');
-    
-    // ✅ MESSAGE 2 : Adresse complète mais hors zone
-    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
-                     "<small>Nous ne livrons pas encore à cette adresse. " +
-                     "Vous pouvez commander à emporter.</small><br><br>" +
-                     "<small style='color: #d63384;'><strong>Si vous commandez plus de 5 couscous, " +
-                     "appelez-nous au <span style='font-size: 1.1em;'>06 95 59 98 59</span></strong></small>";
-    msgEl.classList.remove('text-success', 'text-danger');
-    msgEl.classList.add('text-warning');
-    
-    // Désactiver livraison, activer emporter
-    btnNow.classList.add("disabled", "btn-disabled-state");
-    btnNow.setAttribute("disabled", "disabled");
-    btnNow.dataset.forceDisabled = "true";
-    btnNow.innerText = "Livraison indisponible";
-    
-    btnLater.classList.add("disabled", "btn-disabled-state");
-    btnLater.setAttribute("disabled", "disabled");
-    btnLater.dataset.forceDisabled = "true";
-    btnLater.innerText = "Planifier indisponible";
-    
-    btnPickup.classList.remove("disabled", "btn-disabled-state");
-    btnPickup.removeAttribute("disabled");
-    btnPickup.dataset.forceDisabled = "false";
-    btnPickup.innerText = "Commander à emporter";
-    btnPickup.classList.remove('btn-outline-secondary');
-    btnPickup.classList.add('btn-outline-success');
-    
-    optionsEl.style.display = 'flex';
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-}
-
-function showOutOfZoneError() {
-    const modalEl = document.getElementById('deliveryEstimateModal');
-    const msgEl = document.getElementById('deliveryEstimateMessage');
-    const optionsEl = document.getElementById('modalOptions');
-    
-    const btnNow = document.getElementById('acceptNow');
-    const btnLater = document.getElementById('scheduleLater');
-    const btnPickup = document.getElementById('pickupOrder');
-    
-    // ✅ MESSAGE 2 : Adresse complète mais hors zone
-    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
-                     "<small>Nous ne livrons pas encore à cette adresse. " +
-                     "Vous pouvez commander à emporter.</small><br><br>" +
-                     "<small style='color: #d63384;'><strong>Si vous commandez plus de 5 couscous, " +
-                     "appelez-nous au <span style='font-size: 1.1em;'>06 95 59 98 59</span></strong></small>";
-    msgEl.classList.remove('text-success', 'text-danger');
-    msgEl.classList.add('text-warning');
-    
-    // Désactiver livraison, activer emporter
-    btnNow.classList.add("disabled", "btn-disabled-state");
-    btnNow.setAttribute("disabled", "disabled");
-    btnNow.dataset.forceDisabled = "true";
-    btnNow.innerText = "Livraison indisponible";
-    
-    btnLater.classList.add("disabled", "btn-disabled-state");
-    btnLater.setAttribute("disabled", "disabled");
-    btnLater.dataset.forceDisabled = "true";
-    btnLater.innerText = "Planifier indisponible";
-    
-    btnPickup.classList.remove("disabled", "btn-disabled-state");
-    btnPickup.removeAttribute("disabled");
-    btnPickup.dataset.forceDisabled = "false";
-    btnPickup.innerText = "Commander à emporter";
-    btnPickup.classList.remove('btn-outline-secondary');
-    btnPickup.classList.add('btn-outline-success');
-    
-    optionsEl.style.display = 'flex';
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-}
-
-function forceGeocodeWithZoneCheck(address) {
-    const geocoder = new google.maps.Geocoder();
-    
-    geocoder.geocode({ address: address }, function(results, status) {
-        if (status === "OK" && results[0]) {
-            const place = results[0];
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
-            
-            if (isInDeliveryZone(lat, lng)) {
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lng;
-                document.getElementById('code_postal').value = getComponent(place, 'postal_code');
-                document.getElementById('ville').value = getComponent(place, 'locality') || getComponent(place, 'administrative_area_level_2');
-                document.getElementById('zone').value = 'gisors';
-                
-                // Soumettre le formulaire après géocodage réussi
-                document.getElementById('addressForm').dispatchEvent(new Event('submit'));
-            } else {
-                showOutOfZoneError();
-            }
-        } else {
-            // Adresse non reconnue - afficher l'aide
-            showAddressHelpModal();
+function getCookie(name) {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+            return decodeURIComponent(cookie.substring(name.length + 1));
         }
-    });
-}
-
-function showOutOfZoneError() {
-    const modalEl = document.getElementById('deliveryEstimateModal');
-    const msgEl = document.getElementById('deliveryEstimateMessage');
-    const optionsEl = document.getElementById('modalOptions');
-    
-    const btnNow = document.getElementById('acceptNow');
-    const btnLater = document.getElementById('scheduleLater');
-    const btnPickup = document.getElementById('pickupOrder');
-    
-    msgEl.innerHTML = "🚫 <strong>Hors zone de livraison</strong><br><br>" +
-                     "<small>Nous ne livrons pas encore à cette adresse. " +
-                     "Vous pouvez commander à emporter ou vérifier votre adresse.</small>";
-    msgEl.classList.remove('text-success', 'text-danger');
-    msgEl.classList.add('text-warning');
-    
-    // Désactiver livraison, activer emporter
-    btnNow.classList.add("disabled", "btn-disabled-state");
-    btnNow.setAttribute("disabled", "disabled");
-    btnNow.dataset.forceDisabled = "true";
-    btnNow.innerText = "Livraison indisponible";
-    
-    btnLater.classList.add("disabled", "btn-disabled-state");
-    btnLater.setAttribute("disabled", "disabled");
-    btnLater.dataset.forceDisabled = "true";
-    btnLater.innerText = "Planifier indisponible";
-    
-    btnPickup.classList.remove("disabled", "btn-disabled-state");
-    btnPickup.removeAttribute("disabled");
-    btnPickup.dataset.forceDisabled = "false";
-    btnPickup.innerText = "Commander à emporter";
-    btnPickup.classList.remove('btn-outline-secondary');
-    btnPickup.classList.add('btn-outline-success');
-    
-    optionsEl.style.display = 'flex';
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-}
-
-
-
-    
-    function getCookie(name) {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            cookie = cookie.trim();
-            if (cookie.startsWith(name + '=')) {
-                return decodeURIComponent(cookie.substring(name.length + 1));
-            }
-        }
-        return null;
     }
-    </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChxLP7_um9XUuGA3rHlUPTQuB7SRFuSNk&libraries=places&callback=initAutocomplete" async defer></script>
-
+    return null;
+}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChxLP7_um9XUuGA3rHlUPTQuB7SRFuSNk&libraries=places&callback=initAutocomplete" async defer></script>
 {% endblock %}
