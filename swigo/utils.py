@@ -165,7 +165,7 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     logger.debug(f"[SERVICE] Actuel: {service_courant} | Ouverts aujourd'hui: {services_ouverts}")
 
     if not services_ouverts:
-        logger.info("[FERME] Aucun service ouvert aujourd’hui")
+        logger.info("[FERME] Aucun service ouvert aujourd'hui")
         # Si on est tard, tenter demain
         if maintenant.time() >= time(22, 0):
             jour_suivant = maintenant + timedelta(days=1)
@@ -219,13 +219,20 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     debut_possible = max(heure_ouverture, maintenant + timedelta(minutes=delai_total))
     logger.debug(f"[MIN] Début possible: {debut_possible} (prépa {TEMPS_PREPARATION_MINUTES} + route {temps_livraison})")
 
-    # Si trop tard pour midi, passer au soir
-    if service_courant == "MIDI" and maintenant.time() >= HEURE_CUTOFF_MIDI:
-        switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
-        if debut_possible < switch_heure:
-            debut_possible = switch_heure
+    # CORRECTION : Logique améliorée de bascule MIDI→SOIR
+    if service_courant == "MIDI" and "SOIR" in services_ouverts:
+        # Cas 1: Commande après le cutoff MIDI → bascule directe vers SOIR
+        if maintenant.time() >= HEURE_CUTOFF_MIDI:
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            debut_possible = max(debut_possible, switch_heure)
             service_courant = "SOIR"
-            logger.debug(f"[BASCULE] Midi -> Soir à {debut_possible}")
+            logger.debug(f"[BASCULE CUTOFF] Midi -> Soir à {debut_possible}")
+        # Cas 2: L'heure estimée dépasse le cutoff MIDI → bascule aussi
+        elif debut_possible.time() > HEURE_CUTOFF_MIDI:
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            debut_possible = max(debut_possible, switch_heure)
+            service_courant = "SOIR"
+            logger.debug(f"[BASCULE ESTIM] Midi -> Soir (estim dépasse cutoff) à {debut_possible}")
 
     # Estimation selon dispo livreur
     livreurs_libres = apps.get_model('swigo', 'Livreur').objects.filter(au_travaille=True, is_booked=False)
@@ -257,32 +264,39 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             prochaine_heure = max(maintenant + timedelta(minutes=40 + delai_total), debut_possible)
             logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
 
-    # CORRECTION DU BUG : Vérification des horaires par service
+    # CORRECTION : Vérification intelligente des horaires avec bascule
     if service_courant == "SOIR":
         heure_fin_effective = HEURE_FIN_SOIR
     else:
         heure_fin_effective = HEURE_CUTOFF_MIDI
 
-    # Vérifier si on est dans les horaires du service actuel
-    if not (heure_ouverture_service <= prochaine_heure.time() <= heure_fin_effective):
-        logger.debug(f"[HORS HORAIRE {service_courant}] {prochaine_heure.time()} hors de {heure_ouverture_service}-{heure_fin_effective}")
-        logger.debug("On bascule au jour suivant")
+    # Vérifier si l'heure estimée dépasse les horaires du service actuel
+    if prochaine_heure.time() > heure_fin_effective:
+        logger.debug(f"[HORS HORAIRE {service_courant}] {prochaine_heure.time()} après {heure_fin_effective}")
         
-        JOURS_MAP = {0: "LUN", 1: "MAR", 2: "MER", 3: "JEU", 4: "VEN", 5: "SAM", 6: "DIM"}
-        next_date = prochaine_heure.date()
-        for i in range(7):
-            d = next_date + timedelta(days=i)
-            j = JOURS_MAP[d.weekday()]
-            dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
-            if "MIDI" in dispo:
-                h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-            if "SOIR" in dispo:
-                h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-        logger.debug(f"[NEXT OPEN] {prochaine_heure}")
+        # CORRECTION : Si on dépasse le cutoff MIDI, essayer de basculer vers SOIR
+        if service_courant == "MIDI" and "SOIR" in services_ouverts:
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            prochaine_heure = max(prochaine_heure, switch_heure)
+            service_courant = "SOIR"
+            logger.debug(f"[BASCULE HORAIRE] MIDI->SOIR à {prochaine_heure}")
+        else:
+            # Sinon, reporter au jour suivant
+            logger.debug("[REPORT] Bascule au jour suivant")
+            next_date = prochaine_heure.date()
+            for i in range(1, 8):  # Chercher sur 7 jours
+                d = next_date + timedelta(days=i)
+                j = JOURS_MAP[d.weekday()]
+                dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
+                if "MIDI" in dispo:
+                    h = get_heure_debut_service(j, "MIDI", time(11, 30))
+                    prochaine_heure = make_aware(datetime.combine(d, h))
+                    break
+                if "SOIR" in dispo:
+                    h = get_heure_debut_service(j, "SOIR", time(18, 30))
+                    prochaine_heure = make_aware(datetime.combine(d, h))
+                    break
+            logger.debug(f"[NEXT OPEN] {prochaine_heure}")
 
     # Arrondi & recherche créneau dispo
     heure_estimee_brute = chercher_prochain_creneau_disponible(prochaine_heure, mode='livraison')
