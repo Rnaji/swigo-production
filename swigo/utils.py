@@ -258,23 +258,32 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
 
     # Hors horaires ? Chercher prochain jour ouvert
-    if not (time(6, 0) <= prochaine_heure.time() <= heure_fin.time()):
-        logger.debug("[HORS HORAIRE] On bascule au jour suivant")
-        JOURS_MAP = {0: "LUN", 1: "MAR", 2: "MER", 3: "JEU", 4: "VEN", 5: "SAM", 6: "DIM"}
-        next_date = prochaine_heure.date()
-        for i in range(7):
-            d = next_date + timedelta(days=i)
-            j = JOURS_MAP[d.weekday()]
-            dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
-            if "MIDI" in dispo:
-                h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-            if "SOIR" in dispo:
-                h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-        logger.debug(f"[NEXT OPEN] {prochaine_heure}")
+# CORRECTION : Vérifier d'abord si on peut passer au service du soir du même jour
+        if service_courant == "MIDI" and prochaine_heure.time() > HEURE_CUTOFF_MIDI:
+            # Vérifier si le service du soir est ouvert aujourd'hui
+            if "SOIR" in services_ouverts:
+                logger.debug(f"[BASCULE MIDI->SOIR] {prochaine_heure.time()} après cutoff midi")
+                # Passer au début du service du soir
+                debut_soir = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+                prochaine_heure = max(prochaine_heure, debut_soir)
+                service_courant = "SOIR"
+                logger.debug(f"[SOIR] Nouvelle estimation: {prochaine_heure}")
+            else:
+                logger.debug("[PAS DE SOIR] On bascule au jour suivant")
+                # Pas de service du soir, passer au lendemain
+                for i in range(1, 7):
+                    d = maintenant.date() + timedelta(days=i)
+                    j = JOURS_MAP[d.weekday()]
+                    dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
+                    if "MIDI" in dispo:
+                        h = get_heure_debut_service(j, "MIDI", time(11, 30))
+                        prochaine_heure = make_aware(datetime.combine(d, h))
+                        break
+                    if "SOIR" in dispo:
+                        h = get_heure_debut_service(j, "SOIR", time(18, 30))
+                        prochaine_heure = make_aware(datetime.combine(d, h))
+                        break
+                logger.debug(f"[NEXT OPEN] {prochaine_heure}")
 
     # Arrondi & recherche créneau dispo
     heure_estimee_brute = chercher_prochain_creneau_disponible(prochaine_heure, mode='livraison')
