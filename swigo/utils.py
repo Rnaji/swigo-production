@@ -257,203 +257,6 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             prochaine_heure = max(maintenant + timedelta(minutes=40 + delai_total), debut_possible)
             logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
 
-    # Hors horaires ? Chercher prochain jour ouvert
-# CORRECTION : Vérifier d'abord si on peut passer au service du soir du même jour
-        if service_courant == "MIDI" and prochaine_heure.time() > HEURE_CUTOFF_MIDI:
-            # Vérifier si le service du soir est ouvert aujourd'hui
-            if "SOIR" in services_ouverts:
-                logger.debug(f"[BASCULE MIDI->SOIR] {prochaine_heure.time()} après cutoff midi")
-                # Passer au début du service du soir
-                debut_soir = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
-                prochaine_heure = max(prochaine_heure, debut_soir)
-                service_courant = "SOIR"
-                logger.debug(f"[SOIR] Nouvelle estimation: {prochaine_heure}")
-            else:
-                logger.debug("[PAS DE SOIR] On bascule au jour suivant")
-                # Pas de service du soir, passer au lendemain
-                for i in range(1, 7):
-                    d = maintenant.date() + timedelta(days=i)
-                    j = JOURS_MAP[d.weekday()]
-                    dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
-                    if "MIDI" in dispo:
-                        h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                        prochaine_heure = make_aware(datetime.combine(d, h))
-                        break
-                    if "SOIR" in dispo:
-                        h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                        prochaine_heure = make_aware(datetime.combine(d, h))
-                        break
-                logger.debug(f"[NEXT OPEN] {prochaine_heure}")
-
-    # Arrondi & recherche créneau dispo
-    heure_estimee_brute = chercher_prochain_creneau_disponible(prochaine_heure, mode='livraison')
-    heure_estimee = arrondir_au_quart_heure(heure_estimee_brute)
-
-    # Ajustement léger possible (jamais avant debut_possible)
-    candidate = heure_estimee - timedelta(minutes=15)
-    if (heure_estimee.minute == 15
-        and (heure_estimee - prochaine_heure).seconds < 20 * 60
-        and candidate >= debut_possible):
-        logger.debug(f"[AJUST] {heure_estimee} -> {candidate}")
-        heure_estimee = candidate
-
-    # Si l'heure estimée est aujourd'hui mais passée, chercher dès demain
-    if heure_estimee.date() == maintenant.date() and heure_estimee < maintenant:
-        logger.debug(f"[DEPASSE] {heure_estimee} -> recherche lendemain")
-        prochaine_heure = None
-        for i in range(1, 7):
-            d = maintenant.date() + timedelta(days=i)
-            j = JOURS_MAP[d.weekday()]
-            services_dispos = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
-            if "MIDI" in services_dispos:
-                h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-            if "SOIR" in services_dispos:
-                h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
-                break
-        if not prochaine_heure:
-            return {'error': "Aucun créneau de livraison disponible cette semaine."}
-        heure_estimee = chercher_prochain_creneau_disponible(prochaine_heure, mode="livraison")
-
-    # Vérifications finales de cohérence
-    JOURS_MAP# =========================
-# Estimation Livraison
-# =========================
-def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = None):
-    """
-    Estime la prochaine heure de livraison possible selon adresse, horaires et disponibilité livreurs.
-    Retourne un datetime (aware) ou un dict {'error': '...'}.
-    """
-    HoraireDisponible = apps.get_model('swigo', 'HoraireDisponible')
-    JourFermeture = apps.get_model('swigo', 'JourFermeture')
-    VilleDesservie = apps.get_model('swigo', 'VilleDesservie')
-    Livreur = apps.get_model('swigo', 'Livreur')
-    Tournee = apps.get_model('swigo', 'Tournee')
-
-    if maintenant is None:
-        maintenant = timezone.localtime()
-
-    logger.debug(f"[NOW] {maintenant}")
-
-    # Fermeture du jour
-    if hasattr(JourFermeture, "est_ferme") and JourFermeture.est_ferme(maintenant.date()):
-        logger.info("[FERME] Restaurant fermé aujourd'hui")
-        return {'error': "Le restaurant est fermé aujourd'hui."}
-
-    JOURS_MAP = {0: "LUN", 1: "MAR", 2: "MER", 3: "JEU", 4: "VEN", 5: "SAM", 6: "DIM"}
-    jour_semaine = JOURS_MAP[maintenant.weekday()]
-
-    # Heures d'ouverture (premiers slots)
-    HEURE_OUVERTURE_MIDI = get_heure_debut_service(jour_semaine, "MIDI", time(11, 30))
-    HEURE_CUTOFF_MIDI = time(14, 30)
-    HEURE_OUVERTURE_SOIR = get_heure_debut_service(jour_semaine, "SOIR", time(18, 30))
-    HEURE_FIN_SOIR = time(22, 30)
-
-    def get_service(dt: datetime) -> str:
-        return "MIDI" if dt.time() < time(16, 0) else "SOIR"
-
-    service_courant = get_service(maintenant)
-    services_ouverts = list(HoraireDisponible.objects
-                            .filter(jour=jour_semaine)
-                            .values_list('service', flat=True)
-                            .distinct())
-    logger.debug(f"[SERVICE] Actuel: {service_courant} | Ouverts aujourd'hui: {services_ouverts}")
-
-    if not services_ouverts:
-        logger.info("[FERME] Aucun service ouvert aujourd’hui")
-        # Si on est tard, tenter demain
-        if maintenant.time() >= time(22, 0):
-            jour_suivant = maintenant + timedelta(days=1)
-            jour_str = JOURS_MAP[jour_suivant.weekday()]
-            services_demain = list(HoraireDisponible.objects
-                                   .filter(jour=jour_str)
-                                   .values_list('service', flat=True)
-                                   .distinct())
-            if "MIDI" in services_demain:
-                h = get_heure_debut_service(jour_str, "MIDI", time(11, 30))
-                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), h))
-                return estimer_heure_livraison(adresse_livraison, maintenant=nouvelle_heure)
-            if "SOIR" in services_demain:
-                h = get_heure_debut_service(jour_str, "SOIR", time(18, 30))
-                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), h))
-                return estimer_heure_livraison(adresse_livraison, maintenant=nouvelle_heure)
-
-        return {'error': "Aucun service ouvert aujourd'hui."}
-
-    # Si le service courant n'est pas ouvert, bascule au soir si possible
-    if service_courant not in services_ouverts:
-        if "SOIR" in services_ouverts:
-            service_courant = "SOIR"
-            if maintenant.time() < HEURE_OUVERTURE_SOIR:
-                maintenant = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
-                logger.debug(f"[PASSAGE] Vers SOIR à {maintenant}")
-        else:
-            return {'error': f"Le service du {service_courant.lower()} est fermé aujourd'hui."}
-
-    # Temps livraison par ville
-    try:
-        VilleDesservie_obj = VilleDesservie.objects.get(ville=adresse_livraison.ville)
-        temps_livraison = int(VilleDesservie_obj.temps_gisors or 20)
-    except VilleDesservie.DoesNotExist:
-        temps_livraison = 60
-    logger.debug(f"[ROUTE] Temps livraison estimé: {temps_livraison} min")
-
-    # Bornes du service
-    if service_courant == "SOIR":
-        heure_ouverture_service = HEURE_OUVERTURE_SOIR
-        heure_fin_service = HEURE_FIN_SOIR
-    else:
-        heure_ouverture_service = HEURE_OUVERTURE_MIDI
-        heure_fin_service = HEURE_CUTOFF_MIDI
-
-    heure_ouverture = make_aware(datetime.combine(maintenant.date(), heure_ouverture_service))
-    heure_fin = make_aware(datetime.combine(maintenant.date(), heure_fin_service))
-
-    # Calcul heure mini possible (prépa + trajet)
-    delai_total = TEMPS_PREPARATION_MINUTES + temps_livraison
-    debut_possible = max(heure_ouverture, maintenant + timedelta(minutes=delai_total))
-    logger.debug(f"[MIN] Début possible: {debut_possible} (prépa {TEMPS_PREPARATION_MINUTES} + route {temps_livraison})")
-
-    # Si trop tard pour midi, passer au soir
-    if service_courant == "MIDI" and maintenant.time() >= HEURE_CUTOFF_MIDI:
-        switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
-        if debut_possible < switch_heure:
-            debut_possible = switch_heure
-            service_courant = "SOIR"
-            logger.debug(f"[BASCULE] Midi -> Soir à {debut_possible}")
-
-    # Estimation selon dispo livreur
-    livreurs_libres = apps.get_model('swigo', 'Livreur').objects.filter(au_travaille=True, is_booked=False)
-    if livreurs_libres.exists():
-        est = maintenant + timedelta(minutes=delai_total)
-        prochaine_heure = max(est, debut_possible)
-        logger.debug(f"[LIVREUR OK] Prochaine estimation brute: {prochaine_heure}")
-    else:
-        TourneeModel = apps.get_model('swigo', 'Tournee')
-        tournees = TourneeModel.objects.filter(
-            is_done=False, is_closed=True, is_sent_livreur=True,
-            livreur__au_travaille=True, heure_retour_estime__isnull=False
-        )
-        estimations_possibles = []
-        for t in tournees:
-            retour = make_aware(datetime.combine(t.date_tournee, t.heure_retour_estime))
-            autre = TourneeModel.objects.filter(
-                livreur=t.livreur, is_done=False, is_closed=False,
-                date_tournee=t.date_tournee, nom__gt=t.nom
-            ).exists()
-            if not autre:
-                est = retour + timedelta(minutes=delai_total)
-                estimations_possibles.append(max(est, debut_possible))
-
-        if estimations_possibles:
-            prochaine_heure = min(estimations_possibles)
-            logger.debug(f"[TOURNEE] Estim via retour: {prochaine_heure}")
-        else:
-            prochaine_heure = max(maintenant + timedelta(minutes=40 + delai_total), debut_possible)
-            logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
-
     # CORRECTION DU BUG : Vérification des horaires par service
     if service_courant == "SOIR":
         heure_fin_effective = HEURE_FIN_SOIR
@@ -552,7 +355,7 @@ def estimer_heure_retrait():
     debut_prepa = max(now_local, debut_service)
     fin_prepa = debut_prepa + timedelta(minutes=TEMPS_PREPARATION_MINUTES)
 
-    # Arrondi au quart d’heure supérieur
+    # Arrondi au quart d'heure supérieur
     minute_arrondie = ((fin_prepa.minute // 15) + 1) * 15
     if minute_arrondie >= 60:
         fin_prepa += timedelta(hours=1)
@@ -562,7 +365,7 @@ def estimer_heure_retrait():
 
     # Limite fin de service
     if fin_prepa.time() > HEURE_FIN_SOIR:
-        raise Exception("Il est trop tard pour commander à emporter aujourd’hui.")
+        raise Exception("Il est trop tard pour commander à emporter aujourd'hui.")
 
     # Cherche le créneau dispo en mode 'emporter'
     return chercher_prochain_creneau_disponible(fin_prepa, mode='emporter')
@@ -754,12 +557,6 @@ def price_per_stock_unit(total_price_eur, qty, from_unit, unite_stock) -> Decima
         raise ValueError("Quantité convertie nulle ou négative.")
     return (total / stock_qty).quantize(Decimal('0.0001'))
 
-
-
-from decimal import Decimal
-from swigo.utils import to_stock_units
-
-
 def format_qty(qty, unit_stock):
     """
     Formate les quantités pour affichage humain.
@@ -779,14 +576,12 @@ def format_qty(qty, unit_stock):
         return f"{qty:.0f} u"
     return f"{qty} {unit_stock}"
 
-
 def afficher_recette_detail(recette):
     """
     Affiche le détail d'une recette : ingrédients, quantités, coût par ingrédient,
     total et prix de revient unitaire.
     """
-
-    from swigo.models import RecetteIngredient  # 👈 import local
+    from swigo.models import RecetteIngredient
 
     print(f"📋 Recette : {recette.nom} ({recette.portions} portions)")
     total_ht = Decimal("0")
