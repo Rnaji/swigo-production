@@ -669,45 +669,49 @@ document.addEventListener('DOMContentLoaded', function () {
             return response.json();
         })
         .then(data => {
-            console.log("✅ Réponse reçue:", data);
-            window._erc_last_estimation = data;
+    console.log("✅ Réponse reçue:", data);
+    window._erc_last_estimation = data;
 
-            if (data.hors_zone === true) {
-                showOutOfZoneError();
-                return;
-            }
+    // ✅ NOUVELLE LOGIQUE : Utiliser les flags du backend
+    if (data.disable_livrer_au_plus_tot !== undefined) {
+        // Appliquer les états des boutons selon les flags du backend
+        setBtnState(btnNow, data.disable_livrer_au_plus_tot, 
+                   data.disable_livrer_au_plus_tot ? "Livraison indisponible" : "Livrer au plus tôt");
+        setBtnState(btnLater, data.disable_planifier, 
+                   data.disable_planifier ? "Planifier indisponible" : "Planifier plus tard");
+        setBtnState(btnPickup, data.disable_emporter, 
+                   data.disable_emporter ? "À emporter indisponible" : "Commander à emporter");
+        
+        // Afficher le message
+        showMessage(data.message || data.error, data.disable_livrer_au_plus_tot ? 'warning' : 'success');
+        showModal();
+        return;
+    }
 
-            if (data.error) {
-                showMessage(data.error, 'error');
-                setupButtonsForHelp();
-                showModal();
-                return;
-            }
+    // Ancienne logique pour compatibilité (si les flags n'existent pas)
+    if (data.hors_zone === true) {
+        showOutOfZoneError();
+        return;
+    }
 
-            if (data.premiere_heure) {
-                showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
-                document.getElementById('premiereDate').value = data.premiere_date;
-                document.getElementById('premiereHeure').value = data.premiere_heure;
-                setupButtonsForSuccess();
-                showModal();
-            } else {
-                showMessage("Aucun créneau de livraison disponible pour le moment.", 'warning');
-                setBtnState(btnNow, true, "Indisponible");
-                setBtnState(btnLater, true, "Indisponible");
-                setBtnState(btnPickup, false, "Commander à emporter");
-                showModal();
-            }
-        })
-        .catch(error => {
-    console.error('❌ Erreur:', error);
-    if (error.message === 'SERVER_ERROR') {
-        showAddressRecognitionError();
+    if (data.error) {
+        showMessage(data.error, 'error');
+        setupButtonsForHelp();
+        showModal();
+        return;
+    }
+
+    if (data.premiere_heure) {
+        showMessage(afficherPlageHoraire(data.premiere_heure), 'success');
+        document.getElementById('premiereDate').value = data.premiere_date;
+        document.getElementById('premiereHeure').value = data.premiere_heure;
+        setupButtonsForSuccess();
+        showModal();
     } else {
-        // ✅ MODIFICATION : Désactiver tous les boutons pour les autres erreurs
-        showMessage('Erreur technique. Veuillez nous appeler au 06 95 59 98 59', 'error');
-        setBtnState(btnNow, true, "Erreur");
-        setBtnState(btnLater, true, "Erreur");
-        setBtnState(btnPickup, true, "Erreur"); // ← CHANGÉ ICI
+        showMessage("Aucun créneau de livraison disponible pour le moment.", 'warning');
+        setBtnState(btnNow, true, "Indisponible");
+        setBtnState(btnLater, true, "Indisponible");
+        setBtnState(btnPickup, false, "Commander à emporter");
         showModal();
     }
 });
