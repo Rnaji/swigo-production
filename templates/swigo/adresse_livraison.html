@@ -592,10 +592,10 @@ function showOutOfZoneError() {
 
     msgEl.classList.add('text-warning');
     
-    // Désactiver TOUS les boutons
+    // ✅ MODIFICATION : 
     setBtnState(btnNow, true, "Livraison indisponible");
-    setBtnState(btnLater, true, "Planifier indisponible");
-    setBtnState(btnPickup, true, "À emporter indisponible");
+    setBtnState(btnLater, false, "Planifier plus tard"); // Planifier livraison future
+    setBtnState(btnPickup, true, "À emporter indisponible"); // Emporter seulement jour même
     
     showModal();
 }
