@@ -617,6 +617,13 @@ function showModal() {
     modal.show();
 }
 
+// FONCTION MANQUANTE - À AJOUTER
+function setupButtonsForHelp() {
+    setBtnState(btnNow, true, "Livraison indisponible");
+    setBtnState(btnLater, true, "Planifier indisponible");
+    setBtnState(btnPickup, true, "À emporter indisponible");
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Initialisation des éléments
     modalEl = document.getElementById('deliveryEstimateModal');
