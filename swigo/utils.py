@@ -121,7 +121,9 @@ def get_heure_debut_service(jour_semaine: str, service: str, fallback: time) -> 
         return datetime.strptime(dispo.get_horaires()[0], "%H:%M").time()
     return fallback
 
-
+# =========================
+# Estimation Livraison
+# =========================
 def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = None):
     """
     Estime la prochaine heure de livraison possible selon adresse, horaires et disponibilité livreurs.
@@ -246,21 +248,14 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
         )
         estimations_possibles = []
         for t in tournees:
-            # CORRECTION COMPLÈTE : heure_retour_estime est déjà un DateTime complet !
-            retour = t.heure_retour_estime
-            # S'assurer que c'est en timezone locale
-            if retour and retour.tzinfo is None:
-                retour = make_aware(retour)
-            
-            # Vérifier si autre tournée après (BIEN INDENTÉ)
+            retour = make_aware(datetime.combine(t.date_tournee, t.heure_retour_estime))
             autre = TourneeModel.objects.filter(
                 livreur=t.livreur, is_done=False, is_closed=False,
                 date_tournee=t.date_tournee, nom__gt=t.nom
             ).exists()
-            
             if not autre:
                 est = retour + timedelta(minutes=delai_total)
-                estimations_possibles.append(est)  # Toujours prendre l'estimation basée sur le retour
+                estimations_possibles.append(max(est, debut_possible))
 
         if estimations_possibles:
             prochaine_heure = min(estimations_possibles)
@@ -268,8 +263,6 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
         else:
             prochaine_heure = max(maintenant + timedelta(minutes=40 + delai_total), debut_possible)
             logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
-
-    # ... le reste de la fonction reste inchangé ...
 
     # CORRECTION : Vérification intelligente des horaires avec bascule
     if service_courant == "SOIR":
@@ -351,6 +344,7 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
         return {'error': "Il est trop tard pour une livraison ce soir."}
 
     return heure_estimee
+
 # =========================
 # Estimation Retrait (à emporter)
 # =========================

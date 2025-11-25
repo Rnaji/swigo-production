@@ -1904,8 +1904,7 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
     const bouton = document.getElementById('ajouter-au-panier-btn');
     const nomLower = nom.toLowerCase();
 
-    // 🆕 CORRECTION : BASÉ UNIQUEMENT SUR LA CATÉGORIE
-    // GESTION DES CROUSTY
+    // 🆕 GESTION DES CROUSTY
     if (nomLower.includes('crousty')) {
         bouton.onclick = function () {
             $('#platModal').modal('hide');
@@ -1915,8 +1914,12 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
         return;
     }
     
-    // 🆕 POULET PERSONNALISÉ UNIQUEMENT POUR LA CATÉGORIE "poulet"
-    else if (categorie === 'poulet') {
+    // 🆕 POULET PERSONNALISÉ
+    else if (nomLower.includes('poulet') || 
+             nomLower.includes('tenders') || 
+             nomLower.includes('wings') || 
+             nomLower.includes('bucket') ||
+             categorie === 'poulet') {
         bouton.onclick = function () {
             $('#platModal').modal('hide');
             openPouletModal(platId, nom, imageUrl, description, prix);
@@ -1939,7 +1942,7 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
         return;
     }
     
-    // 🍔 BURGERS ET PLATS AVEC OPTIONS (par défaut)
+    // 🍔 BURGERS ET PLATS AVEC OPTIONS
     else {
         configurerPlatAvecOptions(platId, nom, categorie, bouton);
     }
@@ -3074,7 +3077,7 @@ window.handleStripe = function () {
         return;
     }
 
-    const stripe = Stripe('pk_test_51Q4fHlEnEVSBT8EnWVflBcZGmQ7r0HOYV95ItdV4St4BSL7ZNpx86KQA0OLQ8VZHIcWlgYox2i7pBdFn05kMzGT800KmFmRSic');
+    const stripe = Stripe('pk_live_51Q4fHlEnEVSBT8EnZkQeWNZW7BGil8WZY6aclgErBnfGT4B9CJk3YXHLcTRzW3ltz8KU5E2fjLTtYfeYymbfIWsD00M15tPewz');
     const submitClientInfoButton = document.getElementById('submitClientInfo');
     if (!submitClientInfoButton) {
         console.error("Bouton 'submitClientInfo' introuvable.");

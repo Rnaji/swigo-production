@@ -2530,7 +2530,6 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 @csrf_exempt
-@csrf_exempt
 def confirmer_commande(request):
     if request.method != 'POST':
         logger.warning("❌ Mauvaise méthode HTTP : %s", request.method)
@@ -2543,69 +2542,31 @@ def confirmer_commande(request):
         logger.error("❌ Erreur de décodage JSON")
         return JsonResponse({'error': 'Format JSON invalide'}, status=400)
 
-    # Récupérer toutes les données nécessaires
     moyen_paiement = data.get('moyen_paiement')
-    nom = data.get('nom', '').strip()
-    prenom = data.get('prenom', '').strip()
-    email = data.get('email', '').strip().lower()
-    numero_telephone = data.get('numero_telephone', '').strip()
     societe = data.get('societe', '').strip()
-    adresse_facturation = data.get('adresse_facturation', '').strip()
-    facture_sans_detail = data.get('factureSansDetail', False)
-    
-    print(f"[💳] Moyen de paiement : {moyen_paiement}")
-    print(f"[👤] Client : {prenom} {nom} - {email}")
+    print(f"[💳] Moyen de paiement : {moyen_paiement} | Société : {societe}")
 
     if not moyen_paiement:
         logger.warning("❌ Moyen de paiement manquant")
         return JsonResponse({'error': 'Moyen de paiement manquant'}, status=400)
 
-    # Récupérer la commande depuis les données, pas la session
-    commande_id = data.get('commande_id')
-    if not commande_id:
-        # Essayer depuis la session comme fallback
-        commande_id = request.session.get('commande_id')
-    
-    print(f"[🛒] Commande ID : {commande_id}")
+    commande_id = request.session.get('commande_id')
+    print(f"[🛒] Commande ID depuis session : {commande_id}")
 
     if not commande_id:
-        return JsonResponse({'error': 'Commande non trouvée'}, status=400)
+        return JsonResponse({'error': 'Commande non trouvée dans la session'}, status=400)
 
     try:
         commande = Commande.objects.get(id=commande_id)
-        print(f"[✅] Commande récupérée : {commande.id}")
+        print(f"[✅] Commande récupérée : {commande}")
     except Commande.DoesNotExist:
         logger.error(f"❌ Commande {commande_id} introuvable")
         return JsonResponse({'error': 'Commande introuvable'}, status=400)
-
-    # Mettre à jour les informations client
-    try:
-        client = commande.client
-        if client:
-            # Mettre à jour le client existant
-            client.nom = nom or client.nom
-            client.prenom = prenom or client.prenom
-            client.email = email or client.email
-            client.numero_telephone = numero_telephone or client.numero_telephone
-            client.save()
-            print(f"[👤] Client existant mis à jour : {client.id}")
-    except Exception as e:
-        print(f"[⚠️] Erreur mise à jour client : {e}")
-
-    # Mettre à jour les informations de facturation
-    commande.societe = societe
-    commande.adresse_facturation_saisie = adresse_facturation
-    commande.facture_sans_detail = facture_sans_detail
-    commande.nom_saisi = nom
-    commande.prenom_saisi = prenom
-    commande.email_saisi = email
-    commande.telephone_saisi = numero_telephone
 
     # Vérification/créneau
     print("[🔎] Vérification/créneau personnalisé")
     nouvelle_heure = verifier_ou_corriger_creneau_livraison(commande)
 
-    # Verrouiller le panier
     if commande.panier:
         try:
             print(f"[🧮] Recalcul total pour panier {commande.panier.id}")
@@ -2616,56 +2577,39 @@ def confirmer_commande(request):
         except ValueError as e:
             logger.warning(f"[⚠️] Erreur panier : {e}")
 
-    # Vérifier les paiements possibles
     paiements_possibles = obtenir_paiements_possibles(commande)
     print(f"[💳] Paiements possibles : {[p['id'] for p in paiements_possibles]}")
-    
     if not any(p['id'] == moyen_paiement for p in paiements_possibles):
         logger.warning(f"❌ Moyen de paiement invalide : {moyen_paiement}")
         return JsonResponse({'error': 'Moyen de paiement invalide'}, status=400)
 
-    # Gérer le moyen de paiement
+    if hasattr(commande, 'societe'):
+        commande.societe = societe
+
     commande.moyen_paiement = moyen_paiement
 
     if moyen_paiement == "stripe":
-        # Pour Stripe, le paiement est déjà géré dans valider_commande
-        # On marque juste comme payé si ce n'est pas déjà fait
-        if not commande.is_paid:
-            commande.is_paid = True
-            commande.commande_is_valid = True
-            commande.heure_paiement = timezone.now()
-            print(f"[💳] Commande marquée comme payée (Stripe)")
-    else:
-        # Pour les autres moyens de paiement (espèces, tickets)
         commande.commande_is_valid = True
-        commande.is_paid = False  # Sera marqué comme payé à la livraison
-        print(f"[💳] Commande validée (paiement à la livraison)")
+        commande.is_paid = True
+    else:
+        commande.commande_is_valid = False
+        commande.is_paid = False
 
     commande.save()
-    print(f"[✅] Commande sauvegardée : ID {commande.id}, paiement = {moyen_paiement}, is_paid = {commande.is_paid}")
+    print(f"[✅] Commande validée : ID {commande.id}, paiement = {moyen_paiement}")
 
-    # Préparer la réponse
-    livraison_dt = None
-    if commande.date_livraison_specifiee and commande.heure_livraison_specifiee:
-        livraison_dt = datetime.combine(commande.date_livraison_specifiee, commande.heure_livraison_specifiee)
-        if is_naive(livraison_dt):
-            livraison_dt = make_aware(livraison_dt)
-        livraison_dt_local = localtime(livraison_dt)
-        date_str = livraison_dt_local.strftime('%Y-%m-%d')
-        heure_str = livraison_dt_local.strftime('%H:%M')
-    else:
-        date_str = "ASAP"
-        heure_str = "ASAP"
+    livraison_dt = datetime.combine(commande.date_livraison_specifiee, commande.heure_livraison_specifiee)
+    if is_naive(livraison_dt):
+        livraison_dt = make_aware(livraison_dt)
+    livraison_dt_local = localtime(livraison_dt)
 
     return JsonResponse({
         'success': True,
         'commande_id': commande.id,
         'message': 'Commande confirmée',
-        'nouvelle_date': date_str,
-        'nouvelle_heure': heure_str,
-        'total': str(commande.panier.prix_total) if commande.panier else None,
-        'is_paid': commande.is_paid,
-        'commande_is_valid': commande.commande_is_valid
+        'nouvelle_date': livraison_dt_local.strftime('%Y-%m-%d'),
+        'nouvelle_heure': livraison_dt_local.strftime('%H:%M'),
+        'total': str(commande.panier.prix_total) if commande.panier else None
     })
 
 
@@ -3117,112 +3061,60 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 def stripe_webhook(request):
-    logger.info("🎯 Webhook Stripe appelé!")
-    
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-    endpoint_secret = "whsec_38cdd1b4bfef99b43cd11859a11deb415b2e1d6c2a31fb91a2c350c13de5488a"
+    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except Exception as e:
-        logger.error(f"❌ Erreur vérification signature: {e}")
-        return JsonResponse({'error': str(e)}, status=400)
+    except ValueError:
+        logger.error("❌ Invalid payload format")
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError:
+        logger.error("❌ Invalid Stripe signature")
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
 
-    logger.info(f"✅ Événement reçu: {event['type']}")
+    logger.info(f"✅ Événement Stripe reçu : {event['type']}")
 
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        
-        logger.info(f"🔍 client_reference_id: {session.get('client_reference_id')}")
-        logger.info(f"💰 Montant total: {session.get('amount_total')}")
-        logger.info(f"📧 Email client: {session.get('customer_details', {}).get('email')}")
-        logger.info(f"🔍 success_url: {session.get('success_url')}")
-        
-        # ✅ CORRECTION : GÉRER LES ÉVÉNEMENTS DE TEST
-        commande_id = session.get('client_reference_id')
-        
-        # Si c'est un événement de test Stripe (client_reference_id manquant)
-        if not commande_id:
-            logger.warning("⚠️ Événement de test Stripe détecté - client_reference_id manquant")
-            
-            # Vérifier si c'est un vrai événement de test Stripe
-            customer_email = session.get('customer_details', {}).get('email')
-            if customer_email == 'stripe@example.com' or 'httpbin.org' in session.get('success_url', ''):
-                logger.info("🎯 Événement de test Stripe confirmé - Ignorer silencieusement")
-                return JsonResponse({'status': 'test_event_ignored'}, status=200)
-            else:
-                logger.error("❌ Événement réel sans commande_id - Création d'urgence")
-                # Pour les événements réels sans commande_id, créer une commande d'urgence
-                try:
-                    from swigo.models import Commande
-                    from django.utils import timezone
-                    
-                    commande_urgence = Commande.objects.create(
-                        session_key=f"urgence_webhook_{session.get('id')}",
-                        nom_saisi=session.get('customer_details', {}).get('name', 'Client Webhook'),
-                        prenom_saisi="",
-                        email_saisi=session.get('customer_details', {}).get('email', ''),
-                        is_commande_a_emporter=False,
-                        commande_is_valid=True,
-                        is_paid=True,
-                        moyen_paiement='stripe',
-                        montant_stripe=session.get('amount_total', 0) / 100,
-                        heure_paiement=timezone.now(),
-                        statut='payee'
-                    )
-                    commande_id = str(commande_urgence.id)
-                    logger.info(f"📝 Commande d'urgence créée: {commande_urgence.id}")
-                    
-                except Exception as e:
-                    logger.error(f"❌ Erreur création commande urgence: {e}")
-                    return JsonResponse({'status': 'emergency_failed'}, status=200)
-        
-        # ✅ TRAITEMENT NORMAL DE LA COMMANDE
-        try:
-            commande = Commande.objects.get(id=commande_id)
-            logger.info(f"📦 Commande trouvée: {commande.id}, is_paid avant: {commande.is_paid}")
-            
-            payment_status = session.get('payment_status')
-            if payment_status == 'paid':
-                commande.is_paid = True
-                commande.commande_is_valid = True
-                commande.heure_paiement = timezone.now()
-                commande.moyen_paiement = 'stripe'
-                commande.montant_stripe = session.get('amount_total', 0) / 100
-                
-                if hasattr(commande, 'stripe_session_id'):
-                    commande.stripe_session_id = session.get('id')
-                
-                commande.save()
-                
-                # Déduire les ingrédients
-                try:
-                    commande.deduire_ingredients()
-                    logger.info(f"📦 Ingrédients déduits pour la commande {commande.id}")
-                except Exception as e:
-                    logger.error(f"⚠️ Erreur déduction ingrédients: {e}")
-                
-                commande.refresh_from_db()
-                logger.info(f"🎉 SUCCÈS - Commande {commande.id} marquée comme payée")
-                logger.info(f"📊 Statuts: is_paid={commande.is_paid}, commande_is_valid={commande.commande_is_valid}")
-                
-            else:
-                logger.warning(f"⚠️ Statut de paiement non 'paid': {payment_status}")
-            
-        except Commande.DoesNotExist:
-            logger.error(f"❌ Commande {commande_id} non trouvée")
-            return JsonResponse({'status': 'commande_not_found'}, status=200)
-        except Exception as e:
-            logger.error(f"❌ Erreur traitement commande: {e}")
-            import traceback
-            logger.error(f"❌ Stack trace: {traceback.format_exc()}")
-            return JsonResponse({'status': 'processing_error'}, status=200)
-        
-        return JsonResponse({'status': 'success'}, status=200)
+        client_reference_id = session.get('client_reference_id')
 
-    logger.info(f"ℹ️ Événement ignoré: {event['type']}")
+        logger.info(f"🔍 client_reference_id extrait : {client_reference_id}")
+
+        if not client_reference_id:
+            logger.error("❌ Aucun client_reference_id fourni dans l'événement")
+            return JsonResponse({'status': 'missing_client_reference_id'}, status=200)
+
+        try:
+            commande = Commande.objects.get(id=client_reference_id)
+        except Commande.DoesNotExist:
+            logger.error(f"❌ Aucune commande trouvée avec session_key={client_reference_id}")
+            return JsonResponse({'status': 'commande_not_found'}, status=200)
+
+        if commande.is_paid:
+            logger.info(f"✅ Commande {commande.id} déjà payée")
+        else:
+            commande.is_paid = True
+            commande.commande_is_valid = True  # Si c'est ta logique métier
+            commande.heure_paiement = timezone.now()
+            commande.save()
+            logger.info(f"✅ Commande {commande.id} marquée comme payée avec succès")
+
+        # 🔁 Supprimer la session Django liée (nettoyage)
+        try:
+            session_django = Session.objects.get(session_key=client_reference_id)
+            session_django.delete()
+            logger.info(f"🧹 Session Django {client_reference_id} supprimée")
+        except Session.DoesNotExist:
+            logger.warning(f"⚠️ Aucune session Django trouvée avec la clé {client_reference_id}")
+
+        return JsonResponse({'status': 'commande_payee'}, status=200)
+
+    # Autres événements ignorés
+    logger.info(f"ℹ️ Événement Stripe ignoré : {event['type']}")
     return JsonResponse({'status': 'ignored'}, status=200)
+
 
 
 
@@ -3270,38 +3162,17 @@ from swigo.utils import (
 
 def paiement_succes(request):
     commande_id = request.GET.get('commande_id')
-    print(f"🎯 [PAIEMENT_SUCCES] Début - commande_id: {commande_id}")
-    
+    print(f"[DEBUG] ➤ paiement_succes | commande_id reçu : {commande_id}")
+
     if not commande_id or not commande_id.isdigit():
         return render(request, 'swigo/error.html', {'message': 'Aucune commande valide trouvée.'})
 
     try:
         commande = Commande.objects.get(id=int(commande_id))
-        print(f"📦 [PAIEMENT_SUCCES] Commande trouvée: #{commande.id}")
-        print(f"🔍 [PAIEMENT_SUCCES] Statut ACTUEL - is_paid: {commande.is_paid}")
-        
-        # ⭐ NE PAS METTRE À JOUR LE STATUT - JUSTE AFFICHER
-        if commande.is_paid:
-            print(f"✅ [PAIEMENT_SUCCES] Commande déjà payée (par webhook)")
-        else:
-            print(f"⏳ [PAIEMENT_SUCCES] Commande pas encore marquée payée (webhook en cours)")
-            # Optionnel: attendre un peu que le webhook fasse son travail
-            import time
-            for i in range(5):  # Attendre max 5 secondes
-                time.sleep(1)
-                commande.refresh_from_db()
-                if commande.is_paid:
-                    print(f"✅ [PAIEMENT_SUCCES] Commande maintenant payée après {i+1}s")
-                    break
-            else:
-                print(f"⚠️ [PAIEMENT_SUCCES] Commande toujours pas payée après attente")
-            
+        print(f"[DEBUG] ➤ Commande récupérée : #{commande.id}")
     except Commande.DoesNotExist:
         return render(request, 'swigo/error.html', {'message': 'Commande introuvable.'})
-    
-    # ... le reste de votre code d'affichage inchangé ...
-    
-    # 5. RÉCUPÉRATION DU PANIER (existant)
+
     try:
         panier = Panier.objects.get(commande=commande)
         print(f"[DEBUG] ➤ Panier associé : ID {panier.id} - total = {panier.prix_total}")
@@ -3309,9 +3180,8 @@ def paiement_succes(request):
         return render(request, 'swigo/error.html', {'message': 'Aucun panier associé à cette commande.'})
 
     montant_total = panier.prix_total
-    moyen_affiche = "Carte bancaire (en ligne)"
+    moyen_affiche = "Carte bancaire (en ligne)" if commande.is_paid else commande.get_moyen_paiement_display()
 
-    # 6. LOGIQUE DE LIVRAISON (votre code existant)
     def formater_creneau(dt_or_date, heure=None):
         if isinstance(dt_or_date, datetime):
             dt = localtime(dt_or_date)
@@ -3331,16 +3201,24 @@ def paiement_succes(request):
 
     if commande.is_commande_a_emporter:
         print(f"[DEBUG] 🎒 Commande à emporter détectée")
+
+        # 🔄 Vérifie ou corrige automatiquement le créneau de retrait
         heure_corrigee = verifier_ou_corriger_creneau_retrait(commande)
+
         if heure_corrigee:
             creneau_retrait = formater_creneau(heure_corrigee)
             livraison_message = f"Votre commande sera prête à être retirée entre {creneau_retrait}."
         else:
             livraison_message = "Votre commande sera prête à emporter dans environ 30 minutes."
-        details_livraison = "Veuillez venir la récupérer directement au comptoir à l'heure prévue."
+
+        details_livraison = "Veuillez venir la récupérer directement au comptoir à l’heure prévue."
+
     else:
         print(f"[DEBUG] 🚚 Commande en livraison détectée")
+
+        # 🔄 Vérifie ou corrige automatiquement le créneau de livraison
         heure_confirmee = verifier_ou_corriger_creneau_livraison(commande)
+
         if heure_confirmee:
             creneau_livraison = formater_creneau(heure_confirmee)
             livraison_message = f"Votre livraison est prévue entre {creneau_livraison}."
@@ -3348,7 +3226,11 @@ def paiement_succes(request):
             estimation = now() + timedelta(minutes=commande.adresse_livraison.delai_livraison_estime)
             creneau_livraison = formater_creneau(estimation)
             livraison_message = f"Votre livraison est estimée entre {creneau_livraison}."
-        details_livraison = "Vous recevrez un SMS quelques minutes avant l'arrivée du livreur."
+
+        details_livraison = (
+            "Vous recevrez un SMS quelques minutes avant l’arrivée du livreur. "
+            "Celui-ci vous appellera également juste avant d’arriver."
+        )
 
     return render(request, 'swigo/success.html', {
         'commande': commande,
@@ -3360,6 +3242,7 @@ def paiement_succes(request):
         'creneau_livraison': creneau_livraison,
         'creneau_retrait': creneau_retrait,
     })
+
 
 
 

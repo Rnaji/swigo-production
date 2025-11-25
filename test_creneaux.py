@@ -1,238 +1,137 @@
-# test_creneaux_fin_service.py
-import os
-import django
-import datetime
-from decimal import Decimal
+import pytest
+from datetime import datetime, time
+from django.utils.timezone import make_aware
+from swigo.models import Commande
+from swigo.utils import creneau_est_disponible
 
-# Configuration Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
-django.setup()
+@pytest.mark.django_db
+def test_limite_livraison():
+    date = datetime.today().date()
+    heure = time(19, 0)
 
+    # Créer 2 commandes livraison valides
+    for _ in range(2):
+        Commande.objects.create(
+            is_commande_a_emporter=False,
+            date_livraison_specifiee=date,
+            heure_livraison_specifiee=heure,
+            moyen_paiement='especes'
+        )
+
+    # Trop de livraisons → indisponible
+    assert creneau_est_disponible(date, heure, mode='livraison') is False
+
+    # On en supprime une → redevient dispo
+    Commande.objects.all().first().delete()
+    assert creneau_est_disponible(date, heure, mode='livraison') is True
+
+
+@pytest.mark.django_db
+def test_limite_emporte():
+    date = datetime.today().date()
+    heure = time(12, 0)
+    dt_debut = make_aware(datetime.combine(date, heure))
+
+    # Créer 1 commande à emporter valide
+    Commande.objects.create(
+        is_commande_a_emporter=True,
+        heure_pick_up_specifie=dt_debut,
+        moyen_paiement='cb'
+    )
+
+    # Créneau saturé
+    assert creneau_est_disponible(date, heure, mode='emporter') is False
+
+    # Supprime → redevient dispo
+    Commande.objects.all().delete()
+    assert creneau_est_disponible(date, heure, mode='emporter') is True
+
+
+from swigo.utils import chercher_prochain_creneau_disponible
+
+@pytest.mark.django_db
+def test_chercher_prochain_creneau_apres_saturation():
+    from datetime import timedelta
+
+    print("\n🔁 TEST CHERCHER CRENEAU")
+
+    date = datetime.today().date()
+    heure = time(18, 0)  # premier créneau du soir
+    dt_depart = make_aware(datetime.combine(date, heure))
+
+    # Saturer le premier créneau (MAX = 2)
+    for _ in range(2):
+        Commande.objects.create(
+            is_commande_a_emporter=False,
+            date_livraison_specifiee=date,
+            heure_livraison_specifiee=heure,
+            moyen_paiement='cb'
+        )
+
+    # Le système doit proposer un créneau 15 min plus tard
+    prochain_creneau = chercher_prochain_creneau_disponible(dt_depart, mode='livraison')
+
+    attendu = dt_depart + timedelta(minutes=15)
+    assert prochain_creneau == attendu, f"Attendu {attendu}, obtenu {prochain_creneau}"
+    print(f"✅ Prochain créneau libre trouvé : {prochain_creneau.time()}")
+
+
+
+import pytest
+from datetime import datetime, timedelta, time
 from django.utils import timezone
-from swigo.models import AdresseLivraison, VilleDesservie, HoraireDisponible, Client
-from swigo.utils import estimer_heure_livraison, estimer_heure_retrait, creneau_est_disponible
+from swigo.models import AdresseLivraison, VilleDesservie, HoraireDisponible
+from swigo.utils import estimer_heure_livraison
 
-def preparer_adresse_test():
-    """Prépare une adresse de test pour les livraisons"""
-    try:
-        # Utiliser une adresse existante ou créer une simple
-        adresse = AdresseLivraison.objects.filter(ville="Gisors").first()
-        if not adresse:
-            print("ℹ️  Création d'une adresse basique pour test...")
-            # Création minimaliste
-            client_test = Client.objects.first()
-            if not client_test:
-                client_test = Client.objects.create(
-                    nom="Test", prenom="Client", email="test@test.com"
-                )
-            adresse = AdresseLivraison.objects.create(
-                client=client_test,
-                adresse="1 Rue Test",
-                code_postal="27140",
-                ville="Gisors"
-            )
-        return adresse
-    except Exception as e:
-        print(f"❌ Impossible de préparer l'adresse: {e}")
-        return None
+@pytest.mark.django_db
+def test_estimer_livraison_apres_23h_bascule_jour_suivant():
+    print("\n🌙 TEST ESTIMATION À 23H")
 
-def tester_scenarios_livraison():
-    """Teste différents scénarios de livraison selon l'heure"""
-    print("=" * 60)
-    print("🧪 TESTS HEURES LIVRAISON PROPOSÉES")
-    print("=" * 60)
-    
-    adresse = preparer_adresse_test()
-    if not adresse:
-        return
-    
-    # Scénarios de test avec heures critiques
-    scenarios = [
-        # Heures normales
-        {"nom": "🕘 Matin (9h00)", "heure": datetime.time(9, 0)},
-        {"nom": "🕛 Midi (12h00)", "heure": datetime.time(12, 0)},
-        
-        # Fin de service MIDI
-        {"nom": "⏰ Fin Midi - 14h00", "heure": datetime.time(14, 0)},
-        {"nom": "🚨 Fin Midi - 14h15", "heure": datetime.time(14, 15)},
-        {"nom": "❌ Fin Midi - 14h30", "heure": datetime.time(14, 30)},
-        {"nom": "💥 Après Midi - 14h45", "heure": datetime.time(14, 45)},
-        {"nom": "💥 Après Midi - 15h00", "heure": datetime.time(15, 0)},
-        
-        # Début SOIR
-        {"nom": "🌙 Début Soir - 18h00", "heure": datetime.time(18, 0)},
-        {"nom": "🌙 Soir - 19h00", "heure": datetime.time(19, 0)},
-        {"nom": "🌙 Soir - 20h00", "heure": datetime.time(20, 0)},
-        
-        # Fin de service SOIR
-        {"nom": "⏰ Fin Soir - 21h30", "heure": datetime.time(21, 30)},
-        {"nom": "🚨 Fin Soir - 22h00", "heure": datetime.time(22, 0)},
-        {"nom": "🚨 Fin Soir - 22h15", "heure": datetime.time(22, 15)},
-        {"nom": "❌ Fin Soir - 22h30", "heure": datetime.time(22, 30)},
-        {"nom": "💥 Après Soir - 22h45", "heure": datetime.time(22, 45)},
-        {"nom": "💥 Nuit - 23h00", "heure": datetime.time(23, 0)},
-    ]
-    
-    for scenario in scenarios:
-        print(f"\n{scenario['nom']}")
-        print("-" * 40)
-        
-        # Créer un datetime simulé pour aujourd'hui
-        aujourdhui = timezone.localtime().date()
-        heure_simulee = datetime.datetime.combine(aujourdhui, scenario['heure'])
-        heure_simulee = timezone.make_aware(heure_simulee)
-        
-        print(f"⏰ Heure simulation: {heure_simulee.strftime('%d/%m/%Y %H:%M')}")
-        
-        try:
-            resultat = estimer_heure_livraison(adresse, maintenant=heure_simulee)
-            
-            if isinstance(resultat, dict) and 'error' in resultat:
-                print(f"❌ Erreur: {resultat['error']}")
-            else:
-                print(f"✅ Heure proposée: {resultat.strftime('%d/%m/%Y %H:%M')}")
-                delai = (resultat - heure_simulee).total_seconds() / 60
-                print(f"⏱️  Délai estimé: {delai:.0f} minutes")
-                
-                # Vérifier si c'est le même jour ou jour suivant
-                if resultat.date() > heure_simulee.date():
-                    print(f"📅 Report au jour suivant")
-                
-        except Exception as e:
-            print(f"💥 Erreur lors du test: {e}")
+    # Créer la ville desservie
+    VilleDesservie.objects.create(
+        ville="Gisors",
+        code_postal="27140",
+        nombre_habitants=10000,
+        distance_gisors=0,
+        temps_gisors=20,
+        zone=1,
+        panier_minimal=20,
+        localisation="N"
+    )
 
-def tester_retrait_emporter_fin_service():
-    """Teste les heures de retrait à emporter avec heures de fin de service"""
-    print("\n" + "=" * 60)
-    print("🥡 TESTS RETRAIT - HEURES CRITIQUES")
-    print("=" * 60)
-    
-    # Scénarios pour retrait avec heures limites
-    scenarios_retrait = [
-        {"nom": "🕘 Matin (9h00)", "heure": datetime.time(9, 0)},
-        {"nom": "🕛 Midi (12h00)", "heure": datetime.time(12, 0)},
-        
-        # Fin service MIDI
-        {"nom": "⏰ Fin Midi - 14h00", "heure": datetime.time(14, 0)},
-        {"nom": "🚨 Fin Midi - 14h15", "heure": datetime.time(14, 15)},
-        {"nom": "❌ Fin Midi - 14h30", "heure": datetime.time(14, 30)},
-        
-        # Transition après-midi
-        {"nom": "💥 Après-midi 15h00", "heure": datetime.time(15, 0)},
-        {"nom": "💥 Après-midi 16h00", "heure": datetime.time(16, 0)},
-        {"nom": "💥 Après-midi 17h00", "heure": datetime.time(17, 0)},
-        
-        # Début SOIR
-        {"nom": "🌙 Début Soir - 18h00", "heure": datetime.time(18, 0)},
-        {"nom": "🌙 Soir - 19h00", "heure": datetime.time(19, 0)},
-        
-        # Fin service SOIR
-        {"nom": "⏰ Fin Soir - 21h30", "heure": datetime.time(21, 30)},
-        {"nom": "🚨 Fin Soir - 22h00", "heure": datetime.time(22, 0)},
-        {"nom": "🚨 Fin Soir - 22h15", "heure": datetime.time(22, 15)},
-        {"nom": "❌ Fin Soir - 22h30", "heure": datetime.time(22, 30)},
-        {"nom": "💥 Après Soir - 22h45", "heure": datetime.time(22, 45)},
-    ]
-    
-    for scenario in scenarios_retrait:
-        print(f"\n{scenario['nom']}")
-        print("-" * 40)
-        
-        # Simuler l'heure actuelle
-        aujourdhui = timezone.localtime().date()
-        heure_simulee = datetime.datetime.combine(aujourdhui, scenario['heure'])
-        heure_simulee = timezone.make_aware(heure_simulee)
-        
-        print(f"⏰ Heure simulation: {heure_simulee.strftime('%d/%m/%Y %H:%M')}")
-        
-        try:
-            # Pour tester retrait, on va simuler le comportement
-            original_now = timezone.now
-            
-            # Temporairement remplacer now() pour le test
-            def mock_now():
-                return heure_simulee
-            timezone.now = mock_now
-            
-            heure_retrait = estimer_heure_retrait()
-            print(f"✅ Heure retrait proposée: {heure_retrait.strftime('%d/%m/%Y %H:%M')}")
-            
-            delai = (heure_retrait - heure_simulee).total_seconds() / 60
-            print(f"⏱️  Délai estimé: {delai:.0f} minutes")
-            
-            # Vérifier si c'est le même jour ou jour suivant
-            if heure_retrait.date() > heure_simulee.date():
-                print(f"📅 Report au jour suivant")
-            
-            # Restaurer la fonction now originale
-            timezone.now = original_now
-            
-        except Exception as e:
-            print(f"💥 Erreur: {e}")
-            # Restaurer en cas d'erreur
-            timezone.now = original_now
+    # Créer une adresse valide
+    adresse = AdresseLivraison.objects.create(
+        adresse="2 Rue Tard",
+        code_postal="27140",
+        ville="Gisors",
+        zone=1,
+        localisation="N",
+        latitude=49.2794,
+        longitude=1.7778
+    )
 
-def tester_limites_service():
-    """Teste spécifiquement les limites de service"""
-    print("\n" + "=" * 60)
-    print("🚨 TESTS LIMITES DE SERVICE")
-    print("=" * 60)
-    
-    adresse = preparer_adresse_test()
-    if not adresse:
-        return
-    
-    # Test des limites exactes
-    limites = [
-        {"nom": "LIMITE MIDI - 14h29", "heure": datetime.time(14, 29)},
-        {"nom": "LIMITE MIDI - 14h30", "heure": datetime.time(14, 30)},
-        {"nom": "LIMITE MIDI - 14h31", "heure": datetime.time(14, 31)},
-        {"nom": "LIMITE SOIR - 22h29", "heure": datetime.time(22, 29)},
-        {"nom": "LIMITE SOIR - 22h30", "heure": datetime.time(22, 30)},
-        {"nom": "LIMITE SOIR - 22h31", "heure": datetime.time(22, 31)},
-    ]
-    
-    for limite in limites:
-        print(f"\n{limite['nom']}")
-        print("-" * 30)
-        
-        aujourdhui = timezone.localtime().date()
-        heure_simulee = datetime.datetime.combine(aujourdhui, limite['heure'])
-        heure_simulee = timezone.make_aware(heure_simulee)
-        
-        print(f"⏰ Simulation: {heure_simulee.strftime('%H:%M')}")
-        
-        try:
-            resultat = estimer_heure_livraison(adresse, maintenant=heure_simulee)
-            
-            if isinstance(resultat, dict) and 'error' in resultat:
-                print(f"❌ {resultat['error']}")
-            else:
-                print(f"✅ Proposé: {resultat.strftime('%d/%m %H:%M')}")
-                if resultat.date() > heure_simulee.date():
-                    print("🔁 Reporté au lendemain")
-                    
-        except Exception as e:
-            print(f"💥 Erreur: {e}")
+    # Demain (jour suivant)
+    demain = (timezone.localtime() + timedelta(days=1)).date()
+    jour_str = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"][demain.weekday()]
 
-def main():
-    """Fonction principale de test"""
-    print("🚀 Démarrage des tests des créneaux horaires critiques...")
-    print(f"📅 Date du jour: {timezone.localtime().strftime('%d/%m/%Y')}")
-    
-    try:
-        tester_scenarios_livraison()
-        tester_retrait_emporter_fin_service()
-        tester_limites_service()
-        
-        print("\n" + "=" * 60)
-        print("🎯 TESTS DES HEURES LIMITES TERMINÉS")
-        print("=" * 60)
-        
-    except Exception as e:
-        print(f"💥 ERREUR GLOBALE: {e}")
-        import traceback
-        traceback.print_exc()
+    # Créneau dispo demain MIDI
+    HoraireDisponible.objects.create(
+        jour=jour_str,
+        service="MIDI",
+        heure_debut=time(11, 30),
+        heure_fin=time(13, 30),
+        intervalle=15
+    )
 
-if __name__ == "__main__":
-    main()
+    # Simuler qu'on est aujourd'hui à 23h00
+    maintenant = timezone.make_aware(datetime.combine(demain - timedelta(days=1), time(23, 0)))
+
+    # Appeler la fonction
+    resultat = estimer_heure_livraison(adresse, maintenant=maintenant)
+
+    # ✅ On attend un datetime, pas une erreur
+    assert isinstance(resultat, datetime), f"Une erreur a été retournée : {resultat}"
+
+    # ✅ Le créneau doit être demain (date du jour suivant)
+    assert resultat.date() == demain, f"Le créneau devrait être prévu pour le lendemain ({demain}), mais a donné : {resultat}"
+
