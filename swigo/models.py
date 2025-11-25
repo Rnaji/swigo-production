@@ -1766,15 +1766,6 @@ class Commande(models.Model):
         for plat in Plat.objects.all():
             plat.verifier_disponibilite()
 
-    def set_paiement(self, moyen: str):
-            if self.is_paid:
-                logger.warning(f"Commande {self.id} déjà payée.")
-                return
-            if moyen not in dict(MoyenPaiement.choices):
-                raise ValueError(f"Moyen de paiement invalide : {moyen}")
-            self.moyen_paiement = moyen
-            self.update_status('is_paid', 'heure_paiement')
-
     def set_paiement_mixte(self, montant_especes, montant_ticket, montant_stripe):
         montant_especes = montant_especes or 0
         montant_ticket = montant_ticket or 0
