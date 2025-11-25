@@ -1904,7 +1904,8 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
     const bouton = document.getElementById('ajouter-au-panier-btn');
     const nomLower = nom.toLowerCase();
 
-    // 🆕 GESTION DES CROUSTY
+    // 🆕 CORRECTION : BASÉ UNIQUEMENT SUR LA CATÉGORIE
+    // GESTION DES CROUSTY
     if (nomLower.includes('crousty')) {
         bouton.onclick = function () {
             $('#platModal').modal('hide');
@@ -1914,12 +1915,8 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
         return;
     }
     
-    // 🆕 POULET PERSONNALISÉ
-    else if (nomLower.includes('poulet') || 
-             nomLower.includes('tenders') || 
-             nomLower.includes('wings') || 
-             nomLower.includes('bucket') ||
-             categorie === 'poulet') {
+    // 🆕 POULET PERSONNALISÉ UNIQUEMENT POUR LA CATÉGORIE "poulet"
+    else if (categorie === 'poulet') {
         bouton.onclick = function () {
             $('#platModal').modal('hide');
             openPouletModal(platId, nom, imageUrl, description, prix);
@@ -1942,7 +1939,7 @@ window.openPlatModal = function (platId, nomEncoded, imageUrlEncoded, descriptio
         return;
     }
     
-    // 🍔 BURGERS ET PLATS AVEC OPTIONS
+    // 🍔 BURGERS ET PLATS AVEC OPTIONS (par défaut)
     else {
         configurerPlatAvecOptions(platId, nom, categorie, bouton);
     }
