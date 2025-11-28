@@ -1458,32 +1458,49 @@ def ajouter_au_panier(request):
             except Plat.DoesNotExist:
                 return JsonResponse({'success': False, 'message': 'Plat non trouvé'}, status=404)
 
-            # Récupérer ou créer le panier avec session_key
-            if request.user.is_authenticated:
-                session_key = str(request.user.id)
-            else:
-                if not request.session.session_key:
-                    request.session.create()
-                session_key = request.session.session_key
+            # ✅ CORRECTION CRITIQUE : Récupérer le panier via commande_id
+            commande_id = request.session.get('commande_id')
+            if not commande_id:
+                return JsonResponse({
+                    'success': False, 
+                    'message': 'Aucune commande en cours. Veuillez d\'abord sélectionner une adresse.'
+                }, status=400)
 
-            print(f"🔑 Session key: {session_key}")
+            try:
+                # Récupérer la commande
+                commande = Commande.objects.get(id=commande_id)
+                print(f"✅ Commande trouvée: {commande.id} (Pickup: {commande.is_commande_a_emporter})")
+                
+                # Récupérer le panier associé à cette commande
+                panier = commande.panier_associe
+                if not panier:
+                    # Créer le panier s'il n'existe pas
+                    panier = Panier.objects.create(
+                        session_key=request.session.session_key,
+                        commande=commande
+                    )
+                    print(f"✅ Panier créé: {panier.id}")
+                else:
+                    print(f"✅ Panier existant: {panier.id}")
+                    
+            except Commande.DoesNotExist:
+                return JsonResponse({
+                    'success': False, 
+                    'message': 'Commande introuvable. Veuillez réinitialiser votre commande.'
+                }, status=404)
 
-            panier, created = Panier.objects.get_or_create(session_key=session_key)
-            print(f"✅ Panier: {panier.id} (créé: {created})")
-
-            # ÉTAPE 1: Créer l'article de base SANS prix_unitaire
+            # ÉTAPE 1: Créer l'article de base
             article_panier = ArticlePanier(
-                panier=panier,
+                panier=panier,  # ✅ Utilise le panier de la commande
                 plat=plat,
                 quantite=1,
-                prix_total=plat.prix_unitaire_ttc  # Prix initial basé sur le plat
+                prix_total=plat.prix_unitaire_ttc
             )
             
-            # SAUVEGARDER pour obtenir l'ID
             article_panier.save()
             print(f"✅ Article créé avec ID: {article_panier.id}")
 
-            # ÉTAPE 2: Ajouter les options (many-to-many)
+            # ÉTAPE 2: Ajouter les options
             if options_selectionnees:
                 print(f"🔄 Ajout des options: {options_selectionnees}")
                 options_objets = Option.objects.filter(id__in=options_selectionnees)
@@ -1501,7 +1518,7 @@ def ajouter_au_panier(request):
                 except Accompagnement.DoesNotExist:
                     print(f"❌ Accompagnement ID {accompagnement_id} non trouvé")
 
-            # ÉTAPE 4: Calculer le prix final avec la méthode du modèle
+            # ÉTAPE 4: Calculer le prix final
             article_panier.calculate_total_price()
             print(f"💰 Prix final calculé: {article_panier.prix_total}€")
 
@@ -1537,7 +1554,6 @@ def ajouter_au_panier(request):
                 'success': False, 
                 'message': f'Erreur lors de l\'ajout au panier: {str(e)}'
             }, status=500)
-
 
 
 
@@ -2654,15 +2670,33 @@ def get_panier_minimum(request):
     try:
         commande = Commande.objects.select_related('adresse_livraison', 'panier').get(id=commande_id)
         ville = commande.adresse_livraison.ville.strip()
-        ville_info = VilleDesservie.objects.get(ville__iexact=ville)
-        montant = commande.panier.calculate_total_price() if commande.panier else 0
-        return JsonResponse({
-            'ville': ville,
-            'panier_minimum': float(ville_info.panier_minimal),
-            'montant_panier': float(montant)
-        })
-    except VilleDesservie.DoesNotExist:
-        return JsonResponse({'error': 'Ville non desservie.'}, status=400)
+        
+        # ✅ CORRECTION : Pas de minimum pour le pickup
+        if commande.is_commande_a_emporter:
+            montant = commande.panier.calculate_total_price() if commande.panier else 0
+            return JsonResponse({
+                'ville': ville,
+                'panier_minimum': 0.00,  # ✅ Pas de minimum pour pickup
+                'montant_panier': float(montant),
+                'is_pickup': True
+            })
+        
+        # Pour la livraison seulement, vérifier le minimum
+        try:
+            ville_info = VilleDesservie.objects.get(ville__iexact=ville)
+            montant = commande.panier.calculate_total_price() if commande.panier else 0
+            return JsonResponse({
+                'ville': ville,
+                'panier_minimum': float(ville_info.panier_minimal),
+                'montant_panier': float(montant),
+                'is_pickup': False
+            })
+        except VilleDesservie.DoesNotExist:
+            # Ce cas ne devrait pas arriver pour une livraison
+            return JsonResponse({
+                'error': 'Ville non desservie pour la livraison'
+            }, status=400)
+            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
