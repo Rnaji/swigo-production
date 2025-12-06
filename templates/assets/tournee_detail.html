@@ -118,7 +118,19 @@ function ouvrirModalCommande(
     montant,
     modePaiement
 ) {
-    console.log("paiementARecevoir =", paiementARecevoir);
+    // ============ NORMALISATION DES BOOLÉENS ============
+    // Accepte : 'true', 'True', 'TRUE', true, 1, etc.
+    hasMessage = String(hasMessage).toLowerCase() === 'true';
+    paiementARecevoir = String(paiementARecevoir).toLowerCase() === 'true';
+    // ====================================================
+    
+    console.log("DEBUG:", {
+        hasMessageOriginal: arguments[5],
+        hasMessageConverti: hasMessage,
+        paiementOriginal: arguments[7],
+        paiementConverti: paiementARecevoir
+    });
+    
     currentCommandeId = id;
 
     // Mettre à jour le titre de la modal
@@ -152,21 +164,21 @@ function ouvrirModalCommande(
     const existingPaiementButton = document.getElementById('paiementButton');
     if (existingPaiementButton) existingPaiementButton.remove();
 
-    // Bouton "Message pour le livreur"
-    if (hasMessage === 'true' || hasMessage === true) {
+    // Bouton "Message pour le livreur" - VERSION SIMPLIFIÉE
+    if (hasMessage) {
         const messageButton = document.createElement('button');
         messageButton.type = 'button';
         messageButton.className = 'btn btn-warning';
         messageButton.id = 'messageLivreurButton';
         messageButton.textContent = 'Message 💬';
-        messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur);
+        messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur || '(Aucun message)');
 
         const fermerButton = modalFooter.querySelector('button.btn-danger');
         modalFooter.insertBefore(messageButton, fermerButton);
     }
 
-    // Bouton "Paiement à recevoir"
-    if (paiementARecevoir === 'true') {
+    // Bouton "Paiement à recevoir" - VERSION SIMPLIFIÉE
+    if (paiementARecevoir) {
         const paiementButton = document.createElement('button');
         paiementButton.type = 'button';
         paiementButton.className = 'btn btn-outline-danger';
@@ -174,7 +186,8 @@ function ouvrirModalCommande(
         paiementButton.textContent = 'Paiement 💸';
         paiementButton.onclick = () => {
             const mode = modePaiement || 'non précisé';
-            alert(`Le livreur doit récupérer un paiement de ${montant} € (${mode}).`);
+            const montantAffichage = montant || '0.00';
+            alert(`Le livreur doit récupérer un paiement de ${montantAffichage} € (${mode}).`);
         };
 
         const fermerButton = modalFooter.querySelector('button.btn-danger');
@@ -185,7 +198,6 @@ function ouvrirModalCommande(
     const commandeModal = new bootstrap.Modal(document.getElementById('commandeModal'));
     commandeModal.show();
 }
-
 
 
 
