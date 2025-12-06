@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 MAX_LIVRAISONS_PAR_CRENEAU = 2
 MAX_EMPORTES_PAR_CRENEAU = 1
 HEURE_DEBUT_SOIR = time(18, 0)
-TEMPS_PREPARATION_MINUTES = 20  # minutes
+TEMPS_PREPARATION_MINUTES = 30  # MODIFICATION : 20 minutes → 30 minutes
 
 # =========================
 # Outils généraux
@@ -215,7 +215,7 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     heure_fin = make_aware(datetime.combine(maintenant.date(), heure_fin_service))
 
     # Calcul heure mini possible (prépa + trajet)
-    delai_total = TEMPS_PREPARATION_MINUTES + temps_livraison
+    delai_total = TEMPS_PREPARATION_MINUTES + temps_livraison  # MODIFICATION : Temps de préparation augmenté
     debut_possible = max(heure_ouverture, maintenant + timedelta(minutes=delai_total))
     logger.debug(f"[MIN] Début possible: {debut_possible} (prépa {TEMPS_PREPARATION_MINUTES} + route {temps_livraison})")
 
@@ -367,7 +367,7 @@ def estimer_heure_retrait():
         debut_service = make_aware(datetime.combine(now_local.date(), HEURE_DEBUT_SOIR_LOCAL))
 
     debut_prepa = max(now_local, debut_service)
-    fin_prepa = debut_prepa + timedelta(minutes=TEMPS_PREPARATION_MINUTES)
+    fin_prepa = debut_prepa + timedelta(minutes=TEMPS_PREPARATION_MINUTES)  # MODIFICATION : Utilise le nouveau temps de préparation
 
     # Arrondi au quart d'heure supérieur
     minute_arrondie = ((fin_prepa.minute // 15) + 1) * 15
