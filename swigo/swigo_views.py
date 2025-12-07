@@ -1436,127 +1436,234 @@ def get_cart_totals(request):
         }
 
 def ajouter_au_panier(request):
-    if request.method == 'POST':
-        article_panier = None
+    """
+    Ajoute un article au panier avec gestion des accompagnements.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False, 
+            'message': 'Méthode non autorisée'
+        }, status=405)
+
+    article_panier = None
+    try:
+        # 1. Parser les données JSON
+        data = json.loads(request.body)
+        plat_id = data.get('plat_id')
+        options_selectionnees = data.get('options', [])
+        accompagnement_id_frontend = data.get('accompagnement')  # ID 1-9 du frontend
+        
+        print(f"📥 Données reçues - Plat: {plat_id}, Options: {options_selectionnees}, Accompagnement: {accompagnement_id_frontend}")
+
+        # 2. Validation des données requises
+        if not plat_id:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Plat ID manquant'
+            }, status=400)
+
+        # 3. 🔥 MAPPING CRITIQUE : Frontend ID (1-9) -> Accompagnement ID réel
+        # Les logs montrent que vos accompagnements ont ces IDs : 130, 131, 132, 133, 134, 135, 136, 137, 138, 140
+        mapping_frontend_vers_accompagnement = {
+            1: 130,   # Frites (Frontend: 1 → DB: 130)
+            2: 136,   # Riz (Frontend: 2 → DB: 136)
+            3: 137,   # Couscous (Frontend: 3 → DB: 137)
+            4: 135,   # Salade (Frontend: 4 → DB: 135)
+            5: 138,   # Kemia (Frontend: 5 → DB: 138)
+            6: 131,   # Coleslaw (Frontend: 6 → DB: 131)
+            7: 132,   # Onion Rings (Frontend: 7 → DB: 132)
+            8: 133,   # Galette Rösti (Frontend: 8 → DB: 133)
+            9: 134,   # Mozzarella Sticks (Frontend: 9 → DB: 134)
+        }
+
+        # 4. Récupérer le plat
         try:
-            data = json.loads(request.body)
-            plat_id = data.get('plat_id')
-            options_selectionnees = data.get('options', [])
-            accompagnement_id = data.get('accompagnement')
+            plat = Plat.objects.get(id=plat_id)
+            print(f"✅ Plat trouvé: {plat.nom} (ID: {plat.id})")
+        except Plat.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Plat non trouvé'
+            }, status=404)
 
-            print(f"📥 Données reçues - Plat: {plat_id}, Options: {options_selectionnees}, Accompagnement: {accompagnement_id}")
+        # 5. Récupérer ou créer la commande en cours
+        commande_id = request.session.get('commande_id')
+        if not commande_id:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Aucune commande en cours. Veuillez d\'abord sélectionner une adresse.'
+            }, status=400)
 
-            # Validation
-            if not plat_id:
-                return JsonResponse({'success': False, 'message': 'Plat ID manquant'}, status=400)
-
-            # Récupérer le plat
-            try:
-                plat = Plat.objects.get(id=plat_id)
-                print(f"✅ Plat trouvé: {plat.nom}")
-            except Plat.DoesNotExist:
-                return JsonResponse({'success': False, 'message': 'Plat non trouvé'}, status=404)
-
-            # ✅ CORRECTION CRITIQUE : Récupérer le panier via commande_id
-            commande_id = request.session.get('commande_id')
-            if not commande_id:
-                return JsonResponse({
-                    'success': False, 
-                    'message': 'Aucune commande en cours. Veuillez d\'abord sélectionner une adresse.'
-                }, status=400)
-
-            try:
-                # Récupérer la commande
-                commande = Commande.objects.get(id=commande_id)
-                print(f"✅ Commande trouvée: {commande.id} (Pickup: {commande.is_commande_a_emporter})")
-                
-                # Récupérer le panier associé à cette commande
-                panier = commande.panier_associe
-                if not panier:
-                    # Créer le panier s'il n'existe pas
-                    panier = Panier.objects.create(
-                        session_key=request.session.session_key,
-                        commande=commande
-                    )
-                    print(f"✅ Panier créé: {panier.id}")
-                else:
-                    print(f"✅ Panier existant: {panier.id}")
-                    
-            except Commande.DoesNotExist:
-                return JsonResponse({
-                    'success': False, 
-                    'message': 'Commande introuvable. Veuillez réinitialiser votre commande.'
-                }, status=404)
-
-            # ÉTAPE 1: Créer l'article de base
-            article_panier = ArticlePanier(
-                panier=panier,  # ✅ Utilise le panier de la commande
-                plat=plat,
-                quantite=1,
-                prix_total=plat.prix_unitaire_ttc
-            )
+        try:
+            commande = Commande.objects.get(id=commande_id)
+            print(f"✅ Commande trouvée: {commande.id} (Pickup: {commande.is_commande_a_emporter})")
             
-            article_panier.save()
-            print(f"✅ Article créé avec ID: {article_panier.id}")
+            # Récupérer le panier associé ou le créer
+            panier = commande.panier_associe
+            if not panier:
+                panier = Panier.objects.create(
+                    session_key=request.session.session_key,
+                    commande=commande
+                )
+                print(f"✅ Panier créé: {panier.id}")
+            else:
+                print(f"✅ Panier existant: {panier.id}")
+                
+        except Commande.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Commande introuvable. Veuillez réinitialiser votre commande.'
+            }, status=404)
 
-            # ÉTAPE 2: Ajouter les options
-            if options_selectionnees:
-                print(f"🔄 Ajout des options: {options_selectionnees}")
+        # 6. Créer l'article de base dans le panier
+        article_panier = ArticlePanier.objects.create(
+            panier=panier,
+            plat=plat,
+            quantite=1,
+            prix_total=plat.prix_unitaire_ttc
+        )
+        print(f"✅ Article créé avec ID: {article_panier.id}")
+
+        # 7. Ajouter les options sélectionnées
+        if options_selectionnees and len(options_selectionnees) > 0:
+            print(f"🔄 Ajout des options: {options_selectionnees}")
+            try:
                 options_objets = Option.objects.filter(id__in=options_selectionnees)
                 if options_objets.exists():
                     article_panier.options.add(*options_objets)
-                    print(f"✅ Options ajoutées: {options_objets.count()}")
+                    print(f"✅ {options_objets.count()} option(s) ajoutée(s)")
+                else:
+                    print(f"⚠️ Aucune option trouvée pour les IDs: {options_selectionnees}")
+            except Exception as e:
+                print(f"⚠️ Erreur lors de l'ajout des options: {e}")
 
-            # ÉTAPE 3: Gérer l'accompagnement
-            if accompagnement_id and accompagnement_id != 'undefined':
-                try:
-                    accompagnement = Accompagnement.objects.get(id=accompagnement_id)
-                    article_panier.accompagnement = accompagnement
-                    article_panier.save(update_fields=['accompagnement'])
-                    print(f"✅ Accompagnement ajouté: {accompagnement.nom}")
-                except Accompagnement.DoesNotExist:
-                    print(f"❌ Accompagnement ID {accompagnement_id} non trouvé")
+        # 8. 🔥 GESTION CRITIQUE DE L'ACCOMPAGNEMENT (avec mapping et vérification)
+        if accompagnement_id_frontend and accompagnement_id_frontend != 'undefined':
+            print(f"🍟 Traitement de l'accompagnement (Frontend ID: {accompagnement_id_frontend})")
+            
+            try:
+                # Convertir en entier
+                accompagnement_id_frontend_int = int(accompagnement_id_frontend)
+                
+                # Appliquer le mapping
+                accompagnement_id_reel = mapping_frontend_vers_accompagnement.get(
+                    accompagnement_id_frontend_int
+                )
+                
+                if accompagnement_id_reel:
+                    print(f"🔄 Mapping appliqué: Frontend ID {accompagnement_id_frontend} → Accompagnement ID {accompagnement_id_reel}")
+                    
+                    # VÉRIFIER SI L'ACCOMPAGNEMENT EXISTE DANS LA BASE
+                    from swigo.models import Accompagnement
+                    try:
+                        accompagnement = Accompagnement.objects.get(id=accompagnement_id_reel)
+                        
+                        # Attacher l'accompagnement à l'article
+                        article_panier.accompagnement = accompagnement
+                        article_panier.save(update_fields=['accompagnement'])
+                        
+                        print(f"✅ Accompagnement attaché: {accompagnement.nom} (ID DB: {accompagnement.id})")
+                        
+                    except Accompagnement.DoesNotExist:
+                        print(f"❌ Accompagnement ID {accompagnement_id_reel} non trouvé dans la base")
+                        # 🔥 LOG DES ACCOMPAGNEMENTS DISPONIBLES POUR DÉBOGAGE
+                        tous_accompagnements = Accompagnement.objects.all().values_list('id', 'nom')
+                        print(f"   📋 Accompagnements disponibles: {list(tous_accompagnements)}")
+                        
+                        # 🔥 TENTATIVE DE RÉCUPÉRATION DIRECTE SANS MAPPING (pour test)
+                        try:
+                            # Essayer avec l'ID frontend directement
+                            accompagnement_direct = Accompagnement.objects.get(id=accompagnement_id_frontend_int)
+                            article_panier.accompagnement = accompagnement_direct
+                            article_panier.save(update_fields=['accompagnement'])
+                            print(f"🔄 Accompagnement attaché directement (sans mapping): {accompagnement_direct.nom}")
+                        except:
+                            print(f"⚠️ Échec de l'attachement direct")
+                    
+                else:
+                    print(f"❌ Aucun mapping trouvé pour Frontend ID: {accompagnement_id_frontend}")
+                    print(f"   Mapping disponible: {mapping_frontend_vers_accompagnement}")
+                    
+            except ValueError:
+                print(f"❌ ID accompagnement invalide: {accompagnement_id_frontend}")
+            except Exception as e:
+                print(f"❌ Erreur lors de l'ajout de l'accompagnement: {e}")
+        else:
+            print("ℹ️ Aucun accompagnement sélectionné")
 
-            # ÉTAPE 4: Calculer le prix final
+        # 9. Calculer le prix total de l'article
+        try:
             article_panier.calculate_total_price()
             print(f"💰 Prix final calculé: {article_panier.prix_total}€")
-
-            # ÉTAPE 5: Mettre à jour les totaux du panier
-            panier.calculate_total_price()
-            
-            # ÉTAPE 6: Récupérer les données mises à jour
-            cart_items = get_cart_items(panier)
-            totals = get_cart_totals(request)
-
-            return JsonResponse({
-                'success': True,
-                'message': 'Article ajouté au panier',
-                'cart_items': cart_items,
-                'totals': totals,
-                'article_id': article_panier.id
-            })
-            
         except Exception as e:
-            print(f"❌ Erreur ajouter_au_panier: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
-            # Nettoyer en cas d'erreur
-            if article_panier and article_panier.id:
-                try:
-                    article_panier.delete()
-                    print("🧹 Article nettoyé après erreur")
-                except:
-                    pass
-            
-            return JsonResponse({
-                'success': False, 
-                'message': f'Erreur lors de l\'ajout au panier: {str(e)}'
-            }, status=500)
+            print(f"⚠️ Erreur lors du calcul du prix: {e}")
 
+        # 10. Mettre à jour les totaux du panier (CORRECTION DE L'ERREUR)
+        try:
+            # Vérifier si la méthode calculate_total_price existe
+            if hasattr(panier, 'calculate_total_price'):
+                panier.calculate_total_price()
+                print(f"📊 Panier mis à jour")
+            else:
+                print(f"⚠️ Méthode calculate_total_price non disponible pour Panier")
+                
+            # 🔥 CORRECTION : Utiliser l'attribut correct pour le total
+            panier_total = 0
+            if hasattr(panier, 'total'):
+                panier_total = float(panier.total) if panier.total else 0
+            elif hasattr(panier, 'total_ttc'):
+                panier_total = float(panier.total_ttc) if panier.total_ttc else 0
+            elif hasattr(panier, 'prix_total'):
+                panier_total = float(panier.prix_total) if panier.prix_total else 0
+                
+            print(f"💰 Total panier calculé: {panier_total}€")
+                
+        except Exception as e:
+            print(f"⚠️ Erreur lors de la mise à jour du panier: {e}")
 
+        # 11. Préparer la réponse avec les données mises à jour
+        cart_items = get_cart_items(panier)
+        totals = get_cart_totals(request)
+        
+        # Log de débogage pour vérifier l'accompagnement dans la réponse
+        for item in cart_items:
+            if item.get('article_id') == article_panier.id:
+                print(f"📋 Article dans la réponse:")
+                print(f"   - Nom: {item.get('plat_nom')}")
+                print(f"   - Accompagnement: {item.get('accompagnement')}")
+                print(f"   - Options: {item.get('options')}")
+                break
 
-
+        return JsonResponse({
+            'success': True,
+            'message': 'Article ajouté au panier avec succès',
+            'cart_items': cart_items,
+            'totals': totals,
+            'article_id': article_panier.id,
+            'panier_total': panier_total  # Utiliser la variable calculée
+        })
+        
+    except json.JSONDecodeError:
+        print("❌ Erreur de parsing JSON")
+        return JsonResponse({
+            'success': False, 
+            'message': 'Format JSON invalide'
+        }, status=400)
+        
+    except Exception as e:
+        print(f"❌ Erreur inattendue dans ajouter_au_panier: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # 🚫 NE PAS SUPPRIMER L'ARTICLE EN CAS D'ERREUR
+        # Juste logger l'erreur
+        if article_panier:
+            print(f"⚠️ Article #{article_panier.id} créé mais erreur dans la réponse")
+        
+        return JsonResponse({
+            'success': False, 
+            'message': f'Erreur lors de l\'ajout au panier: {str(e)}'
+        }, status=500)
 
 
 

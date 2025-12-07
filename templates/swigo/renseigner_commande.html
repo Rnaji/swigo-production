@@ -1259,6 +1259,7 @@ window.showOptionsModal = function (platId, categorie) {
         let accordionItemCount = 0;
 
 // 🍟 SECTION ACCOMPAGNEMENTS (EN PREMIER) - AVEC CORRECTION COMPLÈTE DES IDs
+// 🍟 SECTION ACCOMPAGNEMENTS (EN PREMIER) - AVEC MAPPING CORRECT
 if (hasAccompagnements) {
     accordionItemCount++;
     
@@ -1297,75 +1298,85 @@ if (hasAccompagnements) {
     // 🆕 CLASSEMENT DES ACCOMPAGNEMENTS DANS L'ORDRE SOUHAITÉ
     console.log('🔄 CLASSEMENT DES ACCOMPAGNEMENTS');
     
-    // Définir l'ordre souhaité des accompagnements - COUSCOUS APRÈS COLESLAW
-    const ordreAccompagnements = [
-        { nom: 'Frites', id: 1001 },
-        { nom: 'Riz', id: 1002 },
-        { nom: 'Salade', id: 1004 },
-        { nom: 'Kemia', id: 1005 },
-        { nom: 'Coleslaw', id: 1006 },
-        { nom: 'Couscous', id: 1003 },  // Couscous après Coleslaw
-        { nom: 'Onion Rings', id: 1007 },
-        { nom: 'Galette Rösti', id: 1008 },
-        { nom: 'Mozzarella Sticks', id: 1009 }
-    ];
-
-    // Trier les accompagnements selon l'ordre défini
+    // 🔥 MAPPING CRITIQUE : ID Plat (backend) -> ID Accompagnement (pour frontend)
+    const mappingPlatVersAccompagnement = {
+        // ID Plat (dans la liste) -> ID pour le frontend (1-9)
+        130: 1,   // Frites
+        136: 2,   // Riz
+        137: 3,   // Couscous
+        135: 4,   // Salade
+        138: 5,   // Kemia
+        131: 6,   // Coleslaw
+        132: 7,   // Onion Rings
+        133: 8,   // Galette Rösti
+        134: 9,   // Mozzarella Sticks
+    };
+    
+    // Définir l'ordre d'affichage souhaité (par ID frontend)
+    const ordreAccompagnements = [1, 2, 4, 5, 6, 3, 7, 8, 9]; // Couscous après Coleslaw
+    
+    // Trier selon l'ordre défini
     const accompagnementsTries = [];
     
-    ordreAccompagnements.forEach(ordre => {
-        const accompagnement = accompagnementsData.accompagnements.find(acc => 
-            acc.id == ordre.id || acc.nom.toLowerCase().includes(ordre.nom.toLowerCase())
+    ordreAccompagnements.forEach(idFrontend => {
+        // Trouver l'ID Plat correspondant à cet ID frontend
+        const idPlat = Object.keys(mappingPlatVersAccompagnement).find(
+            key => mappingPlatVersAccompagnement[key] == idFrontend
         );
-        if (accompagnement) {
-            accompagnementsTries.push(accompagnement);
+        
+        if (idPlat) {
+            const accompagnement = accompagnementsData.accompagnements.find(acc => 
+                acc.id == idPlat
+            );
+            if (accompagnement) {
+                accompagnementsTries.push({
+                    ...accompagnement,
+                    idFrontend: idFrontend // 🔥 ID pour le frontend
+                });
+            }
         }
     });
 
     // Ajouter les accompagnements non spécifiés dans l'ordre
-    const accompagnementsRestants = accompagnementsData.accompagnements.filter(acc => 
-        !accompagnementsTries.includes(acc)
-    );
+    const accompagnementsRestants = accompagnementsData.accompagnements
+        .filter(acc => !accompagnementsTries.some(a => a.id == acc.id))
+        .map(acc => ({
+            ...acc,
+            idFrontend: mappingPlatVersAccompagnement[acc.id] || acc.id
+        }));
+    
     const tousLesAccompagnements = [...accompagnementsTries, ...accompagnementsRestants];
 
-    console.log('🎯 ACCOMPAGNEMENTS TRIÉS:', tousLesAccompagnements.map(a => a.nom));
+    console.log('🎯 ACCOMPAGNEMENTS TRIÉS:', tousLesAccompagnements.map(a => 
+        `${a.nom} (Plat ID: ${a.id} → Frontend ID: ${a.idFrontend})`
+    ));
 
-    // 🆕 CORRECTION COMPLÈTE DES IDs D'ACCOMPAGNEMENT
+    // Créer les options avec l'ID frontend
     tousLesAccompagnements.forEach(accompagnement => {
-        // 🎯 MAPPING COMPLET DES IDs 1001-1009 → 1-9
-        const idMapping = {
-            '1001': 1,  // Frites
-            '1002': 2,  // Riz
-            '1003': 3,  // Couscous
-            '1004': 4,  // Salade
-            '1005': 5,  // Kemia
-            '1006': 6,  // Coleslaw
-            '1007': 7,  // Onion Rings
-            '1008': 8,  // Galette Rösti
-            '1009': 9,  // Mozzarella Sticks
-        };
+        const accompagnementIdFrontend = accompagnement.idFrontend; // ← ID pour le frontend (1-9)
+        const accompagnementNom = accompagnement.nom;
+        const accompagnementPrix = accompagnement.prix || 0;
         
-        const correctedId = idMapping[accompagnement.id] || accompagnement.id;
-        
-        console.log(`   - ${accompagnement.nom}: ID ${accompagnement.id} → ${correctedId}`);
+        console.log(`   - ${accompagnementNom}: Plat ID ${accompagnement.id} → Frontend ID ${accompagnementIdFrontend}`);
 
         const optionCol = document.createElement('div');
         optionCol.className = 'col-md-6 mb-2';
         
-        const isDefault = accompagnement.nom.toLowerCase().includes('frites');
+        const isDefault = accompagnementNom.toLowerCase().includes('frites');
         
-        // 🆕 FORMAT DES PRIX AVEC 2 DÉCIMALES
         optionCol.innerHTML = `
             <div class="form-check">
                 <input class="form-check-input" type="radio" 
-                       name="accompagnement_burger" 
-                       value="${correctedId}"
-                       id="accomp-${correctedId}"
-                       ${isDefault ? 'checked' : ''}
-                       required>
-                <label class="form-check-label d-flex justify-content-between" for="accomp-${correctedId}">
-                    <span>${accompagnement.nom}</span>
-                    ${accompagnement.prix > 0 ? `<span class="text-success">+${parseFloat(accompagnement.prix).toFixed(2)}€</span>` : '<span class="text-muted">Inclus</span>'}
+                    name="accompagnement_burger" 
+                    value="${accompagnementIdFrontend}"
+                    id="accomp-${accompagnementIdFrontend}"
+                    ${isDefault ? 'checked' : ''}
+                    required>
+                <label class="form-check-label d-flex justify-content-between" for="accomp-${accompagnementIdFrontend}">
+                    <span>${accompagnementNom}</span>
+                    ${accompagnementPrix > 0 ? 
+                    `<span class="text-success">+${parseFloat(accompagnementPrix).toFixed(2)}€</span>` : 
+                    '<span class="text-muted">Inclus</span>'}
                 </label>
             </div>
         `;
