@@ -1325,8 +1325,8 @@ def plats_par_categorie_ajax(request, categorie_nom):
     vrai_nom = mapping.get(categorie_nom, categorie_nom)
     print(f"[DEBUG] Nom réel de la catégorie après déslugification : {vrai_nom}")
 
-
-    plats = Plat.objects.filter(categorie__nom__iexact=vrai_nom)
+    # AJOUT DU FILTRE disponible=True ICI
+    plats = Plat.objects.filter(categorie__nom__iexact=vrai_nom, disponible=True)
 
     if plats.exists():
         print(f"Nombre de plats trouvés : {plats.count()}")
@@ -1350,7 +1350,6 @@ def plats_par_categorie_ajax(request, categorie_nom):
 
     print(f"Réponse JSON envoyée : {plats_list}")
     return JsonResponse({'plats': plats_list})
-
 
 
 
@@ -7187,14 +7186,15 @@ def ajouter_menu_personnalise(request):
                         # 🔥 MAPPING CORRECT Plat ID -> Accompagnement ID
                         mapping_plat_vers_accompagnement = {
                             # ID Plat (vrai) -> ID Accompagnement (vrai)
-                            129: 1,   # Frites Maison Croustillantes -> Frites Classiques (ID 1)
-                            130: 6,   # Coleslaw Maison -> Coleslaw (ID 6)
-                            131: 7,   # Onion Rings Maison (6 pcs) -> Onion Rings (ID 7)
-                            132: 9,   # Mozzarella Sticks Maison (2 pcs) -> Mozzarella Sticks (2 pcs) (ID 9)
-                            133: 8,   # Galette Rösti Maison (1 pcs) -> Galette Rösti (ID 8) ⭐ CELUI-CI
-                            134: 4,   # Salade et Vinaigrette Maison -> Salade Verte (ID 4)
-                            135: 2,   # Riz et Sauce Maison -> Riz Basmati (ID 2)
-                            136: 3,   # Couscous et Sauce -> Couscous (ID 3)
+                            130: 1,   # ✅ Frites Maison Croustillantes -> Frites Classiques (ID 1)
+                            131: 6,   # ✅ Coleslaw Maison -> Coleslaw (ID 6)
+                            132: 7,   # ✅ Onion Rings Maison (6 pcs) -> Onion Rings (ID 7)
+                            133: 8,   # ✅ Galette Rösti Maison (1 pcs) -> Galette Rösti (ID 8)
+                            134: 9,   # ✅ Mozzarella Sticks Maison (2 pcs) -> Mozzarella Sticks (2 pcs) (ID 9)
+                            135: 4,   # ✅ Salade et Vinaigrette Maison -> Salade Verte (ID 4)
+                            136: 2,   # ✅ Riz et Sauce Maison -> Riz Basmati (ID 2)
+                            137: 3,   # ✅ Couscous et Sauce -> Couscous (ID 3)
+                            138: 5,   # ✅ Kemia (olive carotte céleri) -> Kemia (ID 5)
                         }
                         
                         if accompagnement_id in mapping_plat_vers_accompagnement:
@@ -7346,6 +7346,15 @@ def api_choix_menu(request, menu_id):
             logger.error(f"❌ Menu introuvable: {menu_id}")
             return JsonResponse({'error': 'Menu introuvable', 'menu_id': menu_id}, status=404)
 
+        # VÉRIFIER SI LE MENU EST DISPONIBLE
+        if not menu.disponible:
+            logger.warning(f"⚠️ Menu {menu.nom} (ID: {menu_id}) n'est pas disponible")
+            return JsonResponse({
+                'error': 'Ce menu n\'est pas disponible actuellement',
+                'menu_id': menu_id,
+                'menu_nom': menu.nom
+            }, status=404)
+
         choix_list = []
         utilise_couscous = False
 
@@ -7358,7 +7367,7 @@ def api_choix_menu(request, menu_id):
                 'warning': 'Aucun choix configuré pour ce menu'
             })
 
-        # 🆕 TOUS LES SUPPLÉMENTS CONFIGURÉS
+        # LISTES DES SUPPLÉMENTS CONFIGURÉS
         DESSERTS_AVEC_SUPPLEMENTS = [
             (111, 'Brownie Maison', Decimal('4.90'), Decimal('2.00'), True),
             (112, 'Cookie Maison', Decimal('2.90'), Decimal('0.00'), False),
@@ -7388,17 +7397,16 @@ def api_choix_menu(request, menu_id):
             (121, 'Orangina', Decimal('2.50'), Decimal('0.00'), False),
         ]
 
-        # 🆕 ACCOMPAGNEMENTS AVEC SUPPLÉMENTS (identique à accompagnements_burger_ajax)
         ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS = [
-            (1001, 'Frites', Decimal('0.00')),
-            (1002, 'Riz', Decimal('0.00')),
-            (1003, 'Couscous', Decimal('1.00')),
-            (1004, 'Salade', Decimal('0.00')),
-            (1005, 'Kemia', Decimal('0.00')),
-            (1006, 'Coleslaw', Decimal('0.00')),
-            (1007, 'Onion Rings', Decimal('1.00')),
-            (1008, 'Galette Rösti', Decimal('0.70')),
-            (1009, 'Mozzarella Sticks (2 pcs)', Decimal('0.90')),
+            (130, 'Frites Maison Croustillantes', Decimal('0.00')),
+            (136, 'Riz et Sauce Maison', Decimal('0.00')),
+            (137, 'Couscous et Sauce', Decimal('1.00')),
+            (135, 'Salade et Vinaigrette Maison', Decimal('0.00')),
+            (138, 'Kemia (olive carotte céleri)', Decimal('0.00')),
+            (131, 'Coleslaw Maison', Decimal('0.30')),  # Note: 0.30€ au lieu de 0.00
+            (132, 'Onion Rings Maison (6 pcs)', Decimal('1.00')),
+            (133, 'Galette Rösti Maison (1 pcs)', Decimal('0.70')),
+            (134, 'Mozzarella Sticks Maison (2 pcs)', Decimal('0.90')),
         ]
 
         for choix in menu.choix.all():
@@ -7408,15 +7416,23 @@ def api_choix_menu(request, menu_id):
                 utilise_couscous = True
                 logger.info("🍛 Menu couscous détecté")
 
-            # 🆕 CONSTRUCTION DES DONNÉES AVEC TOUS LES PRIX
+            # CORRECTION IMPORTANTE : Filtrer SEULEMENT les plats disponibles
             plats_data = []
-            for p in choix.plats_possibles.all():
+            
+            # Log pour déboguer tous les plats (disponibles et non disponibles)
+            tous_plats = choix.plats_possibles.all()
+            plats_disponibles = choix.plats_possibles.filter(disponible=True)
+            
+            logger.info(f"📊 Choix {choix.role}: {tous_plats.count()} plats totaux, {plats_disponibles.count()} disponibles")
+            
+            for p in plats_disponibles:  # <-- CHANGEMENT ICI : filter(disponible=True)
                 prix_supplement = Decimal('0.00')
                 
                 # Chercher dans les desserts
                 for dessert_info in DESSERTS_AVEC_SUPPLEMENTS:
                     if dessert_info[0] == p.id:
                         prix_supplement = dessert_info[3] if dessert_info[4] else Decimal('0.00')
+                        logger.info(f"💰 Dessert {p.nom}: supplément = {prix_supplement}€")
                         break
                 
                 # Chercher dans les boissons si pas trouvé
@@ -7424,13 +7440,15 @@ def api_choix_menu(request, menu_id):
                     for boisson_info in BOISSONS_AVEC_SUPPLEMENTS:
                         if boisson_info[0] == p.id:
                             prix_supplement = boisson_info[3] if boisson_info[4] else Decimal('0.00')
+                            logger.info(f"🥤 Boisson {p.nom}: supplément = {prix_supplement}€")
                             break
                 
-                # 🆕 CHERCHER DANS LES ACCOMPAGNEMENTS
+                # Chercher dans les accompagnements
                 if prix_supplement == 0:
                     for acc_info in ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS:
                         if acc_info[0] == p.id:
                             prix_supplement = acc_info[2]
+                            logger.info(f"🍟 Accompagnement {p.nom}: supplément = {prix_supplement}€")
                             break
                 
                 # Si non trouvé, vérifier par nom (fallback)
@@ -7438,15 +7456,19 @@ def api_choix_menu(request, menu_id):
                     nom_lower = p.nom.lower()
                     if any(mot in nom_lower for mot in ['brownie', 'fondant', 'tiramisu', 'assortiment']):
                         prix_supplement = Decimal('2.00')
+                        logger.info(f"🔍 Fallback dessert {p.nom}: supplément = {prix_supplement}€")
                     elif 'red bull' in nom_lower:
                         prix_supplement = Decimal('1.00')
-                    # 🆕 FALLBACK POUR ACCOMPAGNEMENTS PAR NOM
+                        logger.info(f"🔍 Fallback Red Bull: supplément = {prix_supplement}€")
                     elif any(mot in nom_lower for mot in ['couscous', 'onion rings', 'onion']):
                         prix_supplement = Decimal('1.00')
+                        logger.info(f"🔍 Fallback accompagnement {p.nom}: supplément = {prix_supplement}€")
                     elif 'rösti' in nom_lower or 'rosti' in nom_lower:
                         prix_supplement = Decimal('0.70')
+                        logger.info(f"🔍 Fallback Rösti: supplément = {prix_supplement}€")
                     elif 'mozzarella' in nom_lower:
                         prix_supplement = Decimal('0.90')
+                        logger.info(f"🔍 Fallback Mozzarella: supplément = {prix_supplement}€")
                 
                 plat_data = {
                     "id": p.id, 
@@ -7454,10 +7476,18 @@ def api_choix_menu(request, menu_id):
                     "prix_unitaire_ttc": str(p.prix_unitaire_ttc) if p.prix_unitaire_ttc else "0.00",
                     "prix_supplement": str(prix_supplement),
                     "description_courte": getattr(p, 'description_courte', '') or "",
-                    "photo_url": p.photo.url if hasattr(p, 'photo') and p.photo else None
+                    "photo_url": p.photo.url if hasattr(p, 'photo') and p.photo else None,
+                    "disponible": p.disponible  # Ajout pour le débogage côté client
                 }
                 plats_data.append(plat_data)
-                logger.info(f"💰 Plat {p.nom}: supplément = {prix_supplement}€")
+                logger.info(f"✅ Plat ajouté au choix: {p.nom} (ID: {p.id}, supplément: {prix_supplement}€)")
+
+            # Log des plats non disponibles (pour déboguer)
+            plats_non_disponibles = choix.plats_possibles.filter(disponible=False)
+            if plats_non_disponibles.exists():
+                logger.warning(f"⚠️ Plats NON disponibles exclus du choix {choix.role}:")
+                for plat in plats_non_disponibles:
+                    logger.warning(f"   - {plat.nom} (ID: {plat.id})")
 
             choix_data = {
                 "id": choix.id,
@@ -7482,7 +7512,7 @@ def api_choix_menu(request, menu_id):
                             "prix_supplement": str(getattr(v, 'supplement_inclus', 0)) if getattr(v, 'supplement_inclus', None) else "0.00"
                         }
                         viandes_data.append(viande_data)
-                        logger.info(f"💰 Viande {v.nom}: supplément = {viande_data['prix_supplement']}€")
+                        logger.info(f"🥩 Viande {v.nom}: supplément = {viande_data['prix_supplement']}€")
                 
                 choix_data["viandes_possibles"] = viandes_data
 
@@ -7492,14 +7522,12 @@ def api_choix_menu(request, menu_id):
             "menu_id": menu_id,
             "menu_nom": menu.nom,
             "choix": choix_list,
-            # 🆕 AJOUTER LA LISTE DES ACCOMPAGNEMENTS POUR RÉFÉRENCE
             "accompagnements_config": ACCOMPAGNEMENTS_AVEC_SUPPLEMENTS
         }
 
         if utilise_couscous:
             try:
                 accompagnements = list(AccompagnementCouscous.objects.all().values("id", "nom"))
-                # 🆕 AJOUTER LES PRIX AUX ACCOMPAGNEMENTS COUSCOUS
                 accompagnements_avec_prix = []
                 for acc in accompagnements:
                     prix_acc = Decimal('0.00')
@@ -7514,14 +7542,18 @@ def api_choix_menu(request, menu_id):
                     })
                 
                 response_data["accompagnements_couscous"] = accompagnements_avec_prix
-                logger.info(f"🍟 {len(accompagnements_avec_prix)} accompagnements chargés avec prix")
+                logger.info(f"🍟 {len(accompagnements_avec_prix)} accompagnements couscous chargés")
             except Exception as e:
-                logger.error(f"❌ Erreur chargement accompagnements: {e}")
+                logger.error(f"❌ Erreur chargement accompagnements couscous: {e}")
                 response_data["accompagnements_couscous"] = []
 
         response_data["menu_type"] = detecter_type_menu(menu.nom)
         
+        # Log final pour résumé
+        total_plats_disponibles = sum(len(choix["plats"]) for choix in choix_list)
         logger.info(f"✅ API choix_menu réussie pour {menu.nom}")
+        logger.info(f"📊 Résumé: {total_plats_disponibles} plats disponibles dans {len(choix_list)} choix")
+        
         return JsonResponse(response_data)
         
     except Exception as e:
@@ -8182,22 +8214,94 @@ def ajouter_poulet_personnalise(request):
     # Dans views.py
 def accompagnements_burger_ajax(request):
     """Retourne la liste des accompagnements disponibles pour les burgers"""
-    accompagnements = [
-        {'id': 1001, 'nom': 'Frites', 'prix': 0.00},
-        {'id': 1002, 'nom': 'Riz', 'prix': 0.00},
-        {'id': 1003, 'nom': 'Couscous', 'prix': 1.00},
-        {'id': 1004, 'nom': 'Salade', 'prix': 0.00},
-        {'id': 1005, 'nom': 'Kemia', 'prix': 0.00},
-        {'id': 1006, 'nom': 'Coleslaw', 'prix': 0.00},
-        {'id': 1007, 'nom': 'Onion Rings', 'prix': 1.00},
-        {'id': 1008, 'nom': 'Galette Rösti', 'prix': 0.70},
-        {'id': 1009, 'nom': 'Mozzarella Sticks (2 pcs)', 'prix': 0.90},
-    ]
-    
-    return JsonResponse({
-        'success': True,
-        'accompagnements': accompagnements
-    })
+    try:
+        # 1. Récupérer les vrais accompagnements depuis la base
+        from swigo.models import Categorie, Plat
+        
+        categorie_sides = Categorie.objects.get(nom='sides')
+        vrais_accompagnements = Plat.objects.filter(
+            categorie=categorie_sides,
+            disponible=True
+        ).order_by('nom')
+        
+        # 2. Créer la liste avec les vrais IDs et noms
+        accompagnements = []
+        for plat in vrais_accompagnements:
+            # Déterminer le prix
+            prix = 0.00
+            nom_lower = plat.nom.lower()
+            
+            if 'coleslaw' in nom_lower:
+                prix = 0.30
+            elif 'onion' in nom_lower or 'rings' in nom_lower:
+                prix = 1.00
+            elif 'rösti' in nom_lower or 'rosti' in nom_lower:
+                prix = 0.70
+            elif 'mozzarella' in nom_lower:
+                prix = 0.90
+            elif 'couscous' in nom_lower:
+                prix = 1.00
+            # Frites, Riz, Salade, Kemia = 0.00
+            
+            # Simplifier le nom pour l'affichage
+            nom_simple = plat.nom
+            if 'Frites Maison Croustillantes' in plat.nom:
+                nom_simple = 'Frites'
+            elif 'Riz et Sauce Maison' in plat.nom:
+                nom_simple = 'Riz'
+            elif 'Salade et Vinaigrette Maison' in plat.nom:
+                nom_simple = 'Salade'
+            elif 'Coleslaw Maison' in plat.nom:
+                nom_simple = 'Coleslaw'
+            elif 'Onion Rings Maison (6 pcs)' in plat.nom:
+                nom_simple = 'Onion Rings'
+            elif 'Galette Rösti Maison (1 pcs)' in plat.nom:
+                nom_simple = 'Galette Rösti'
+            elif 'Mozzarella Sticks Maison (2 pcs)' in plat.nom:
+                nom_simple = 'Mozzarella Sticks (2 pcs)'
+            elif 'Couscous et Sauce' in plat.nom:
+                nom_simple = 'Couscous'
+            elif 'Kemia (olive carotte céleri)' in plat.nom:
+                nom_simple = 'Kemia'
+            
+            accompagnements.append({
+                'id': plat.id,  # ← VRAI ID (130, 131, etc.)
+                'nom': nom_simple,
+                'prix': prix
+            })
+        
+        # 3. Log pour déboguer
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"✅ accompagnements_burger_ajax: {len(accompagnements)} accompagnements retournés")
+        for acc in accompagnements:
+            logger.info(f"   - ID {acc['id']}: {acc['nom']} ({acc['prix']}€)")
+        
+        return JsonResponse({
+            'success': True,
+            'accompagnements': accompagnements
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"❌ Erreur dans accompagnements_burger_ajax: {e}")
+        
+        # Fallback temporaire
+        return JsonResponse({
+            'success': True,
+            'accompagnements': [
+                {'id': 130, 'nom': 'Frites', 'prix': 0.00},
+                {'id': 136, 'nom': 'Riz', 'prix': 0.00},
+                {'id': 137, 'nom': 'Couscous', 'prix': 1.00},
+                {'id': 135, 'nom': 'Salade', 'prix': 0.00},
+                {'id': 138, 'nom': 'Kemia', 'prix': 0.00},
+                {'id': 131, 'nom': 'Coleslaw', 'prix': 0.30},
+                {'id': 132, 'nom': 'Onion Rings', 'prix': 1.00},
+                {'id': 133, 'nom': 'Galette Rösti', 'prix': 0.70},
+                {'id': 134, 'nom': 'Mozzarella Sticks (2 pcs)', 'prix': 0.90},
+            ]
+        })
 
 
 def get_plats_par_categorie(request):
