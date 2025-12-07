@@ -4895,123 +4895,157 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
         details_data = []
         accompagnement_info = None
 
-        # 🆕 GROUPEMENT PAR CATÉGORIES AVEC COULEURS
+        # DICTIONNAIRE POUR GÉRER LES QUANTITÉS D'OPTIONS
         options_grouped = {
-            'viandes': [],
-            'accompagnements': [],
-            'fromages': [],
-            'sauces': [],
-            'supplements': []
+            'viandes': [],      # 🔴 Viandes
+            'accompagnements': [],  # 🟢 Accompagnements
+            'fromages': [],     # 🟡 Fromages
+            'sauces': [],       # 🔵 Sauces
+            'supplements': []   # 🟣 Suppléments
         }
 
         # Récupérer l'accompagnement principal (sans prix)
         if article.accompagnement:
             accompagnement_info = article.accompagnement.nom
-            options_grouped['accompagnements'].append(accompagnement_info)
+            options_grouped['accompagnements'].append(f"{article.quantite}x {accompagnement_info}")
 
         # ----------- PLAT CLASSIQUE -----------
         if article.plat:
             nom_article = article.plat.nom
             categorie = article.plat.categorie.nom if article.plat.categorie else "Autres"
             
-            # Filtrer boissons/desserts
+            # Filtrer boissons/desserts pour la cuisine
             cat_lower = categorie.lower()
             is_boisson = (cat_lower == "boisson")
             is_dessert = (cat_lower == "dessert")
             if filtrer_cuisine and (is_boisson or is_dessert):
                 continue
 
-            # Options classiques (sans prix)
-            if article.options.exists():
-                for option in article.options.all():
-                    option_text = option.nom_option
-                    option_text = option_text.split(' (+')[0]
-                    
-                    # Catégorisation automatique
-                    option_lower = option_text.lower()
-                    if any(mot in option_lower for mot in ['fromage', 'emmental', 'cheddar', 'mozzarella']):
-                        options_grouped['fromages'].append(option_text)
-                    elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq', 'mild', 'hot', 'épicé', 'doux']):
-                        options_grouped['sauces'].append(option_text)
-                    elif any(mot in option_lower for mot in ['viande', 'bacon', 'poulet', 'agneau', 'merguez', 'boulette']):
-                        options_grouped['viandes'].append(option_text)
-                    elif any(mot in option_lower for mot in ['accompagnement', 'frites', 'riz', 'salade', 'couscous', 'coleslaw']):
-                        options_grouped['accompagnements'].append(option_text)
-                    else:
-                        options_grouped['supplements'].append(option_text)
+            # ========== LOGIQUE UNIFIÉE POUR LES OPTIONS AVEC QUANTITÉS ==========
             
-            # Options Crousty (sans prix)
-            if article.plat.type_plat == 'crousty' and article.options_crousty.exists():
-                for option in article.options_crousty.all():
-                    option_text = option.nom
+            # 1. OPTIONS POUR LES PLATS DE POULET (avec quantités spécifiques)
+            if article.plat.type_plat == 'poulet' or categorie.lower() == 'poulet':
+                if hasattr(article, 'options_poulet_avec_quantites') and article.options_poulet_avec_quantites:
+                    from collections import Counter
                     
-                    option_lower = option.nom.lower()
-                    if any(mot in option_lower for mot in ['fromage', 'emmental', 'cheddar', 'mozzarella']):
-                        options_grouped['fromages'].append(option_text)
-                    elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
-                        options_grouped['sauces'].append(option_text)
-                    elif any(mot in option_lower for mot in ['bacon', 'viande']):
-                        options_grouped['viandes'].append(option_text)
-                    else:
-                        options_grouped['supplements'].append(option_text)
+                    # Compter les occurrences de chaque ID d'option
+                    id_counts = Counter(article.options_poulet_avec_quantites)
+                    
+                    # Créer un mapping ID -> Option
+                    options_by_id = {opt.id: opt for opt in article.options_poulet.all()}
+                    
+                    for opt_id, quantite_option in id_counts.items():
+                        if opt_id in options_by_id:
+                            option = options_by_id[opt_id]
+                            option_text = option.nom
+                            categorie_opt = getattr(option, 'categorie', 'autres').lower()
+                            
+                            # Calculer la quantité finale (client choisit par plat)
+                            final_quantite = article.quantite * quantite_option
+                            
+                            if categorie_opt == 'assaisonnement':  # Mild/Hot
+                                options_grouped['sauces'].insert(0, f"{final_quantite}x {option_text}")
+                            
+                            elif categorie_opt == 'sauce':  # Ketchup, Mayo, etc.
+                                options_grouped['sauces'].append(f"{final_quantite}x {option_text}")
+                            
+                            elif categorie_opt == 'accompagnement':  # Couscous, Galette, etc.
+                                options_grouped['accompagnements'].append(f"{final_quantite}x {option_text}")
+                            
+                            else:  # Autres
+                                options_grouped['supplements'].append(f"{final_quantite}x {option_text}")
+                else:
+                    # Fallback: options sans quantités spécifiques
+                    for option in article.options_poulet.all():
+                        option_text = option.nom
+                        categorie_opt = getattr(option, 'categorie', 'autres').lower()
+                        
+                        if categorie_opt == 'assaisonnement':
+                            options_grouped['sauces'].insert(0, f"{article.quantite}x {option_text}")
+                        elif categorie_opt == 'sauce':
+                            options_grouped['sauces'].append(f"{article.quantite}x {option_text}")
+                        elif categorie_opt == 'accompagnement':
+                            options_grouped['accompagnements'].append(f"{article.quantite}x {option_text}")
+                        else:
+                            options_grouped['supplements'].append(f"{article.quantite}x {option_text}")
             
-            # Options Poulet (sans prix + priorité sauces)
-            if (article.plat.type_plat == 'poulet' or article.plat.categorie.nom.lower() == 'poulet') and article.options_poulet.exists():                
-                for option in article.options_poulet.all():
-                    option_text = option.nom
-                    
-                    option_lower = option.nom.lower()
-                    if any(mot in option_lower for mot in ['mild', 'hot', 'épicé', 'doux']):
-                        options_grouped['sauces'].insert(0, option_text)
-                    elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
-                        options_grouped['sauces'].append(option_text)
-                    elif any(mot in option_lower for mot in ['coleslaw', 'frites', 'riz', 'couscous', 'galette']):
-                        options_grouped['accompagnements'].append(option_text)
-                    else:
-                        options_grouped['supplements'].append(option_text)
+            # 2. OPTIONS POUR LES PLATS CROUSTY
+            elif article.plat.type_plat == 'crousty':
+                if hasattr(article, 'options_crousty') and article.options_crousty.exists():
+                    for option in article.options_crousty.all():
+                        option_text = option.nom
+                        option_lower = option.nom.lower()
+                        
+                        if any(mot in option_lower for mot in ['fromage', 'emmental', 'cheddar', 'mozzarella']):
+                            options_grouped['fromages'].append(f"{article.quantite}x {option_text}")
+                        elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
+                            options_grouped['sauces'].append(f"{article.quantite}x {option_text}")
+                        elif any(mot in option_lower for mot in ['bacon', 'viande']):
+                            options_grouped['viandes'].append(f"{article.quantite}x {option_text}")
+                        else:
+                            options_grouped['supplements'].append(f"{article.quantite}x {option_text}")
+            
+            # 3. OPTIONS POUR LES PLATS CLASSIQUES (hors poulet/crousty)
+            else:
+                if hasattr(article, 'options') and article.options.exists():
+                    for option in article.options.all():
+                        option_text = option.nom_option.split(' (+')[0]
+                        option_lower = option_text.lower()
+                        
+                        if any(mot in option_lower for mot in ['fromage', 'emmental', 'cheddar', 'mozzarella']):
+                            options_grouped['fromages'].append(f"{article.quantite}x {option_text}")
+                        elif any(mot in option_lower for mot in ['sauce', 'ketchup', 'mayo', 'moutarde', 'bbq']):
+                            options_grouped['sauces'].append(f"{article.quantite}x {option_text}")
+                        elif any(mot in option_lower for mot in ['viande', 'bacon', 'poulet', 'agneau', 'merguez', 'boulette']):
+                            options_grouped['viandes'].append(f"{article.quantite}x {option_text}")
+                        elif any(mot in option_lower for mot in ['accompagnement', 'frites', 'riz', 'salade', 'couscous', 'coleslaw']):
+                            options_grouped['accompagnements'].append(f"{article.quantite}x {option_text}")
+                        else:
+                            options_grouped['supplements'].append(f"{article.quantite}x {option_text}")
 
-        # ----------- AUTRES TYPES D'ARTICLES -----------
+        # ----------- SALADE PERSONNALISÉE -----------
         elif article.salade_personnalisee:
             salade = article.salade_personnalisee
             nom_article = "Salade personnalisée"
             categorie = "Salades"
             
             if salade.base:
-                options_grouped['accompagnements'].append(f"Base: {salade.base.nom}")
+                options_grouped['accompagnements'].append(f"{article.quantite}x Base: {salade.base.nom}")
             if salade.sauce:
-                options_grouped['sauces'].append(f"Sauce: {salade.sauce.nom}")
+                options_grouped['sauces'].append(f"{article.quantite}x Sauce: {salade.sauce.nom}")
             
             for proteine in salade.proteines.all():
-                options_grouped['viandes'].append(f"Protéine: {proteine.nom}")
+                options_grouped['viandes'].append(f"{article.quantite}x Protéine: {proteine.nom}")
             for garniture in salade.garnitures.all():
-                options_grouped['accompagnements'].append(f"Garniture: {garniture.nom}")
+                options_grouped['accompagnements'].append(f"{article.quantite}x Garniture: {garniture.nom}")
             for topping in salade.toppings.all():
-                options_grouped['supplements'].append(f"Topping: {topping.nom}")
+                options_grouped['supplements'].append(f"{article.quantite}x Topping: {topping.nom}")
             for supplement in salade.supplement.all():
-                options_grouped['supplements'].append(f"Supplément: {supplement.nom}")
+                options_grouped['supplements'].append(f"{article.quantite}x Supplément: {supplement.nom}")
 
+        # ----------- COUSCOUS PERSONNALISÉ -----------
         elif article.couscous_personnalise:
             couscous = article.couscous_personnalise
             nom_article = f"Couscous {couscous.formule.nom}" if couscous.formule else "Couscous"
             categorie = "Couscous"
             
             for choix in couscous.choixviandecouscous_set.select_related('viande'):
-                nom = choix.viande.nom
-                nom = nom.split(' (+')[0]
-                options_grouped['viandes'].append(nom)
+                nom = choix.viande.nom.split(' (+')[0]
+                options_grouped['viandes'].append(f"{article.quantite}x {nom}")
             
             if couscous.option_xl:
-                options_grouped['supplements'].append("Option XL")
+                options_grouped['supplements'].append(f"{article.quantite}x Option XL")
             
             for accompagnement in couscous.accompagnements.all():
-                options_grouped['accompagnements'].append(accompagnement.nom)
+                options_grouped['accompagnements'].append(f"{article.quantite}x {accompagnement.nom}")
 
+        # ----------- MENU PERSONNALISÉ -----------
         elif article.menu:
             nom_article = article.menu.nom
             categorie = "Menus"
             
-            # CORRECTION : Utiliser un set pour éviter les doublons
             accompagnements_couscous_deja_vus = set()
+            has_cuisine_items = False  # Pour vérifier si le menu a des items pour la cuisine
             
             for c in article.choix_menu.all():
                 role_lower = c.role.lower()
@@ -5019,70 +5053,75 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
 
                 is_boisson = (role_lower == "boisson")
                 is_dessert = (role_lower == "dessert")
+                
+                # Si on filtre pour la cuisine ET c'est boisson/dessert → skip
                 if filtrer_cuisine and (is_boisson or is_dessert):
                     continue
+                
+                # Si on arrive ici en mode cuisine, c'est un item valide pour la cuisine
+                if filtrer_cuisine:
+                    has_cuisine_items = True
 
-                # CORRECTION : Gestion du couscous personnalisé dans les menus
+                # Gestion du couscous personnalisé dans les menus
                 if c.couscous:
-                    # Extraire les viandes du couscous
                     for choix_viande in c.couscous.choixviandecouscous_set.select_related('viande'):
                         nom_viande = choix_viande.viande.nom.split(' (+')[0]
-                        options_grouped['viandes'].append(nom_viande)
+                        options_grouped['viandes'].append(f"{article.quantite}x {nom_viande}")
                     
-                    # Extraire les accompagnements du couscous et les mémoriser
                     for accompagnement in c.couscous.accompagnements.all():
                         accompagnements_couscous_deja_vus.add(accompagnement.nom)
-                        options_grouped['accompagnements'].append(accompagnement.nom)
+                        options_grouped['accompagnements'].append(f"{article.quantite}x {accompagnement.nom}")
                     
                     if c.couscous.option_xl:
-                        options_grouped['supplements'].append("Option XL")
-                                
-                # CORRECTION : Gestion des accompagnements couscous individuels - Éviter les doublons
+                        options_grouped['supplements'].append(f"{article.quantite}x Option XL")
+                
+                # Accompagnements couscous individuels
                 elif c.role == "accompagnement_couscous" and getattr(c, "info_text", None):
                     option_text = c.info_text.split(' (+')[0]
-                    # Vérifier si cet accompagnement n'a pas déjà été ajouté via le couscous
                     if option_text not in accompagnements_couscous_deja_vus:
-                        options_grouped['accompagnements'].append(option_text)
-                                
+                        options_grouped['accompagnements'].append(f"{article.quantite}x {option_text}")
+                
                 elif c.role == "viande" and getattr(c, "info_text", None):
                     option_text = c.info_text.split(' (+')[0]
-                    options_grouped['viandes'].append(option_text)
-                    
+                    options_grouped['viandes'].append(f"{article.quantite}x {option_text}")
+                
                 elif c.role == "accompagnement" and getattr(c, "info_text", None):
                     option_text = c.info_text.split(' (+')[0]
-                    options_grouped['accompagnements'].append(option_text)
-                    
+                    options_grouped['accompagnements'].append(f"{article.quantite}x {option_text}")
+                
                 elif c.role == "boisson" and getattr(c, "info_text", None):
-                    if not filtrer_cuisine:
+                    if not filtrer_cuisine:  # Pour le bar seulement
                         option_text = c.info_text.split(' (+')[0]
-                        options_grouped['supplements'].append(f"Boisson: {option_text}")
-                        
-                # CORRECTION : Les plats choisis de type viande vont dans viandes
+                        options_grouped['supplements'].append(f"{article.quantite}x Boisson: {option_text}")
+                
+                # Plats choisis
                 elif c.plat_choisi:
                     plat_nom_lower = c.plat_choisi.nom.lower()
-                    # Déterminer si c'est un plat principal (viande)
                     is_plat_principal = (
                         c.role == "plat" or 
                         any(mot in plat_nom_lower for mot in ['tenders', 'poulet', 'viande', 'agneau', 'merguez', 'boulette', 'burger', 'steak', 'wing', 'aile', 'frit'])
                     )
                     
                     if is_plat_principal:
-                        options_grouped['viandes'].append(f"Plat: {c.plat_choisi.nom}")
+                        options_grouped['viandes'].append(f"{article.quantite}x Plat: {c.plat_choisi.nom}")
                     else:
-                        options_grouped['supplements'].append(f"{label}: {c.plat_choisi.nom}")
-                        
+                        options_grouped['supplements'].append(f"{article.quantite}x {label}: {c.plat_choisi.nom}")
+                
                 elif getattr(c, "info_text", None):
-                    options_grouped['supplements'].append(f"{label}: {c.info_text.split(' (+')[0]}")
-                    
+                    options_grouped['supplements'].append(f"{article.quantite}x {label}: {c.info_text.split(' (+')[0]}")
+                
                 elif c.salade:
-                    options_grouped['supplements'].append(f"{label}: Salade personnalisée")
+                    options_grouped['supplements'].append(f"{article.quantite}x {label}: Salade personnalisée")
+            
+            # En mode cuisine, si le menu n'a AUCUN item pour la cuisine, on le skip
+            if filtrer_cuisine and not has_cuisine_items:
+                continue
 
         else:
+            # Si aucun type reconnu, on skip cet article
             continue
 
-        # CONSTRUCTION DE L'AFFICHAGE
-        details_data = []
-        
+        # ========== CONSTRUCTION DU FORMAT FINAL POUR LE FRONTEND ==========
         categories_config = [
             ('viandes', '🔴 Viandes:', 'text-danger'),
             ('accompagnements', '🟢 Accompagnements:', 'text-success'), 
@@ -5093,13 +5132,15 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
         
         for cat_key, cat_label, color_class in categories_config:
             if options_grouped[cat_key]:
+                # Joindre les items avec "---" pour le frontend
+                items_str = '---'.join(options_grouped[cat_key])
                 details_data.append({
                     'label': cat_label,
-                    'items': options_grouped[cat_key],
+                    'items': items_str,
                     'color': color_class
                 })
 
-        # Ajouter l'article avec options groupées
+        # ✅ Ajouter l'article au résultat
         articles.append({
             'nom': nom_article,
             'categorie': categorie,
@@ -5109,23 +5150,27 @@ def extraire_articles_et_aggregats(commande, aggregated_articles=None, filtrer_c
             'prix_total': str(article.prix_total) if article.prix_total else '0.00'
         })
 
-        # Agrégation
+        # ========== AGRÉGATION POUR LE RÉCAPITULATIF ==========
         if categorie not in aggregated_articles:
             aggregated_articles[categorie] = {}
 
+        # Créer une clé unique pour l'article avec ses options
         article_key = nom_article
         if details_data:
-            options_text = []
+            options_text_parts = []
             for opt_group in details_data:
-                options_text.append(f"{opt_group['label']} {opt_group['items']}")
-            article_key += f" - {' | '.join(options_text)}"
+                # Remplacer "---" par ", " pour l'agrégation
+                items_formatted = opt_group['items'].replace('---', ', ')
+                options_text_parts.append(f"{opt_group['label']} {items_formatted}")
+            article_key += f" - {' | '.join(options_text_parts)}"
 
         if article_key in aggregated_articles[categorie]:
             aggregated_articles[categorie][article_key]['quantite'] += article.quantite
         else:
+            # Pour l'agrégation, on stocke les options dans le format original
             aggregated_articles[categorie][article_key] = {
                 'nom': nom_article,
-                'options': details_data,
+                'options': details_data,  # Format complet avec label/items/color
                 'quantite': article.quantite
             }
 
