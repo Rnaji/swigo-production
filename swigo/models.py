@@ -1590,6 +1590,8 @@ class Commande(models.Model):
     date_livraison_specifiee = models.DateField(null=True, blank=True)
     heure_livraison_specifiee = models.TimeField(null=True, blank=True)
     heure_livraison_asap = models.DateTimeField(null=True, blank=True)
+    couverts_bois = models.BooleanField(default=False, verbose_name="Couverts en bois")
+
 
     horaire_verrouille = models.BooleanField(default=False, help_text="Empêche la modification automatique de l’horaire une fois la commande confirmée")
 

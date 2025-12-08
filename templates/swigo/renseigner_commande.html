@@ -860,8 +860,8 @@
     
   
   
-  <!-- Modal pour renseigner les informations de commande -->
-  <div class="modal fade" id="validerCommandeModal" tabindex="-1" aria-labelledby="validerCommandeLabel" aria-hidden="true">
+<!-- Modal pour renseigner les informations de commande -->
+<div class="modal fade" id="validerCommandeModal" tabindex="-1" aria-labelledby="validerCommandeLabel" aria-hidden="true">
     <div class="modal-dialog modal-custom-size">
       <div class="modal-content">
         <div class="modal-header">
@@ -871,21 +871,21 @@
         <div class="modal-body">
           <form id="clientInfoForm">
             <div class="mb-3">
-                <label for="nom" class="form-label">Nom</label>
-                <input type="text" class="form-control" id="nom" name="nom" required>
-              </div>
-              <div class="mb-3">
-                <label for="prenom" class="form-label">Prénom</label>
-                <input type="text" class="form-control" id="prenom" name="prenom" required>
-              </div>
-              <div class="mb-3">
-                <label for="societe" class="form-label">Société <span style="font-weight: normal; color: #888; font-size: 13px;">(facultatif)</span></label>
-                <input type="text" class="form-control" id="societe" name="societe">
-              </div>
-              <div class="mb-3">
-                <label for="numero_telephone" class="form-label">Numéro de téléphone</label>
-                <input type="text" class="form-control" id="numero_telephone" name="numero_telephone" required>
-              </div>
+              <label for="nom" class="form-label">Nom</label>
+              <input type="text" class="form-control" id="nom" name="nom" required>
+            </div>
+            <div class="mb-3">
+              <label for="prenom" class="form-label">Prénom</label>
+              <input type="text" class="form-control" id="prenom" name="prenom" required>
+            </div>
+            <div class="mb-3">
+              <label for="societe" class="form-label">Société <span style="font-weight: normal; color: #888; font-size: 13px;">(facultatif)</span></label>
+              <input type="text" class="form-control" id="societe" name="societe">
+            </div>
+            <div class="mb-3">
+              <label for="numero_telephone" class="form-label">Numéro de téléphone</label>
+              <input type="text" class="form-control" id="numero_telephone" name="numero_telephone" required>
+            </div>
             <div class="mb-3">
               <label for="email" class="form-label">Email</label>
               <input type="email" class="form-control" id="email" name="email" required>
@@ -897,20 +897,27 @@
             </div>
   
             <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="differentBillingAddress" name="differentBillingAddress">
-                <label class="form-check-label" for="differentBillingAddress">
-                  Adresse de facturation différente
-                </label>
+              <input class="form-check-input" type="checkbox" id="differentBillingAddress" name="differentBillingAddress">
+              <label class="form-check-label" for="differentBillingAddress">
+                Adresse de facturation différente
+              </label>
             </div>
-
+  
             <div class="form-check mb-3 ms-3">
-                <input class="form-check-input" type="checkbox" id="factureSansDetail" name="factureSansDetail">
-                <label class="form-check-label" for="factureSansDetail">
-                  Facture sans détail <span class="text-muted" style="font-size:13px"></span>
-                </label>
+              <input class="form-check-input" type="checkbox" id="factureSansDetail" name="factureSansDetail">
+              <label class="form-check-label" for="factureSansDetail">
+                Facture sans détail <span class="text-muted" style="font-size:13px"></span>
+              </label>
             </div>
-
-
+  
+            <!-- AJOUT ICI : Case pour les couverts en bois -->
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="couvertsBois" name="couvertsBois">
+              <label class="form-check-label" for="couvertsBois">
+                🍴 Je souhaite des couverts en bois
+              </label>
+            </div>
+  
             <div class="mb-3" id="adresseFacturationContainer" style="display: none;">
               <label for="adresse_facturation" class="form-label">Adresse de facturation (facultatif)</label>
               <input type="text" class="form-control" id="adresse_facturation" name="adresse_facturation">
@@ -930,29 +937,28 @@
               <label for="message_livreur" class="form-label">Message pour notre livreur (facultatif)</label>
               <textarea class="form-control" id="message_livreur" name="message_livreur" rows="3" placeholder="Laissez un message pour le livreur..."></textarea>
             </div>
-
+  
             <div class="mb-3">
-                <label class="form-label">Consentements</label>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="consent_cookies" checked required>
-                  <label class="form-check-label" for="consent_cookies">
-                    J'accepte l'utilisation des cookies.
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="consent_sms" checked>
-                  <label class="form-check-label" for="consent_sms">
-                    Je consens à recevoir des SMS.
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="consent_email" checked>
-                  <label class="form-check-label" for="consent_email">
-                    Je consens à recevoir des emails.
-                  </label>
-                </div>
+              <label class="form-label">Consentements</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="consent_cookies" checked required>
+                <label class="form-check-label" for="consent_cookies">
+                  J'accepte l'utilisation des cookies.
+                </label>
               </div>
-              
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="consent_sms" checked>
+                <label class="form-check-label" for="consent_sms">
+                  Je consens à recevoir des SMS.
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="consent_email" checked>
+                <label class="form-check-label" for="consent_email">
+                  Je consens à recevoir des emails.
+                </label>
+              </div>
+            </div>
           </form>
         </div>
         <div class="modal-footer">
@@ -3147,6 +3153,8 @@ window.handleStripe = function () {
             consent_sms: document.getElementById('consent_sms').checked,
             consent_email: document.getElementById('consent_email').checked,
             factureSansDetail: document.getElementById('factureSansDetail').checked,
+            couvertsBois: document.getElementById('couvertsBois').checked, // AJOUT ICI
+
 
 
         };

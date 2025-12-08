@@ -401,9 +401,14 @@ def verifier_ou_corriger_creneau_livraison(commande):
     if not commande.date_livraison_specifiee or not commande.heure_livraison_specifiee:
         logger.debug("[CRENEAU] Incomplet (date/heure manquantes), estimation ASAP")
         heure_estimee = estimer_heure_livraison(commande.adresse_livraison)
+        
+        # CORRECTION : Mettre à jour TOUS les champs de date/heure
         commande.heure_livraison_asap = heure_estimee
+        commande.date_livraison_specifiee = heure_estimee.date()  # ← AJOUT
+        commande.heure_livraison_specifiee = heure_estimee.time()  # ← AJOUT
         commande.horaire_verrouille = True
-        commande.save(update_fields=['heure_livraison_asap', 'horaire_verrouille'])
+        
+        commande.save(update_fields=['heure_livraison_asap', 'date_livraison_specifiee', 'heure_livraison_specifiee', 'horaire_verrouille'])
         return heure_estimee
 
     heure_choisie = make_aware(
@@ -429,9 +434,14 @@ def verifier_ou_corriger_creneau_livraison(commande):
     # Recalcul automatique
     nouvelle_heure = estimer_heure_livraison(commande.adresse_livraison, maintenant=maintenant)
     logger.debug(f"[RECALC] Nouveau créneau: {nouvelle_heure}")
+    
+    # CORRECTION : Mettre à jour TOUS les champs
     commande.heure_livraison_asap = nouvelle_heure
+    commande.date_livraison_specifiee = nouvelle_heure.date()  # ← AJOUT
+    commande.heure_livraison_specifiee = nouvelle_heure.time()  # ← AJOUT
     commande.horaire_verrouille = True
-    commande.save(update_fields=['heure_livraison_asap', 'horaire_verrouille'])
+    
+    commande.save(update_fields=['heure_livraison_asap', 'date_livraison_specifiee', 'heure_livraison_specifiee', 'horaire_verrouille'])
     return nouvelle_heure
 
 
@@ -487,8 +497,11 @@ def verifier_ou_corriger_creneau_retrait(commande):
         logger.debug("[CHECK RETRAIT] Créneau non précisé -> estimation")
         heure_estimee = estimer_heure_retrait()
         commande.heure_pick_up_specifie = heure_estimee
+        # Pour les commandes à emporter, aussi sauvegarder la date/heure
+        commande.date_livraison_specifiee = heure_estimee.date()  # ← AJOUT (optionnel)
+        commande.heure_livraison_specifiee = heure_estimee.time()  # ← AJOUT (optionnel)
         commande.horaire_verrouille = True
-        commande.save(update_fields=['heure_pick_up_specifie', 'horaire_verrouille'])
+        commande.save(update_fields=['heure_pick_up_specifie', 'date_livraison_specifiee', 'heure_livraison_specifiee', 'horaile_verrouille'])
         return heure_estimee
 
     recalcul = False
@@ -508,8 +521,11 @@ def verifier_ou_corriger_creneau_retrait(commande):
     nouvelle_heure = estimer_heure_retrait()
     logger.debug(f"[RECALC RETRAIT] Nouveau créneau: {nouvelle_heure}")
     commande.heure_pick_up_specifie = nouvelle_heure
+    # Pour les commandes à emporter, aussi sauvegarder la date/heure
+    commande.date_livraison_specifiee = nouvelle_heure.date()  # ← AJOUT (optionnel)
+    commande.heure_livraison_specifiee = nouvelle_heure.time()  # ← AJOUT (optionnel)
     commande.horaire_verrouille = True
-    commande.save(update_fields=['heure_pick_up_specifie', 'horaire_verrouille'])
+    commande.save(update_fields=['heure_pick_up_specifie', 'date_livraison_specifiee', 'heure_livraison_specifiee', 'horaire_verrouille'])
     return nouvelle_heure
 
 

@@ -2666,7 +2666,9 @@ def confirmer_commande(request):
 
     moyen_paiement = data.get('moyen_paiement')
     societe = data.get('societe', '').strip()
-    print(f"[💳] Moyen de paiement : {moyen_paiement} | Société : {societe}")
+    couverts_bois = data.get('couvertsBois', False)
+
+    print(f"[💳] Moyen de paiement : {moyen_paiement} | Société : {societe} | Couverts bois: {couverts_bois}")
 
     if not moyen_paiement:
         logger.warning("❌ Moyen de paiement manquant")
@@ -2688,6 +2690,43 @@ def confirmer_commande(request):
     # Vérification/créneau
     print("[🔎] Vérification/créneau personnalisé")
     nouvelle_heure = verifier_ou_corriger_creneau_livraison(commande)
+
+    # CORRECTION : Gestion du cas où date_livraison_specifiee est None
+    if not commande.date_livraison_specifiee or not commande.heure_livraison_specifiee:
+        print(f"[⚠️] date_livraison_specifiee ou heure_livraison_specifiee est None pour commande {commande.id}")
+        print(f"  - date_livraison_specifiee: {commande.date_livraison_specifiee}")
+        print(f"  - heure_livraison_specifiee: {commande.heure_livraison_specifiee}")
+        print(f"  - heure_livraison_asap: {commande.heure_livraison_asap}")
+        
+        if commande.heure_livraison_asap:
+            # Utiliser heure_livraison_asap comme fallback
+            print(f"[🔄] Utilisation heure_livraison_asap comme fallback: {commande.heure_livraison_asap}")
+            livraison_dt = commande.heure_livraison_asap
+            
+            # Mettre à jour les champs manquants
+            commande.date_livraison_specifiee = livraison_dt.date()
+            commande.heure_livraison_specifiee = livraison_dt.time()
+            commande.save(update_fields=['date_livraison_specifiee', 'heure_livraison_specifiee'])
+            print(f"[✅] Champs mis à jour: date={commande.date_livraison_specifiee}, heure={commande.heure_livraison_specifiee}")
+        else:
+            # Aucune heure disponible, erreur
+            error_msg = "Aucune date/heure de livraison spécifiée pour la commande"
+            print(f"[❌] {error_msg}")
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+    else:
+        # Cas normal : les champs sont définis
+        livraison_dt = datetime.combine(commande.date_livraison_specifiee, commande.heure_livraison_specifiee)
+    
+    # Vérification de timezone
+    if is_naive(livraison_dt):
+        livraison_dt = make_aware(livraison_dt)
+    
+    livraison_dt_local = localtime(livraison_dt)
+    print(f"[📅] Date/heure livraison final: {livraison_dt_local}")
+
+    if 'couvertsBois' in data:
+        commande.couverts_bois = bool(data['couvertsBois'])
+        print(f"[🍴] Couverts bois mis à jour: {commande.couverts_bois}")
 
     if commande.panier:
         try:
@@ -2719,11 +2758,6 @@ def confirmer_commande(request):
 
     commande.save()
     print(f"[✅] Commande validée : ID {commande.id}, paiement = {moyen_paiement}")
-
-    livraison_dt = datetime.combine(commande.date_livraison_specifiee, commande.heure_livraison_specifiee)
-    if is_naive(livraison_dt):
-        livraison_dt = make_aware(livraison_dt)
-    livraison_dt_local = localtime(livraison_dt)
 
     return JsonResponse({
         'success': True,
@@ -2944,6 +2978,8 @@ def valider_commande(request):
     commande.message_pour_chef = data.get('message_chef', '')
     commande.message_pour_livreur = data.get('message_livreur', '')
     commande.facture_sans_detail = data.get('factureSansDetail', False)
+    commande.couverts_bois = data.get('couvertsBois', False)
+
     if moyen_paiement:
         commande.moyen_paiement = moyen_paiement
     commande.save()
@@ -4738,7 +4774,7 @@ def get_commandes_cuisine(request):
             Q(is_paid=True) | Q(commande_is_valid=True),
             is_in_the_kitchen=True,
             is_cooked=False
-        ).select_related('client')  # ✅ IMPORTANT : Inclure le client
+        ).select_related('client')
 
         tournees_commandes = []
         five_minutes_ago = now() - timedelta(minutes=5)
@@ -4771,12 +4807,14 @@ def get_commandes_cuisine(request):
                     cuisson_en_cours = True
                     cuisson_start_times.append(commande.heure_cuisson_en_cours)
 
+                # AJOUT DE couverts_bois
                 commandes_tournee.append({
                     'commande_id': commande.id,
                     'articles': articles,
                     'cuisson_en_cours': commande.cuisson_en_cours,
                     'has_message_for_chef': bool(commande.message_pour_chef),
-                    'message_pour_chef': commande.message_pour_chef.strip() if commande.message_pour_chef else ''
+                    'message_pour_chef': commande.message_pour_chef.strip() if commande.message_pour_chef else '',
+                    'couverts_bois': commande.couverts_bois  # ← AJOUT ICI
                 })
 
             cuisson_start_time = min(cuisson_start_times) if cuisson_start_times else None
@@ -4818,6 +4856,7 @@ def get_commandes_cuisine(request):
             articles, aggregated_articles = extraire_articles_et_aggregats(commande)
             heure_emport = commande.heure_pick_up_specifie
 
+            # AJOUT DE couverts_bois ICI AUSSI
             tournees_commandes.append({
                 'tournee_id': tournee.id,
                 'tournee_nom': tournee.nom,
@@ -4826,7 +4865,8 @@ def get_commandes_cuisine(request):
                     'articles': articles,
                     'cuisson_en_cours': commande.cuisson_en_cours,
                     'has_message_for_chef': bool(commande.message_pour_chef),
-                    'message_pour_chef': commande.message_pour_chef.strip() if commande.message_pour_chef else ''
+                    'message_pour_chef': commande.message_pour_chef.strip() if commande.message_pour_chef else '',
+                    'couverts_bois': commande.couverts_bois  # ← AJOUT ICI
                 }],
                 'aggregated_articles': aggregated_articles,
                 'recently_closed': True,
