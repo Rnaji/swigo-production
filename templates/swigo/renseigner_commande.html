@@ -2571,6 +2571,7 @@ window.updateCartDisplay = function (cartItems, totals, codePromo = null) {
 };
 
 // Fonction pour extraire les détails d'un article
+// Fonction pour extraire les détails d'un article
 function extractItemDetails(item) {
     let accompagnementNom = '';
     let accompagnementPrix = '';
@@ -2583,7 +2584,11 @@ function extractItemDetails(item) {
         console.log('🥩 VIANDES COUSCOUS TROUVÉES:', item.tous_les_champs.viandes_couscous);
         item.tous_les_champs.viandes_couscous.forEach(viande => {
             if (typeof viande === 'string' && viande.trim() !== '') {
-                optionsArray.push(`🥩 ${viande.trim()}`);
+                // Nettoyer le nom de la viande
+                let viandeClean = viande.trim();
+                // Supprimer les préfixes en double
+                viandeClean = viandeClean.replace(/^(🥩\s*)?(Viande:\s*)?(Accompagnement_couscous:\s*)?/, '');
+                optionsArray.push(`🥩 ${viandeClean}`);
             }
         });
     }
@@ -2593,20 +2598,27 @@ function extractItemDetails(item) {
         console.log('📦 OPTIONS DIRECTES:', item.options);
         item.options.forEach(option => {
             if (typeof option === 'string' && option.trim() !== '') {
-                // Vérifier si c'est une viande couscous dans les options
-                const isViandeCouscous = option.includes('Cuisse de Poulet') || 
-                                       option.includes('Merguez') || 
-                                       option.includes('Boulettes') || 
-                                       option.includes('Brochette') || 
-                                       option.includes('Agneau') ||
-                                       option.match(/^\d+\s+\w+/) || // "1 Cuisse"
-                                       option.match(/^\+\d+\s+\w+/); // "+2 Merguez"
+                let optionClean = option.trim();
                 
-                if (isViandeCouscous && !optionsArray.some(opt => opt.includes(option))) {
-                    console.log('🥩 VIANDE COUSCOUS DANS OPTIONS:', option);
-                    optionsArray.push(`🥩 ${option.trim()}`);
+                // Nettoyer les préfixes en double
+                optionClean = optionClean.replace(/^(Accompagnement_couscous:\s*)?/, '');
+                
+                // Vérifier si c'est une viande couscous dans les options
+                const isViandeCouscous = optionClean.includes('Cuisse de Poulet') || 
+                                       optionClean.includes('Merguez') || 
+                                       optionClean.includes('Boulettes') || 
+                                       optionClean.includes('Brochette') || 
+                                       optionClean.includes('Agneau') ||
+                                       optionClean.match(/^\d+\s+\w+/) || // "1 Cuisse"
+                                       optionClean.match(/^\+\d+\s+\w+/); // "+2 Merguez"
+                
+                if (isViandeCouscous && !optionsArray.some(opt => opt.includes(optionClean))) {
+                    console.log('🥩 VIANDE COUSCOUS DANS OPTIONS:', optionClean);
+                    // Supprimer "🥩" si déjà présent
+                    optionClean = optionClean.replace(/^🥩\s*/, '');
+                    optionsArray.push(`🥩 ${optionClean}`);
                 } else if (!isViandeCouscous) {
-                    optionsArray.push(option.trim());
+                    optionsArray.push(optionClean);
                 }
             }
         });
@@ -2627,15 +2639,19 @@ function extractItemDetails(item) {
             console.log('📋 OPTIONS CLASSIQUES:', item.tous_les_champs.options_classiques);
             item.tous_les_champs.options_classiques.forEach(option => {
                 if (typeof option === 'string' && option.trim() !== '') {
-                    // Ne pas ajouter les viandes couscous en double
-                    const isViandeCouscous = option.includes('Cuisse de Poulet') || 
-                                           option.includes('Merguez') || 
-                                           option.includes('Boulettes') || 
-                                           option.includes('Brochette') || 
-                                           option.includes('Agneau');
+                    let optionClean = option.trim();
+                    // Supprimer les préfixes en double
+                    optionClean = optionClean.replace(/^(Accompagnement_couscous:\s*)?/, '');
                     
-                    if (!isViandeCouscous || !optionsArray.some(opt => opt.includes(option))) {
-                        optionsArray.push(option.trim());
+                    // Ne pas ajouter les viandes couscous en double
+                    const isViandeCouscous = optionClean.includes('Cuisse de Poulet') || 
+                                           optionClean.includes('Merguez') || 
+                                           optionClean.includes('Boulettes') || 
+                                           optionClean.includes('Brochette') || 
+                                           optionClean.includes('Agneau');
+                    
+                    if (!isViandeCouscous || !optionsArray.some(opt => opt.includes(optionClean))) {
+                        optionsArray.push(optionClean);
                     }
                 }
             });
@@ -2648,7 +2664,9 @@ function extractItemDetails(item) {
                 if (typeof option === 'object' && option.nom) {
                     optionsArray.push(`🐔 ${option.nom}`);
                 } else if (typeof option === 'string' && option.trim() !== '') {
-                    optionsArray.push(`🐔 ${option.trim()}`);
+                    let optionClean = option.trim();
+                    optionClean = optionClean.replace(/^(Accompagnement_couscous:\s*)?/, '');
+                    optionsArray.push(`🐔 ${optionClean}`);
                 }
             });
         }
@@ -2660,7 +2678,9 @@ function extractItemDetails(item) {
                 if (typeof option === 'object' && option.nom) {
                     optionsArray.push(option.nom);
                 } else if (typeof option === 'string' && option.trim() !== '') {
-                    optionsArray.push(option.trim());
+                    let optionClean = option.trim();
+                    optionClean = optionClean.replace(/^(Accompagnement_couscous:\s*)?/, '');
+                    optionsArray.push(optionClean);
                 }
             });
         }
@@ -2668,6 +2688,10 @@ function extractItemDetails(item) {
 
     // 5. NETTOYER ET FILTRER LES OPTIONS
     optionsArray = optionsArray
+        .map(opt => {
+            // Supprimer tous les préfixes en double restants
+            return opt.replace(/^(Accompagnement_couscous:\s*)?(Accompagnement:\s*)?(Option:\s*)?(Viande:\s*)?/, '');
+        })
         .filter(opt => {
             // Supprimer les valeurs vides
             if (!opt || opt === '' || opt === 'undefined' || opt === 'null') return false;
@@ -2675,15 +2699,18 @@ function extractItemDetails(item) {
             if (typeof opt === 'string' && !isNaN(opt.trim())) return false;
             return true;
         })
-        // Supprimer les doublons
-        .filter((opt, index, self) => self.indexOf(opt) === index);
+        // Supprimer les doublons (case insensitive)
+        .filter((opt, index, self) => 
+            self.findIndex(o => o.toLowerCase() === opt.toLowerCase()) === index
+        );
 
-    console.log('✅ OPTIONS FINALES:', optionsArray);
+    console.log('✅ OPTIONS FINALES NETTOYÉES:', optionsArray);
 
     // 6. FORMATER L'ACCOMPAGNEMENT
     let accompagnementDisplay = '';
     if (accompagnementNom && accompagnementNom !== '') {
-        accompagnementDisplay = `🍟 ${accompagnementNom}`;
+        let accompagnementClean = accompagnementNom.replace(/^(Accompagnement_couscous:\s*)?/, '');
+        accompagnementDisplay = `🍟 ${accompagnementClean}`;
         if (accompagnementPrix && parseFloat(accompagnementPrix) > 0) {
             accompagnementDisplay += ` (+${parseFloat(accompagnementPrix).toFixed(2)}€)`;
         }
@@ -2698,7 +2725,8 @@ function extractItemDetails(item) {
     if (optionsArray.length > 0) {
         const optionsHTML = optionsArray.map(option => {
             // Viandes couscous avec 🥩
-            if (option.includes('🥩')) {
+            if (option.includes('🥩') || option.includes('Cuisse') || option.includes('Merguez') || 
+                option.includes('Boulettes') || option.includes('Brochette') || option.includes('Agneau')) {
                 return `
                     <div class="option-line viande-couscous-option" 
                          style="font-style: italic; color: #28a745; font-weight: 500; font-size: 13.5px; margin-top: 2px; line-height: 1.3;">
@@ -2706,7 +2734,8 @@ function extractItemDetails(item) {
                     </div>`;
             }
             // Options poulet avec 🐔
-            else if (option.includes('🐔')) {
+            else if (option.includes('🐔') || option.includes('Mild') || option.includes('Hot') || 
+                    option.includes('Ketchup') || option.includes('Mayo') || option.includes('Coleslaw')) {
                 return `
                     <div class="option-line poulet-option" 
                          style="font-style: italic; color: #D35400; font-weight: 500; font-size: 13.5px; margin-top: 2px; line-height: 1.3;">
