@@ -1104,6 +1104,7 @@ function getTriIndex(item) {
 }
 
 // Fonction globale
+// Fonction globale - MODIFIÉE POUR GROUPER LES MENUS PAR TYPE
 window.loadPlats = function (categorie_nom) {
     console.log(`🔍 Chargement AJAX pour : ${categorie_nom}`);
 
@@ -1158,53 +1159,60 @@ window.loadPlats = function (categorie_nom) {
             // ✅ VIDER une seconde fois par sécurité
             platsContainer.innerHTML = '';
 
-            items.forEach(item => {
-                // ✅ VÉRIFIER les doublons avant d'ajouter
-                const existingItem = Array.from(platsContainer.children).find(child => 
-                    child.querySelector('.dz-content .title')?.textContent === item.nom
-                );
-                
-                if (existingItem) {
-                    console.warn(`⚠️ Doublon détecté et ignoré: ${item.nom}`);
-                    return; // Passer au suivant
-                }
-
-                const imageUrl = item.photo_url || '/static/images/default.jpg';
-                const escapedNom = htmlEscape(item.nom);
-                const escapedDescriptionCourte = htmlEscape(item.description_courte);
-
-                const card = document.createElement("li");
-                card.className = `card-container col-lg-4 col-md-6 m-b30 ${categorie_nom}`;
-                card.setAttribute('data-plat-id', item.id); // ✅ Identifiant unique
-
-                const dzBox = document.createElement("div");
-                dzBox.className = "dz-img-box style-7";
-
-                dzBox.addEventListener("click", () => {
-                    if (categorie_nom === 'menu') {
-                        openMenuModal(item.id, item.nom, imageUrl, item.description_longue, item.prix_unitaire_ttc);
-                    } else {
-                        openPlatModal(item.id, item.nom, imageUrl, item.description_longue, item.prix_unitaire_ttc, categorie_nom);
+            // ✅ POUR LES MENUS SEULEMENT : Grouper par type avec séparation poulet frit/josper
+            if (categorie_nom === 'menu') {
+                // Appeler la fonction de regroupement des menus
+                afficherMenusParType(items, platsContainer);
+            } else {
+                // Pour les autres catégories, affichage normal (code original)
+                items.forEach(item => {
+                    // ✅ VÉRIFIER les doublons avant d'ajouter
+                    const existingItem = Array.from(platsContainer.children).find(child => 
+                        child.querySelector('.dz-content .title')?.textContent === item.nom
+                    );
+                    
+                    if (existingItem) {
+                        console.warn(`⚠️ Doublon détecté et ignoré: ${item.nom}`);
+                        return; // Passer au suivant
                     }
-                });
 
-                dzBox.innerHTML = `
-                    <div class="dz-media">
-                        <img src="${imageUrl}" alt="${escapedNom}" class="img-fluid" style="width: 200px; height: 200px; object-fit: cover;">
-                        <div class="dz-meta">
-                            <ul><li class="rating"><i class="fa-solid fa-star"></i> 4.5</li></ul>
+                    const imageUrl = item.photo_url || '/static/images/default.jpg';
+                    const escapedNom = htmlEscape(item.nom);
+                    const escapedDescriptionCourte = htmlEscape(item.description_courte);
+
+                    const card = document.createElement("li");
+                    card.className = `card-container col-lg-4 col-md-6 m-b30 ${categorie_nom}`;
+                    card.setAttribute('data-plat-id', item.id); // ✅ Identifiant unique
+
+                    const dzBox = document.createElement("div");
+                    dzBox.className = "dz-img-box style-7";
+
+                    dzBox.addEventListener("click", () => {
+                        if (categorie_nom === 'menu') {
+                            openMenuModal(item.id, item.nom, imageUrl, item.description_longue, item.prix_unitaire_ttc);
+                        } else {
+                            openPlatModal(item.id, item.nom, imageUrl, item.description_longue, item.prix_unitaire_ttc, categorie_nom);
+                        }
+                    });
+
+                    dzBox.innerHTML = `
+                        <div class="dz-media">
+                            <img src="${imageUrl}" alt="${escapedNom}" class="img-fluid" style="width: 200px; height: 200px; object-fit: cover;">
+                            <div class="dz-meta">
+                                <ul><li class="rating"><i class="fa-solid fa-star"></i> 4.5</li></ul>
+                            </div>
                         </div>
-                    </div>
-                    <div class="dz-content">
-                        <h5 class="title">${escapedNom}</h5>
-                        <p>${escapedDescriptionCourte}</p>
-                        <span class="price">${item.prix_unitaire_ttc} €</span>
-                    </div>
-                `;
+                        <div class="dz-content">
+                            <h5 class="title">${escapedNom}</h5>
+                            <p>${escapedDescriptionCourte}</p>
+                            <span class="price">${item.prix_unitaire_ttc} €</span>
+                        </div>
+                    `;
 
-                card.appendChild(dzBox);
-                platsContainer.appendChild(card);
-            });
+                    card.appendChild(dzBox);
+                    platsContainer.appendChild(card);
+                });
+            }
 
             console.log(`✅ ${items.length} éléments chargés pour ${categorie_nom}`);
         })
@@ -1214,6 +1222,144 @@ window.loadPlats = function (categorie_nom) {
         });
 };
 
+// ✅ NOUVELLE FONCTION : Afficher les menus groupés par type
+function afficherMenusParType(menus, container) {
+    console.log("🧾 Affichage des menus groupés par type");
+    
+    // 1. Grouper les menus par type
+    const menusParType = {
+        'burger': [],
+        'couscous': [],
+        'crousty': [],
+        'poulet_frit': [],   // Poulet frit (tenders, wings, frit)
+        'poulet_josper': [],  // Poulet josper/grillé
+        'autres': []
+    };
+    
+    // 2. Répartir les menus dans les bonnes catégories
+    menus.forEach(menu => {
+        const nom = menu.nom.toLowerCase();
+        let type = 'autres';
+        
+        if (nom.includes('burger')) {
+            type = 'burger';
+        } else if (nom.includes('couscous')) {
+            type = 'couscous';
+        } else if (nom.includes('crousty')) {
+            type = 'crousty';
+        } else if (nom.includes('josper')) {
+            type = 'poulet_josper';
+        } else if (nom.includes('grillé') || nom.includes('grille')) {
+            type = 'poulet_josper';
+        } else if (nom.includes('tenders') || nom.includes('wings')) {
+            type = 'poulet_frit';
+        } else if (nom.includes('frit')) {
+            type = 'poulet_frit';
+        } else if (nom.includes('poulet')) {
+            // Par défaut, si juste "poulet" sans précision, mettre en frit
+            type = 'poulet_frit';
+        }
+        
+        menusParType[type].push(menu);
+    });
+    
+    console.log("📊 Répartition des menus:", menusParType);
+    
+    // 3. Créer les sections pour chaque type non vide
+    const typesNonVides = Object.keys(menusParType).filter(t => menusParType[t].length > 0);
+    
+    typesNonVides.forEach((type, index) => {
+        const menusList = menusParType[type];
+        
+        // Créer une section pour ce type
+        const section = document.createElement('div');
+        section.className = 'menu-type-section mb-5';
+        
+        // Ajouter un titre pour la section
+        const titre = document.createElement('h4');
+        titre.className = 'menu-type-title text-center mb-4';
+        
+        // Définir les titres selon le type
+        const titresConfig = {
+            'burger': { icon: '🍔', texte: 'Menus Burger' },
+            'couscous': { icon: '🍛', texte: 'Menus Couscous' },
+            'crousty': { icon: '🌯', texte: 'Menus Crousty' },
+            'poulet_frit': { icon: '🍗', texte: 'Menus Poulet Frit' },
+            'poulet_josper': { icon: '🔥', texte: 'Menus Poulet Josper' },
+            'autres': { icon: '📦', texte: 'Autres Menus' }
+        };
+        
+        const config = titresConfig[type] || titresConfig.autres;
+        titre.innerHTML = `${config.icon} ${config.texte}`;
+        
+        // Style du titre
+        titre.style.cssText = `
+            font-weight: 600;
+            color: #333;
+            font-size: 24px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #ff6600;
+            display: inline-block;
+            margin-bottom: 20px;
+        `;
+        
+        section.appendChild(titre);
+        
+        // Créer une ligne pour les menus de ce type
+        const ligne = document.createElement('div');
+        ligne.className = 'row justify-content-center';
+        
+        // Ajouter chaque menu de ce type
+        menusList.forEach(menu => {
+            const imageUrl = menu.photo_url || '/static/images/default.jpg';
+            const escapedNom = htmlEscape(menu.nom);
+            const escapedDescriptionCourte = htmlEscape(menu.description_courte);
+            
+            const col = document.createElement('div');
+            col.className = 'col-lg-4 col-md-6 m-b30';
+            
+            const card = document.createElement('li');
+            card.className = 'card-container menu-card';
+            card.setAttribute('data-plat-id', menu.id);
+            card.setAttribute('data-menu-type', type);
+            
+            const dzBox = document.createElement('div');
+            dzBox.className = 'dz-img-box style-7 menu-dz-box';
+            
+            dzBox.addEventListener('click', () => {
+                openMenuModal(menu.id, menu.nom, imageUrl, menu.description_longue, menu.prix_unitaire_ttc);
+            });
+            
+            dzBox.innerHTML = `
+                <div class="dz-media">
+                    <img src="${imageUrl}" alt="${escapedNom}" class="img-fluid" style="width: 200px; height: 200px; object-fit: cover;">
+                    <div class="dz-meta">
+                        <ul><li class="rating"><i class="fa-solid fa-star"></i> 4.5</li></ul>
+                    </div>
+                </div>
+                <div class="dz-content">
+                    <h5 class="title">${escapedNom}</h5>
+                    <p>${escapedDescriptionCourte}</p>
+                    <span class="price">${menu.prix_unitaire_ttc} €</span>
+                </div>
+            `;
+            
+            card.appendChild(dzBox);
+            col.appendChild(card);
+            ligne.appendChild(col);
+        });
+        
+        section.appendChild(ligne);
+        container.appendChild(section);
+        
+        // Ajouter un séparateur (sauf pour le dernier type)
+        if (index < typesNonVides.length - 1) {
+            const separator = document.createElement('hr');
+            separator.className = 'menu-separator my-4';
+            container.appendChild(separator);
+        }
+    });
+}
 
 
 
@@ -4150,54 +4296,60 @@ function openMenuModal(menuId, nom, imageUrl, description, prix) {
         
         viandesDetails.addEventListener("change", gererLimiteSelection.bind(null, 'viandes_couscous', maxViandes));
         
-        // === ACCOMPAGNEMENTS COUSCOUS ===
-        if (accompagnements && accompagnements.length > 0) {
-            const accSection = document.createElement("div");
-            accSection.className = "form-group mt-4";
-            
-            const accDetails = document.createElement("details");
-            accDetails.open = true;
-            accDetails.innerHTML = `
-                <summary class="section-title">
-                    <strong>🍟 Accompagnements couscous</strong>
-                    <span class="badge bg-success">Inclus</span>
-                </summary>
-            `;
-            
-            const accContainer = document.createElement("div");
-            accContainer.className = "options-grid";
-            
-            accompagnements.forEach(acc => {
-                const accDiv = document.createElement("div");
-                accDiv.className = "option-item";
-                
-                // 🆕 AFFICHAGE DES PRIX POUR LES ACCOMPAGNEMENTS
-                const prixSupplement = parseFloat(acc.prix_supplement) || 0;
-                const affichagePrix = prixSupplement > 0 ? 
-                    `<span class="prix-supplement text-success">+${prixSupplement.toFixed(2)}€</span>` : 
-                    '<span class="prix-inclus text-muted">Inclus</span>';
-                
-                accDiv.innerHTML = `
-                    <div class="form-check">
-                        <input type="checkbox" 
-                               class="form-check-input" 
-                               name="accompagnements_couscous" 
-                               value="${acc.id}" 
-                               id="acc-${acc.id}"
-                               checked>
-                        <label class="form-check-label" for="acc-${acc.id}">
-                            <span class="option-nom">${acc.nom}</span>
-                            ${affichagePrix}
-                        </label>
-                    </div>
-                `;
-                accContainer.appendChild(accDiv);
-            });
-            
-            accDetails.appendChild(accContainer);
-            accSection.appendChild(accDetails);
-            section.appendChild(accSection);
-        }
+// === ACCOMPAGNEMENTS COUSCOUS ===
+if (accompagnements && accompagnements.length > 0) {
+    const accSection = document.createElement("div");
+    accSection.className = "form-group mt-4";
+    
+    const accDetails = document.createElement("details");
+    accDetails.open = true;
+    accDetails.innerHTML = `
+        <summary class="section-title">
+            <strong>🍟 Accompagnements couscous</strong>
+            <span class="badge bg-success">Inclus</span>
+        </summary>
+    `;
+    
+    const accContainer = document.createElement("div");
+    accContainer.className = "options-grid";
+    
+    accompagnements.forEach(acc => {
+        const accDiv = document.createElement("div");
+        accDiv.className = "option-item";
+        
+        const prixSupplement = parseFloat(acc.prix_supplement) || 0;
+        const affichagePrix = prixSupplement > 0 ? 
+            `<span class="prix-supplement text-success">+${prixSupplement.toFixed(2)}€</span>` : 
+            '<span class="prix-inclus text-muted">Inclus</span>';
+        
+        accDiv.innerHTML = `
+            <div class="form-check">
+                <input type="checkbox"
+                       class="form-check-input"
+                       name="accompagnements_couscous"
+                       value="${acc.id}"
+                       id="acc-${acc.id}">
+                <label class="form-check-label" for="acc-${acc.id}">
+                    <span class="option-nom">${acc.nom}</span>
+                    ${affichagePrix}
+                </label>
+            </div>
+        `;
+        accContainer.appendChild(accDiv);
+    });
+    
+    accDetails.appendChild(accContainer);
+    accSection.appendChild(accDetails);
+    section.appendChild(accSection);
+
+    // 🔥 Désactiver toute coche automatique
+    setTimeout(() => {
+        section.querySelectorAll('input[name="accompagnements_couscous"]').forEach(cb => {
+            cb.checked = false;
+        });
+    }, 20);
+}
+
         
         return section;
     }
@@ -4608,6 +4760,7 @@ window.loadBurgers = function() {
         const img = document.getElementById("welcome-img");
         const title = document.getElementById("welcome-title");
         const text = document.getElementById("welcome-text");
+        
     
         setTimeout(() => {
             // Image
