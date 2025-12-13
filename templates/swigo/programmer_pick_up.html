@@ -136,6 +136,7 @@
                 <form id="pickupTimeForm" method="post" style="width: 100%;">
                     {% csrf_token %}
                     <input type="hidden" name="commande_id" value="{{ request.GET.commande_id|default:request.session.commande_id }}">
+                    
                     <div class="form-group text-left mb-3">
                         <label for="heure_retrait">Choisir une heure :</label>
                         <select id="heure_retrait" name="heure_retrait" class="form-select" required>
@@ -169,8 +170,7 @@
     {{ horaires_disponibles|safe }}
 </script>
 <script>
-    const service = "{{ service_actuel|default:'MIDI' }}";
-    const heureEstimeeServ = "{{ heure_estimee|default:'22:15' }}";
+    const heureEstimeeServ = "{{ heure_estimee|default:'13:30' }}";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/luxon@3.2.0/build/global/luxon.min.js"></script>
 <script>
@@ -187,11 +187,13 @@
         // Récupération des horaires disponibles
         const disponibles = horairesDisponibles['disponibles'] || {};
         const horaires = disponibles[todayKey] || { 'MIDI': [], 'SOIR': [] };
-        const heures = horaires[service] || [];
+        
+        const heuresMidi = horaires['MIDI'] || [];
+        const heuresSoir = horaires['SOIR'] || [];
 
         console.log('=== DEBUG CRÉNEAUX ===');
-        console.log('Service:', service);
-        console.log('Heures disponibles:', heures);
+        console.log('Horaires MIDI:', heuresMidi);
+        console.log('Horaires SOIR:', heuresSoir);
         console.log('Now:', now.toString());
         console.log('Heure estimée serveur:', heureEstimeeServ);
 
@@ -202,32 +204,108 @@
         const [estH, estM] = heureEstimeeServ.split(':').map(Number);
         const heureReference = now.set({ hour: estH, minute: estM, second: 0, millisecond: 0 });
 
-        heures.forEach(h => {
+        // Créer les options avec séparation entre MIDI et SOIR
+        const heuresMidiFiltrees = [];
+        const heuresSoirFiltrees = [];
+
+        // Filtrer les créneaux MIDI
+        heuresMidi.forEach(h => {
             const [hH, hM] = h.split(':').map(Number);
             const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
             
-            console.log(`Créneau ${h}:`, slotDT.toString(), '>=', heureReference.toString(), '?', slotDT >= heureReference);
-            
-            // Condition plus permissive : accepter les créneaux à partir de l'heure estimée du serveur
             if (slotDT >= heureReference) {
-                if (!firstValidHeure) firstValidHeure = h;
-                optionsHtml += `<option value="${h}">${h}</option>`;
+                heuresMidiFiltrees.push({ heure: h, dt: slotDT });
             }
         });
 
-        // Si aucun créneau trouvé avec la référence serveur, essayer sans filtre strict
-        if (!optionsHtml && heures.length > 0) {
-            console.log('Aucun créneau avec filtre strict, essai sans filtre...');
-            heures.forEach(h => {
+        // Pour SOIR, tout afficher (c'est pour plus tard)
+        heuresSoir.forEach(h => {
+            const [hH, hM] = h.split(':').map(Number);
+            const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
+            heuresSoirFiltrees.push({ heure: h, dt: slotDT });
+        });
+
+        // Trier chaque liste
+        heuresMidiFiltrees.sort((a, b) => a.dt - b.dt);
+        heuresSoirFiltrees.sort((a, b) => a.dt - b.dt);
+
+        // Construire le HTML avec séparation
+        if (heuresMidiFiltrees.length > 0) {
+            // Titre MIDI (option désactivée pour séparation visuelle)
+            optionsHtml += `<option disabled style="font-weight: bold; background-color: #f8f9fa;">─── MIDI ───</option>`;
+            
+            // Options MIDI
+            heuresMidiFiltrees.forEach(({ heure }) => {
+                if (!firstValidHeure) firstValidHeure = heure;
+                optionsHtml += `<option value="${heure}">${heure}</option>`;
+            });
+            
+            // Espace entre MIDI et SOIR
+            if (heuresSoirFiltrees.length > 0) {
+                optionsHtml += `<option disabled>&nbsp;</option>`;
+            }
+        }
+
+        if (heuresSoirFiltrees.length > 0) {
+            // Titre SOIR (option désactivée pour séparation visuelle)
+            optionsHtml += `<option disabled style="font-weight: bold; background-color: #f8f9fa;">─── SOIR ───</option>`;
+            
+            // Options SOIR
+            heuresSoirFiltrees.forEach(({ heure }) => {
+                if (!firstValidHeure && heuresMidiFiltrees.length === 0) firstValidHeure = heure;
+                optionsHtml += `<option value="${heure}">${heure}</option>`;
+            });
+        }
+
+        // Fallback si aucun créneau trouvé avec filtre strict pour MIDI
+        if (!optionsHtml && (heuresMidi.length > 0 || heuresSoir.length > 0)) {
+            console.log('Aucun créneau avec filtre strict, essai avec marge...');
+            optionsHtml = '';
+            firstValidHeure = null;
+            
+            // Réessayer avec une marge de 15 minutes
+            const heuresMidiFallback = [];
+            const heuresSoirFallback = [];
+            
+            heuresMidi.forEach(h => {
                 const [hH, hM] = h.split(':').map(Number);
                 const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
                 
-                // Accepter les créneaux qui ne sont pas trop dans le passé
                 if (slotDT >= now.minus({ minutes: 15 })) {
-                    if (!firstValidHeure) firstValidHeure = h;
-                    optionsHtml += `<option value="${h}">${h}</option>`;
+                    heuresMidiFallback.push({ heure: h, dt: slotDT });
                 }
             });
+            
+            heuresSoir.forEach(h => {
+                const [hH, hM] = h.split(':').map(Number);
+                const slotDT = now.set({ hour: hH, minute: hM, second: 0, millisecond: 0 });
+                heuresSoirFallback.push({ heure: h, dt: slotDT });
+            });
+            
+            // Trier
+            heuresMidiFallback.sort((a, b) => a.dt - b.dt);
+            heuresSoirFallback.sort((a, b) => a.dt - b.dt);
+            
+            // Construire le HTML
+            if (heuresMidiFallback.length > 0) {
+                optionsHtml += `<option disabled style="font-weight: bold; background-color: #f8f9fa;">─── MIDI ───</option>`;
+                heuresMidiFallback.forEach(({ heure }) => {
+                    if (!firstValidHeure) firstValidHeure = heure;
+                    optionsHtml += `<option value="${heure}">${heure}</option>`;
+                });
+                
+                if (heuresSoirFallback.length > 0) {
+                    optionsHtml += `<option disabled>&nbsp;</option>`;
+                }
+            }
+            
+            if (heuresSoirFallback.length > 0) {
+                optionsHtml += `<option disabled style="font-weight: bold; background-color: #f8f9fa;">─── SOIR ───</option>`;
+                heuresSoirFallback.forEach(({ heure }) => {
+                    if (!firstValidHeure && heuresMidiFallback.length === 0) firstValidHeure = heure;
+                    optionsHtml += `<option value="${heure}">${heure}</option>`;
+                });
+            }
         }
 
         if (optionsHtml) {
