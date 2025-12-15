@@ -158,6 +158,11 @@ STRIPE_WEBHOOK_SECRET = 'whsec_38cdd1b4bfef99b43cd11859a11deb415b2e1d6c2a31fb91a
 # Google Maps
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 
+# Paramètres d'authentification
+LOGIN_URL = '/login/'  # URL de redirection si non connecté
+LOGIN_REDIRECT_URL = '/'  # Où rediriger après connexion réussie
+LOGOUT_REDIRECT_URL = '/'  # Où rediriger après déconnexion
+
 # Logs
 LOGGING = {
     'version': 1,
