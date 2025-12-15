@@ -993,6 +993,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 
+
+
 @csrf_exempt
 def programmer_pick_up(request):
     # Import des modèles et utilitaires
@@ -1012,7 +1014,16 @@ def programmer_pick_up(request):
         form = PickUpTimeForm(request.POST)
         if form.is_valid():
             heure_retrait = form.cleaned_data.get('heure_retrait')
+            service_selectionne = request.POST.get('service', 'MIDI')  # Récupérer le service choisi
             date_pick_up = today
+
+            # Vérifier que le service sélectionné est ouvert aujourd'hui
+            jour_str = today.strftime('%a').upper()
+            jour_traduit = jours_translation.get(jour_str, jour_str)
+            services_ouverts = list(HoraireDisponible.objects.filter(jour=jour_traduit).values_list('service', flat=True).distinct())
+            
+            if service_selectionne not in services_ouverts:
+                return JsonResponse({'error': f"Le service {service_selectionne} n'est pas ouvert aujourd'hui"}, status=400)
 
             if JourFermeture.est_ferme(date_pick_up):
                 motif_obj = JourFermeture.objects.filter(date_debut__lte=date_pick_up, date_fin__gte=date_pick_up).first()
@@ -1034,6 +1045,7 @@ def programmer_pick_up(request):
             if creneau_est_disponible(date_pick_up, heure_retrait, mode='emporter'):
                 commande.is_commande_a_emporter = True
                 commande.heure_pick_up_specifie = heure_retrait_aware
+                commande.service_pick_up = service_selectionne  # Stocker le service choisi
                 commande.save()
                 return redirect('swigo:renseigner_commande')
             else:
@@ -1058,7 +1070,7 @@ def programmer_pick_up(request):
     # Heure arrondie au quart d'heure pour filtrage des horaires
     heure_estim = arrondir_au_quart_heure(now)
 
-    # Récupérer l'heure estimée de retrait - CORRECTION IMPORTANTE
+    # Récupérer l'heure estimée de retrait
     try:
         heure_estimee_retrait = estimer_heure_retrait()
         heure_estimee_str = heure_estimee_retrait.strftime('%H:%M')
@@ -1077,23 +1089,29 @@ def programmer_pick_up(request):
         heure_estimee_str = heure_estimee.strftime('%H:%M')
         print(f"[PROGRAMMER PICKUP] Fallback heure estimée: {heure_estimee_str}")
 
-    # Déterminer le service actuel (MIDI ou SOIR) selon l'heure
+    # Déterminer le service actuel pour la sélection par défaut
     service_actuel = 'MIDI' if now.hour < 14 else 'SOIR'
 
-    # Traduction du jour actuel au format modèle (LUN, MAR, ...)
+    # Traduction du jour actuel au format modèle
     jour_str = today.strftime('%a').upper()
     jour_traduit = jours_translation.get(jour_str, jour_str)
 
     # Récupérer les services ouverts aujourd'hui
     services_ouverts = list(HoraireDisponible.objects.filter(jour=jour_traduit).values_list('service', flat=True).distinct())
 
-    # Si le service actuel n'est pas ouvert, basculer vers SOIR si possible, sinon fermer
-    ferme = False
+    # Si le service actuel n'est pas ouvert, ajuster la sélection par défaut
     if service_actuel not in services_ouverts:
         if 'SOIR' in services_ouverts:
             service_actuel = 'SOIR'
+        elif 'MIDI' in services_ouverts:
+            service_actuel = 'MIDI'
         else:
-            ferme = True
+            service_actuel = None
+
+    # Vérifier si le restaurant est fermé aujourd'hui
+    ferme = False
+    if not services_ouverts or (len(services_ouverts) == 1 and service_actuel not in services_ouverts):
+        ferme = True
 
     horaires_disponibles = {}
     horaires_complets = {}
@@ -1130,37 +1148,45 @@ def programmer_pick_up(request):
             })
             continue
 
-        # Pour la date du jour, n'affiche que les horaires du service actif
+        # Pour chaque service du jour
         for horaire in horaires_jour:
             service = horaire.service
-            if date == today and service != service_actuel:
-                continue
-                
+            
+            # Pour aujourd'hui, vérifier si le service est encore disponible
+            if date == today:
+                if service == 'MIDI' and now.time() >= time(14, 30):
+                    continue  # Service MIDI terminé
+                if service == 'SOIR' and now.time() >= time(23, 0):
+                    continue  # Service SOIR terminé
+            
+            # Récupérer tous les horaires du service
             for hstr in horaire.get_horaires():
                 try:
                     h = datetime.strptime(hstr, "%H:%M").time()
-                    # Pour aujourd'hui, filtrer les horaires passés
-                    if date == today and h < heure_estim.time():
-                        continue
-
+                    
+                    # Pour aujourd'hui, filtrer les horaires déjà passés
+                    if date == today:
+                        # Pour MIDI, vérifier si l'horaire n'est pas trop tôt par rapport à l'heure estimée
+                        if service == 'MIDI':
+                            heure_estimee = datetime.strptime(heure_estimee_str, "%H:%M").time()
+                            if h < heure_estimee:
+                                continue
+                        # Pour SOIR, vérifier si l'horaire n'est pas passé
+                        elif h < heure_estim.time():
+                            continue
+                    
                     horaires_par_service_complet[service].append(hstr)
                     if creneau_est_disponible(date, h, mode='emporter'):
                         horaires_par_service_dispo[service].append(hstr)
                 except Exception as e:
                     print(f"Erreur parsing horaire {hstr}: {e}")
                     continue
-
-        # CORRECTION CRITIQUE : S'assurer que le créneau 22:30 est inclus
-        if date == today and service_actuel == 'SOIR':
-            # Vérifier manuellement la disponibilité du créneau 22:30
-            creneau_22_30 = time(22, 30)
-            if creneau_est_disponible(date, creneau_22_30, mode='emporter'):
-                if "22:30" not in horaires_par_service_dispo[service_actuel]:
-                    horaires_par_service_dispo[service_actuel].append("22:30")
-                if "22:30" not in horaires_par_service_complet[service_actuel]:
-                    horaires_par_service_complet[service_actuel].append("22:30")
-                print(f"[CORRECTION] Créneau 22:30 ajouté manuellement pour aujourd'hui")
-
+        
+        # Trier les horaires pour chaque service
+        for service in ['MIDI', 'SOIR']:
+            horaires_par_service_complet[service].sort()
+            horaires_par_service_dispo[service].sort()
+        
         jours_affiches.append({
             'date': date,
             'jour': jour_traduit,
@@ -1172,9 +1198,10 @@ def programmer_pick_up(request):
         horaires_disponibles[date.strftime('%Y-%m-%d')] = horaires_par_service_dispo
         horaires_complets[date.strftime('%Y-%m-%d')] = horaires_par_service_complet
 
-    # DEBUG : Afficher les horaires disponibles
+    # DEBUG : Afficher les informations
     print(f"[DEBUG] Horaires disponibles aujourd'hui: {horaires_disponibles.get(today.strftime('%Y-%m-%d'), {})}")
-    print(f"[DEBUG] Service actuel: {service_actuel}")
+    print(f"[DEBUG] Service actuel (sélection par défaut): {service_actuel}")
+    print(f"[DEBUG] Services ouverts aujourd'hui: {services_ouverts}")
     print(f"[DEBUG] Heure estimée: {heure_estimee_str}")
 
     return render(request, 'swigo/programmer_pick_up.html', {
@@ -1187,9 +1214,9 @@ def programmer_pick_up(request):
         }),
         'heure_estimee': heure_estimee_str,
         'service_actuel': service_actuel,
+        'services_ouverts': services_ouverts,  # Passer la liste des services ouverts
         'ferme': ferme
     })
-
 
 
 @csrf_exempt
