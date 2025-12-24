@@ -552,34 +552,47 @@ function envoyerHeuresPassage(data) {
 function envoyerSMS() {
     console.log("📱 Début envoi SMS...");
     console.log("Commande ID:", currentCommandeId);
-    console.log("Téléphone:", currentTelephone);
+    console.log("Téléphone brut:", currentTelephone);
     
-    // Vérifier si on a un numéro
-    if (!currentTelephone || currentTelephone === "None" || currentTelephone === "") {
+    // === VÉRIFICATION ROBUSTE DU NUMÉRO ===
+    if (!currentTelephone) {
         alert("❌ Numéro de téléphone non disponible pour cette commande.");
         return;
     }
     
-    // Récupérer l'heure de passage estimée depuis le texte affiché
-    let heurePassageEstimee = "";
-    const commandeItem = document.getElementById(`commande-${currentCommandeId}`);
-    if (commandeItem) {
-        const trajetDureeSpan = commandeItem.querySelector('.trajet-duree');
-        if (trajetDureeSpan) {
-            // Extraire juste l'heure (format HH:MM) du texte
-            const texte = trajetDureeSpan.textContent;
-            console.log("Texte trajet durée:", texte);
-            
-            // Recherche du format "HH:MM" dans le texte
-            const heureMatch = texte.match(/(\d{1,2}:\d{2})/);
-            if (heureMatch) {
-                heurePassageEstimee = heureMatch[1];
-                console.log("Heure extraite:", heurePassageEstimee);
-            }
-        }
+    const numeroString = currentTelephone.toString().trim();
+    
+    if (numeroString === "None" || numeroString === "null" || numeroString === "" || 
+        numeroString === "undefined" || numeroString.length < 8) {
+        alert(`❌ Numéro de téléphone invalide: "${numeroString}"`);
+        return;
     }
     
-    // Message par défaut avec l'heure de passage
+    console.log("📱 Numéro après nettoyage initial:", numeroString);
+    
+    // === EXTRACTION DE L'HEURE DE PASSAGE ===
+    let heurePassageEstimee = "";
+    try {
+        const commandeItem = document.getElementById(`commande-${currentCommandeId}`);
+        if (commandeItem) {
+            const trajetDureeSpan = commandeItem.querySelector('.trajet-duree');
+            if (trajetDureeSpan) {
+                const texte = trajetDureeSpan.textContent;
+                console.log("Texte trajet durée:", texte);
+                
+                // Recherche du format HH:MM ou HH:MM:SS
+                const heureMatch = texte.match(/(\d{1,2}:\d{2})(?::\d{2})?/);
+                if (heureMatch) {
+                    heurePassageEstimee = heureMatch[1]; // Prend seulement HH:MM
+                    console.log("Heure extraite:", heurePassageEstimee);
+                }
+            }
+        }
+    } catch (error) {
+        console.warn("⚠️ Impossible d'extraire l'heure:", error);
+    }
+    
+    // === MESSAGE PAR DÉFAUT ===
     let messageParDefaut;
     if (heurePassageEstimee) {
         messageParDefaut = `Bonjour, c'est votre livreur. Votre commande #${currentCommandeId} sera livrée vers ${heurePassageEstimee}.`;
@@ -587,116 +600,83 @@ function envoyerSMS() {
         messageParDefaut = `Bonjour, c'est votre livreur. Votre commande #${currentCommandeId} est en route.`;
     }
     
-    // Demander le message (avec l'heure pré-remplie)
+    // === DEMANDE DU MESSAGE ===
     const messagePersonnalise = prompt("✏️ Entrez votre message SMS :", messageParDefaut);
     
-    // Si annulé
     if (messagePersonnalise === null) {
         console.log("Annulé par l'utilisateur");
         return;
     }
     
-    // Message final
-    const messageFinal = messagePersonnalise.trim() || messageParDefaut;
+    const messageFinal = (messagePersonnalise.trim() || messageParDefaut).substring(0, 160);
     
-    // Nettoyer le numéro
-    let numeroPropre = currentTelephone.toString().replace(/[^\d+]/g, '');
+    // === NETTOYAGE ET FORMATAGE DU NUMÉRO ===
+    let numeroPropre = numeroString.replace(/[^\d+]/g, '');
+    console.log("📱 Numéro après suppression caractères spéciaux:", numeroPropre);
     
-    // Convertir 06... en +33...
-    if (numeroPropre.startsWith('0')) {
+    // Conversion pour numéros français
+    if (numeroPropre.match(/^0[1-9]/)) {
+        // Numéro français (06, 07, etc.)
         numeroPropre = '+33' + numeroPropre.substring(1);
+        console.log("📱 Numéro converti en format international:", numeroPropre);
+    } else if (numeroPropre.match(/^[1-9]/) && !numeroPropre.startsWith('+')) {
+        // Numéro sans indicatif, on ajoute +33
+        numeroPropre = '+33' + numeroPropre;
+        console.log("📱 Numéro avec indicatif ajouté:", numeroPropre);
     }
     
-    console.log("✅ Numéro nettoyé:", numeroPropre);
-    console.log("✅ Message:", messageFinal);
+    // Vérification finale du numéro
+    if (!numeroPropre.match(/^\+\d{10,15}$/)) {
+        alert(`❌ Format de numéro invalide: "${numeroPropre}"\n\nVeuillez utiliser un format international comme +33612345678`);
+        return;
+    }
     
-    // ========== PARTIE OPTIMISÉE POUR GOOGLE MESSAGES/MOBILE ==========
+    console.log("✅ Numéro final:", numeroPropre);
+    console.log("✅ Message final:", messageFinal);
     
-    // Encoder pour URL
+    // === CRÉATION DU LIEN SMS ===
     const messageEncode = encodeURIComponent(messageFinal);
-    
-    // Détection Google Messages/navigateur mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isChrome = /Chrome/i.test(navigator.userAgent);
-    
-    let reussi = false;
     const smsUrl = `sms:${numeroPropre}?body=${messageEncode}`;
     
-    if (isMobile) {
-        console.log("📱 Appareil mobile détecté - Méthodes optimisées");
-        
-        // Méthode 1: Redirection directe (fonctionne sur la plupart des mobiles)
-        try {
+    console.log("📱 URL SMS générée:", smsUrl);
+    
+    // === TENTATIVE D'OUVERTURE ===
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let tentativeReussie = false;
+    
+    // Méthode principale
+    try {
+        if (isMobile) {
+            // Pour mobile : redirection directe
             window.location.href = smsUrl;
-            reussi = true;
-            console.log("✅ Méthode window.location.href");
-        } catch (e) {
-            console.log("❌ Méthode 1 échouée:", e);
+            tentativeReussie = true;
+            console.log("✅ Redirection SMS lancée");
+        } else {
+            // Pour desktop : nouvel onglet
+            window.open(smsUrl, '_blank', 'noopener,noreferrer');
+            tentativeReussie = true;
+            console.log("✅ Ouverture SMS dans nouvel onglet");
         }
-        
-        // Méthode 2: Créer et cliquer sur un lien (0.5s après)
-        if (!reussi) {
-            setTimeout(() => {
-                try {
-                    const link = document.createElement('a');
-                    link.href = smsUrl;
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    reussi = true;
-                    console.log("✅ Méthode lien créé/cliqué");
-                } catch (e) {
-                    console.log("❌ Méthode 2 échouée:", e);
-                }
-            }, 500);
-        }
-        
-        // Méthode 3: window.open avec timeout (1s après)
-        if (!reussi) {
-            setTimeout(() => {
-                try {
-                    const newWindow = window.open(smsUrl, '_blank');
-                    if (newWindow && !newWindow.closed) {
-                        reussi = true;
-                        console.log("✅ Méthode window.open");
-                    }
-                } catch (e) {
-                    console.log("❌ Méthode 3 échouée:", e);
-                }
-            }, 1000);
-        }
-        
-    } else {
-        // Pour desktop
-        console.log("💻 Desktop détecté");
-        try {
-            window.open(smsUrl, '_blank');
-            reussi = true;
-            console.log("✅ Desktop: window.open");
-        } catch (e) {
-            console.log("❌ Desktop échoué:", e);
-        }
+    } catch (error) {
+        console.error("❌ Erreur avec la méthode principale:", error);
+        tentativeReussie = false;
     }
     
-    // ========== FALLBACK AMÉLIORÉ POUR GOOGLE MESSAGES ==========
+    // === FALLBACK SI ÉCHEC ===
     setTimeout(() => {
-        if (!reussi) {
-            console.log("❌ Fallback nécessaire");
+        if (!tentativeReussie) {
+            console.log("⚠️ Fallback nécessaire");
             
-            // Format SMSTO (compatible Google Messages)
+            // Format compatible Google Messages
             const texteSMSTO = `SMSTO:${numeroPropre}:${messageFinal}`;
-            // Format standard
             const texteStandard = `${numeroPropre}\n\n${messageFinal}`;
             
-            // Essayer le clipboard moderne
+            // Essayer de copier dans le presse-papier
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                // Demander à l'utilisateur quel format préférer
                 const choix = confirm(
-                    `📱 Pour Google Messages :\n\n` +
-                    `Choisissez le format de copie :\n\n` +
-                    `✅ "OK" : Format SMSTO (recommandé)\n` +
-                    `❌ "Annuler" : Format standard`
+                    `📱 Pour envoyer le SMS :\n\n` +
+                    `✅ "OK" : Copier le format SMSTO (pour Google Messages)\n` +
+                    `❌ "Annuler" : Copier le format standard`
                 );
                 
                 const texteACopier = choix ? texteSMSTO : texteStandard;
@@ -704,125 +684,140 @@ function envoyerSMS() {
                 navigator.clipboard.writeText(texteACopier)
                     .then(() => {
                         const ouvrirApp = confirm(
-                            `✅ ${choix ? 'Format SMSTO' : 'Texte'} copié !\n\n` +
-                            `1. Ouvrez Google Messages\n` +
+                            `✅ Texte copié dans le presse-papier !\n\n` +
+                            `1. Ouvrez votre application SMS\n` +
                             `2. Créez un nouveau message\n` +
                             `3. Collez le texte copié\n\n` +
-                            `Ouvrir Google Messages maintenant ?`
+                            `Voulez-vous ouvrir l'application SMS maintenant ?`
                         );
                         
                         if (ouvrirApp) {
-                            // Essayer d'ouvrir Google Messages
                             if (isMobile) {
-                                window.open('https://messages.google.com/', '_blank');
-                            } else {
                                 window.open('sms:', '_blank');
+                            } else {
+                                window.open('https://messages.google.com/', '_blank');
                             }
                         }
                     })
                     .catch(() => {
-                        // Fallback simple
-                        alert(`📱 Copiez manuellement :\n\n${texteStandard}`);
+                        // Fallback manuel
+                        alert(
+                            `📱 Pour envoyer le SMS manuellement :\n\n` +
+                            `1. Ouvrez votre application SMS\n` +
+                            `2. Envoyez à : ${numeroPropre}\n` +
+                            `3. Message : ${messageFinal}`
+                        );
                     });
             } else {
-                // Vieilles versions - prompt
+                // Anciens navigateurs
                 const choix = confirm(
-                    `📱 Pour Google Messages :\n\n` +
-                    `Choisissez le format :\n\n` +
-                    `✅ "OK" : Format SMSTO\n` +
-                    `❌ "Annuler" : Format standard`
+                    `📱 Pour envoyer le SMS :\n\n` +
+                    `✅ "OK" : Afficher le format SMSTO\n` +
+                    `❌ "Annuler" : Afficher le format standard`
                 );
                 
                 if (choix) {
-                    prompt("📱 Copiez ce format SMSTO dans Google Messages :", texteSMSTO);
+                    prompt("📱 Copiez cette ligne dans Google Messages :", texteSMSTO);
                 } else {
-                    prompt("📱 Copiez ce texte dans Google Messages :", texteStandard);
+                    prompt("📱 Copiez ce texte dans votre application SMS :", texteStandard);
                 }
             }
-        } else {
-            // Succès
-            setTimeout(() => {
-                alert("📱 L'application SMS devrait s'ouvrir...\n\nSi rien ne se passe dans 3 secondes, utilisez la méthode de copie.");
-            }, 1500);
         }
-    }, 2000); // Donner 2 secondes aux méthodes automatiques
+    }, 1000);
 }
 
-    let currentCommandeId;
+let currentCommandeId;
+let currentTelephone;
 
-    function ouvrirModalCommande(id, latitude, longitude, numeroTelephone, hasMessage, messagePourLivreur, paiementARecevoir) {
+function ouvrirModalCommande(id, latitude, longitude, numeroTelephone, hasMessage, messagePourLivreur, paiementARecevoir) {
     currentCommandeId = id;
     currentTelephone = numeroTelephone;
     
-    console.log("PAIEMENT À RECEVOIR =", paiementARecevoir);
-
-    // Mettre à jour le titre de la modal avec le numéro de commande
-    const modalLabel = document.getElementById('commandeModalLabel');
-    modalLabel.textContent = `Commande #${id}`;
+    console.log("=== OUVERTURE MODALE COMMANDE ===");
+    console.log("ID:", id);
+    console.log("Téléphone:", numeroTelephone);
+    console.log("Type téléphone:", typeof numeroTelephone);
+    console.log("Paiement à recevoir:", paiementARecevoir);
     
-    // Configurer le bouton GPS pour ouvrir l'application avec les coordonnées fournies
+    // Validation du numéro pour debug
+    if (!numeroTelephone || numeroTelephone === "None") {
+        console.error("⚠️ ATTENTION : Numéro téléphone invalide dans modal !");
+    }
+    
+    // Titre de la modal
+    const modalLabel = document.getElementById('commandeModalLabel');
+    if (modalLabel) {
+        modalLabel.textContent = `Commande #${id}`;
+    }
+    
+    // Bouton GPS
     const gpsButton = document.getElementById('gpsButton');
-    gpsButton.onclick = () => ouvrirGPS(latitude, longitude);
-
-    // Configurer le bouton Appeler
-    const callButton = document.querySelector('#commandeModal .action-icons button[onclick^="appelerTelephone"]');
-    callButton.onclick = () => appelerTelephone(numeroTelephone);
-
-    // Pas besoin de modifier les boutons d'action
-
-    // Gérer le bouton 'Vous avez un message' dans le modal-footer
+    if (gpsButton) {
+        gpsButton.onclick = () => ouvrirGPS(latitude, longitude);
+    }
+    
+    // Bouton Appeler
+    const callButtons = document.querySelectorAll('#commandeModal .action-icons button');
+    callButtons.forEach(button => {
+        if (button.textContent.includes('CALL') || button.textContent.includes('Appeler')) {
+            button.onclick = () => appelerTelephone(numeroTelephone);
+        }
+    });
+    
+    // Gestion du message pour le livreur
     const modalFooter = document.querySelector('#commandeModal .modal-footer');
-
-    // Supprimer le bouton 'Vous avez un message' s'il existe déjà pour éviter les duplications
-    const existingMessageButton = document.getElementById('messageLivreurButton');
-    if (existingMessageButton) {
-        existingMessageButton.remove();
+    if (modalFooter) {
+        // Supprimer ancien bouton message
+        const existingMessageButton = document.getElementById('messageLivreurButton');
+        if (existingMessageButton) {
+            existingMessageButton.remove();
+        }
+        
+        // Ajouter bouton si message existe
+        if (hasMessage === 'True' || hasMessage === true || hasMessage === 'true') {
+            const messageButton = document.createElement('button');
+            messageButton.type = 'button';
+            messageButton.className = 'btn btn-warning';
+            messageButton.id = 'messageLivreurButton';
+            messageButton.textContent = 'Vous avez un message';
+            messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur);
+            
+            const fermerButton = modalFooter.querySelector('button.btn-danger');
+            if (fermerButton) {
+                modalFooter.insertBefore(messageButton, fermerButton);
+            }
+        }
+        
+        // Gestion paiement à recevoir
+        const existingPaiementButton = document.getElementById('paiementButton');
+        if (existingPaiementButton) {
+            existingPaiementButton.remove();
+        }
+        
+        if (paiementARecevoir === 'true' || paiementARecevoir === true) {
+            const paiementButton = document.createElement('button');
+            paiementButton.type = 'button';
+            paiementButton.className = 'btn btn-outline-danger';
+            paiementButton.id = 'paiementButton';
+            paiementButton.textContent = 'Paiement à recevoir';
+            paiementButton.onclick = () => {
+                alert('Le livreur doit récupérer un paiement pour cette commande.');
+            };
+            
+            const fermerButton = modalFooter.querySelector('button.btn-danger');
+            if (fermerButton) {
+                modalFooter.insertBefore(paiementButton, fermerButton);
+                console.log("✅ Bouton 'Paiement à recevoir' ajouté");
+            }
+        }
     }
-
-    // Ajouter le bouton si hasMessage est vrai
-    if (hasMessage === 'True' || hasMessage === true) {
-        const messageButton = document.createElement('button');
-        messageButton.type = 'button';
-        messageButton.className = 'btn btn-warning';
-        messageButton.id = 'messageLivreurButton';
-        messageButton.textContent = 'Vous avez un message';
-        messageButton.onclick = () => afficherMessageLivreur(messagePourLivreur);
-
-        // Trouver le bouton 'Commande Livrée' et 'Fermer'
-        const commandeLivreeButton = modalFooter.querySelector('button.btn-success');
-        const fermerButton = modalFooter.querySelector('button.btn-danger');
-
-        // Insérer le bouton entre 'Commande Livrée' et 'Fermer'
-        modalFooter.insertBefore(messageButton, fermerButton);
+    
+    // Afficher la modal
+    const commandeModalElement = document.getElementById('commandeModal');
+    if (commandeModalElement) {
+        const commandeModal = new bootstrap.Modal(commandeModalElement);
+        commandeModal.show();
     }
-
-    // Afficher la modal de commande
-    const commandeModal = new bootstrap.Modal(document.getElementById('commandeModal'));
-    commandeModal.show();
-
-        // Supprimer le bouton 'Paiement à recevoir' s'il existe déjà
-    const existingPaiementButton = document.getElementById('paiementButton');
-    if (existingPaiementButton) {
-        existingPaiementButton.remove();
-    }
-
-    if (paiementARecevoir === 'true') {
-        const paiementButton = document.createElement('button');
-        paiementButton.type = 'button';
-        paiementButton.className = 'btn btn-outline-danger';
-        paiementButton.id = 'paiementButton';
-        paiementButton.textContent = 'Paiement à recevoir';
-        paiementButton.onclick = () => {
-            alert('Le livreur doit récupérer un paiement pour cette commande.');
-        };
-
-        const modalFooter = document.querySelector('#commandeModal .modal-footer');
-        const fermerButton = modalFooter.querySelector('button.btn-danger');
-        modalFooter.insertBefore(paiementButton, fermerButton);
-        console.log("✅ Bouton 'Paiement à recevoir' inséré !");
-
-    }
-
 }
 
 // Fonction pour afficher une modal de confirmation avant de marquer la commande comme livrée
