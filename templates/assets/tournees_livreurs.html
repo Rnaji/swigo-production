@@ -610,135 +610,142 @@ function envoyerSMS() {
     console.log("✅ Numéro nettoyé:", numeroPropre);
     console.log("✅ Message:", messageFinal);
     
+    // ========== PARTIE OPTIMISÉE POUR GOOGLE MESSAGES/MOBILE ==========
+    
     // Encoder pour URL
     const messageEncode = encodeURIComponent(messageFinal);
     
-    // ========== PARTIE OPTIMISÉE POUR ANDROID/SAMSUNG ==========
+    // Détection Google Messages/navigateur mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isChrome = /Chrome/i.test(navigator.userAgent);
+    
     let reussi = false;
+    const smsUrl = `sms:${numeroPropre}?body=${messageEncode}`;
     
-    // Détection Android/Samsung
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isSamsung = /Samsung/i.test(navigator.userAgent);
-    
-    if (isAndroid || isSamsung) {
-        console.log("📱 Détecté Android/Samsung - Méthode optimisée");
+    if (isMobile) {
+        console.log("📱 Appareil mobile détecté - Méthodes optimisées");
         
-        // URL SMS standard
-        const smsUrl = `sms:${numeroPropre}?body=${messageEncode}`;
+        // Méthode 1: Redirection directe (fonctionne sur la plupart des mobiles)
+        try {
+            window.location.href = smsUrl;
+            reussi = true;
+            console.log("✅ Méthode window.location.href");
+        } catch (e) {
+            console.log("❌ Méthode 1 échouée:", e);
+        }
         
-        // Essayer plusieurs méthodes pour Android
-        const androidMethods = [
-            () => {
-                // Méthode 1: Redirection directe (fonctionne sur la plupart des Android)
-                window.location.href = smsUrl;
-                return true;
-            },
-            () => {
-                // Méthode 2: Iframe (pour certains Samsung)
+        // Méthode 2: Créer et cliquer sur un lien (0.5s après)
+        if (!reussi) {
+            setTimeout(() => {
                 try {
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = smsUrl;
-                    document.body.appendChild(iframe);
-                    setTimeout(() => {
-                        if (iframe.parentNode) {
-                            document.body.removeChild(iframe);
-                        }
-                    }, 1000);
-                    return true;
-                } catch (e) {
-                    return false;
-                }
-            },
-            () => {
-                // Méthode 3: Nouvelle fenêtre réduite
-                try {
-                    window.open(smsUrl, '_blank', 'height=100,width=100,toolbar=no,location=no');
-                    return true;
-                } catch (e) {
-                    return false;
-                }
-            }
-        ];
-        
-        for (let i = 0; i < androidMethods.length; i++) {
-            try {
-                if (androidMethods[i]()) {
+                    const link = document.createElement('a');
+                    link.href = smsUrl;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                     reussi = true;
-                    console.log(`✅ Méthode Android ${i+1} réussie`);
-                    
-                    setTimeout(() => {
-                        alert("📱 Ouverture application SMS...\n\nSi rien ne se passe dans 3 secondes :\n1. Ouvrez votre appli Messages\n2. Le numéro et message sont copiés");
-                    }, 300);
-                    break;
+                    console.log("✅ Méthode lien créé/cliqué");
+                } catch (e) {
+                    console.log("❌ Méthode 2 échouée:", e);
                 }
-            } catch (e) {
-                console.log(`❌ Méthode Android ${i+1} échouée:`, e);
-            }
+            }, 500);
+        }
+        
+        // Méthode 3: window.open avec timeout (1s après)
+        if (!reussi) {
+            setTimeout(() => {
+                try {
+                    const newWindow = window.open(smsUrl, '_blank');
+                    if (newWindow && !newWindow.closed) {
+                        reussi = true;
+                        console.log("✅ Méthode window.open");
+                    }
+                } catch (e) {
+                    console.log("❌ Méthode 3 échouée:", e);
+                }
+            }, 1000);
         }
         
     } else {
-        // Méthode originale pour iOS et autres
-        console.log("📱 Autre appareil (non Android)");
-        const smsUrls = [
-            `sms:${numeroPropre}?body=${messageEncode}`,
-            `sms://${numeroPropre}?body=${messageEncode}`,
-            `smsto:${numeroPropre}:${messageEncode}`,
-            `mms:${numeroPropre}?body=${messageEncode}`
-        ];
-        
-        for (let url of smsUrls) {
-            try {
-                console.log("Tentative avec:", url);
-                window.open(url, '_blank');
-                reussi = true;
-                console.log("✅ Application SMS ouverte");
-                
-                setTimeout(() => {
-                    alert("✅ Application SMS ouverte !");
-                }, 500);
-                break;
-            } catch (e) {
-                console.log("Échec avec:", url);
-            }
+        // Pour desktop
+        console.log("💻 Desktop détecté");
+        try {
+            window.open(smsUrl, '_blank');
+            reussi = true;
+            console.log("✅ Desktop: window.open");
+        } catch (e) {
+            console.log("❌ Desktop échoué:", e);
         }
     }
     
-    // ========== FALLBACK AMÉLIORÉ ==========
-    if (!reussi) {
-        console.log("❌ Aucune méthode n'a fonctionné, fallback");
-        
-        // Texte à copier (numéro + message)
-        const texteACopier = `${numeroPropre}\n\n${messageFinal}`;
-        
-        // Essayer le clipboard moderne
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(texteACopier)
-                .then(() => {
-                    const confirmation = confirm(
-                        `📱 Pour envoyer le SMS :\n\n` +
-                        `1. Ouvrez votre appli "Messages"\n` +
-                        `2. Créez un nouveau message\n` +
-                        `3. Collez (le numéro et message sont copiés)\n\n` +
-                        `✅ Numéro et message copiés !\n\n` +
-                        `Ouvrir l'appli Messages maintenant ?`
-                    );
-                    
-                    if (confirmation && (isAndroid || isSamsung)) {
-                        // Essayer d'ouvrir l'appli Messages sur Android
-                        window.open('sms:', '_blank');
-                    }
-                })
-                .catch(() => {
-                    // Fallback pour erreur clipboard
-                    prompt("📱 Copiez ce texte dans votre appli Messages :", texteACopier);
-                });
+    // ========== FALLBACK AMÉLIORÉ POUR GOOGLE MESSAGES ==========
+    setTimeout(() => {
+        if (!reussi) {
+            console.log("❌ Fallback nécessaire");
+            
+            // Format SMSTO (compatible Google Messages)
+            const texteSMSTO = `SMSTO:${numeroPropre}:${messageFinal}`;
+            // Format standard
+            const texteStandard = `${numeroPropre}\n\n${messageFinal}`;
+            
+            // Essayer le clipboard moderne
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                // Demander à l'utilisateur quel format préférer
+                const choix = confirm(
+                    `📱 Pour Google Messages :\n\n` +
+                    `Choisissez le format de copie :\n\n` +
+                    `✅ "OK" : Format SMSTO (recommandé)\n` +
+                    `❌ "Annuler" : Format standard`
+                );
+                
+                const texteACopier = choix ? texteSMSTO : texteStandard;
+                
+                navigator.clipboard.writeText(texteACopier)
+                    .then(() => {
+                        const ouvrirApp = confirm(
+                            `✅ ${choix ? 'Format SMSTO' : 'Texte'} copié !\n\n` +
+                            `1. Ouvrez Google Messages\n` +
+                            `2. Créez un nouveau message\n` +
+                            `3. Collez le texte copié\n\n` +
+                            `Ouvrir Google Messages maintenant ?`
+                        );
+                        
+                        if (ouvrirApp) {
+                            // Essayer d'ouvrir Google Messages
+                            if (isMobile) {
+                                window.open('https://messages.google.com/', '_blank');
+                            } else {
+                                window.open('sms:', '_blank');
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        // Fallback simple
+                        alert(`📱 Copiez manuellement :\n\n${texteStandard}`);
+                    });
+            } else {
+                // Vieilles versions - prompt
+                const choix = confirm(
+                    `📱 Pour Google Messages :\n\n` +
+                    `Choisissez le format :\n\n` +
+                    `✅ "OK" : Format SMSTO\n` +
+                    `❌ "Annuler" : Format standard`
+                );
+                
+                if (choix) {
+                    prompt("📱 Copiez ce format SMSTO dans Google Messages :", texteSMSTO);
+                } else {
+                    prompt("📱 Copiez ce texte dans Google Messages :", texteStandard);
+                }
+            }
         } else {
-            // Fallback pour vieux navigateurs
-            const texteFallback = `Numéro: ${numeroPropre}\n\nMessage: ${messageFinal}`;
-            prompt("📱 Copiez ce texte dans votre appli Messages :", texteFallback);
+            // Succès
+            setTimeout(() => {
+                alert("📱 L'application SMS devrait s'ouvrir...\n\nSi rien ne se passe dans 3 secondes, utilisez la méthode de copie.");
+            }, 1500);
         }
-    }
+    }, 2000); // Donner 2 secondes aux méthodes automatiques
 }
 
     let currentCommandeId;
