@@ -549,7 +549,6 @@ function envoyerHeuresPassage(data) {
     window.open(wazeUrl, '_blank');
 }
 
-// REMPLACEZ votre fonction actuelle par celle-ci :
 function envoyerSMS() {
     console.log("📱 Début envoi SMS...");
     console.log("Commande ID:", currentCommandeId);
@@ -614,51 +613,133 @@ function envoyerSMS() {
     // Encoder pour URL
     const messageEncode = encodeURIComponent(messageFinal);
     
-    // Essayer plusieurs formats d'URL SMS
-    const smsUrls = [
-        `sms:${numeroPropre}?body=${messageEncode}`,
-        `sms://${numeroPropre}?body=${messageEncode}`,
-        `smsto:${numeroPropre}:${messageEncode}`,
-        `mms:${numeroPropre}?body=${messageEncode}`
-    ];
-    
+    // ========== PARTIE OPTIMISÉE POUR ANDROID/SAMSUNG ==========
     let reussi = false;
     
-    for (let url of smsUrls) {
-        try {
-            console.log("Tentative avec:", url);
-            window.open(url, '_blank');
-            reussi = true;
-            console.log("✅ Application SMS ouverte");
-            
-            // Message de confirmation simple
-            setTimeout(() => {
-                alert("✅ Application SMS ouverte !\n\nLe message est prêt à être envoyé.");
-            }, 500);
-            
-            break;
-        } catch (e) {
-            console.log("Échec avec:", url);
+    // Détection Android/Samsung
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isSamsung = /Samsung/i.test(navigator.userAgent);
+    
+    if (isAndroid || isSamsung) {
+        console.log("📱 Détecté Android/Samsung - Méthode optimisée");
+        
+        // URL SMS standard
+        const smsUrl = `sms:${numeroPropre}?body=${messageEncode}`;
+        
+        // Essayer plusieurs méthodes pour Android
+        const androidMethods = [
+            () => {
+                // Méthode 1: Redirection directe (fonctionne sur la plupart des Android)
+                window.location.href = smsUrl;
+                return true;
+            },
+            () => {
+                // Méthode 2: Iframe (pour certains Samsung)
+                try {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = smsUrl;
+                    document.body.appendChild(iframe);
+                    setTimeout(() => {
+                        if (iframe.parentNode) {
+                            document.body.removeChild(iframe);
+                        }
+                    }, 1000);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            () => {
+                // Méthode 3: Nouvelle fenêtre réduite
+                try {
+                    window.open(smsUrl, '_blank', 'height=100,width=100,toolbar=no,location=no');
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+        ];
+        
+        for (let i = 0; i < androidMethods.length; i++) {
+            try {
+                if (androidMethods[i]()) {
+                    reussi = true;
+                    console.log(`✅ Méthode Android ${i+1} réussie`);
+                    
+                    setTimeout(() => {
+                        alert("📱 Ouverture application SMS...\n\nSi rien ne se passe dans 3 secondes :\n1. Ouvrez votre appli Messages\n2. Le numéro et message sont copiés");
+                    }, 300);
+                    break;
+                }
+            } catch (e) {
+                console.log(`❌ Méthode Android ${i+1} échouée:`, e);
+            }
+        }
+        
+    } else {
+        // Méthode originale pour iOS et autres
+        console.log("📱 Autre appareil (non Android)");
+        const smsUrls = [
+            `sms:${numeroPropre}?body=${messageEncode}`,
+            `sms://${numeroPropre}?body=${messageEncode}`,
+            `smsto:${numeroPropre}:${messageEncode}`,
+            `mms:${numeroPropre}?body=${messageEncode}`
+        ];
+        
+        for (let url of smsUrls) {
+            try {
+                console.log("Tentative avec:", url);
+                window.open(url, '_blank');
+                reussi = true;
+                console.log("✅ Application SMS ouverte");
+                
+                setTimeout(() => {
+                    alert("✅ Application SMS ouverte !");
+                }, 500);
+                break;
+            } catch (e) {
+                console.log("Échec avec:", url);
+            }
         }
     }
     
+    // ========== FALLBACK AMÉLIORÉ ==========
     if (!reussi) {
-        // Fallback
-        const copier = confirm(
-            `📱 Pour envoyer le SMS :\n\n` +
-            `Numéro: ${numeroPropre}\n` +
-            `Message: ${messageFinal}\n\n` +
-            `Copier le message dans le presse-papier ?`
-        );
+        console.log("❌ Aucune méthode n'a fonctionné, fallback");
         
-        if (copier) {
-            navigator.clipboard.writeText(messageFinal)
-                .then(() => alert("✅ Message copié !\nCollez-le dans votre application SMS."))
-                .catch(() => alert(`📝 Message à copier :\n\n${messageFinal}`));
+        // Texte à copier (numéro + message)
+        const texteACopier = `${numeroPropre}\n\n${messageFinal}`;
+        
+        // Essayer le clipboard moderne
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(texteACopier)
+                .then(() => {
+                    const confirmation = confirm(
+                        `📱 Pour envoyer le SMS :\n\n` +
+                        `1. Ouvrez votre appli "Messages"\n` +
+                        `2. Créez un nouveau message\n` +
+                        `3. Collez (le numéro et message sont copiés)\n\n` +
+                        `✅ Numéro et message copiés !\n\n` +
+                        `Ouvrir l'appli Messages maintenant ?`
+                    );
+                    
+                    if (confirmation && (isAndroid || isSamsung)) {
+                        // Essayer d'ouvrir l'appli Messages sur Android
+                        window.open('sms:', '_blank');
+                    }
+                })
+                .catch(() => {
+                    // Fallback pour erreur clipboard
+                    prompt("📱 Copiez ce texte dans votre appli Messages :", texteACopier);
+                });
+        } else {
+            // Fallback pour vieux navigateurs
+            const texteFallback = `Numéro: ${numeroPropre}\n\nMessage: ${messageFinal}`;
+            prompt("📱 Copiez ce texte dans votre appli Messages :", texteFallback);
         }
     }
 }
-
 
     let currentCommandeId;
 
