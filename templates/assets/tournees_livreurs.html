@@ -549,15 +549,122 @@ function envoyerHeuresPassage(data) {
     window.open(wazeUrl, '_blank');
 }
 
-    function envoyerSMS() {
-        alert("SMS envoyé pour la commande.");
+// REMPLACEZ votre fonction actuelle par celle-ci :
+function envoyerSMS() {
+    console.log("📱 Début envoi SMS...");
+    console.log("Commande ID:", currentCommandeId);
+    console.log("Téléphone:", currentTelephone);
+    
+    // Vérifier si on a un numéro
+    if (!currentTelephone || currentTelephone === "None" || currentTelephone === "") {
+        alert("❌ Numéro de téléphone non disponible pour cette commande.");
+        return;
     }
+    
+    // Récupérer l'heure de passage estimée depuis le texte affiché
+    let heurePassageEstimee = "";
+    const commandeItem = document.getElementById(`commande-${currentCommandeId}`);
+    if (commandeItem) {
+        const trajetDureeSpan = commandeItem.querySelector('.trajet-duree');
+        if (trajetDureeSpan) {
+            // Extraire juste l'heure (format HH:MM) du texte
+            const texte = trajetDureeSpan.textContent;
+            console.log("Texte trajet durée:", texte);
+            
+            // Recherche du format "HH:MM" dans le texte
+            const heureMatch = texte.match(/(\d{1,2}:\d{2})/);
+            if (heureMatch) {
+                heurePassageEstimee = heureMatch[1];
+                console.log("Heure extraite:", heurePassageEstimee);
+            }
+        }
+    }
+    
+    // Message par défaut avec l'heure de passage
+    let messageParDefaut;
+    if (heurePassageEstimee) {
+        messageParDefaut = `Bonjour, c'est votre livreur. Votre commande #${currentCommandeId} sera livrée vers ${heurePassageEstimee}.`;
+    } else {
+        messageParDefaut = `Bonjour, c'est votre livreur. Votre commande #${currentCommandeId} est en route.`;
+    }
+    
+    // Demander le message (avec l'heure pré-remplie)
+    const messagePersonnalise = prompt("✏️ Entrez votre message SMS :", messageParDefaut);
+    
+    // Si annulé
+    if (messagePersonnalise === null) {
+        console.log("Annulé par l'utilisateur");
+        return;
+    }
+    
+    // Message final
+    const messageFinal = messagePersonnalise.trim() || messageParDefaut;
+    
+    // Nettoyer le numéro
+    let numeroPropre = currentTelephone.toString().replace(/[^\d+]/g, '');
+    
+    // Convertir 06... en +33...
+    if (numeroPropre.startsWith('0')) {
+        numeroPropre = '+33' + numeroPropre.substring(1);
+    }
+    
+    console.log("✅ Numéro nettoyé:", numeroPropre);
+    console.log("✅ Message:", messageFinal);
+    
+    // Encoder pour URL
+    const messageEncode = encodeURIComponent(messageFinal);
+    
+    // Essayer plusieurs formats d'URL SMS
+    const smsUrls = [
+        `sms:${numeroPropre}?body=${messageEncode}`,
+        `sms://${numeroPropre}?body=${messageEncode}`,
+        `smsto:${numeroPropre}:${messageEncode}`,
+        `mms:${numeroPropre}?body=${messageEncode}`
+    ];
+    
+    let reussi = false;
+    
+    for (let url of smsUrls) {
+        try {
+            console.log("Tentative avec:", url);
+            window.open(url, '_blank');
+            reussi = true;
+            console.log("✅ Application SMS ouverte");
+            
+            // Message de confirmation simple
+            setTimeout(() => {
+                alert("✅ Application SMS ouverte !\n\nLe message est prêt à être envoyé.");
+            }, 500);
+            
+            break;
+        } catch (e) {
+            console.log("Échec avec:", url);
+        }
+    }
+    
+    if (!reussi) {
+        // Fallback
+        const copier = confirm(
+            `📱 Pour envoyer le SMS :\n\n` +
+            `Numéro: ${numeroPropre}\n` +
+            `Message: ${messageFinal}\n\n` +
+            `Copier le message dans le presse-papier ?`
+        );
+        
+        if (copier) {
+            navigator.clipboard.writeText(messageFinal)
+                .then(() => alert("✅ Message copié !\nCollez-le dans votre application SMS."))
+                .catch(() => alert(`📝 Message à copier :\n\n${messageFinal}`));
+        }
+    }
+}
 
 
     let currentCommandeId;
 
     function ouvrirModalCommande(id, latitude, longitude, numeroTelephone, hasMessage, messagePourLivreur, paiementARecevoir) {
     currentCommandeId = id;
+    currentTelephone = numeroTelephone;
     
     console.log("PAIEMENT À RECEVOIR =", paiementARecevoir);
 
