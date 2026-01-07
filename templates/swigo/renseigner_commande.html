@@ -3513,7 +3513,7 @@ async function confirmerPaiement() {
     const moyenPaiement = formPaiement.moyen_paiement.value;
     console.log('Moyen de paiement sélectionné:', moyenPaiement);
 
-    // Récupérer les données client
+    // Récupérer TOUTES les données du formulaire client
     const nom = document.getElementById('nom').value.trim();
     const prenom = document.getElementById('prenom').value.trim();
     const societe = document.getElementById('societe').value.trim();
@@ -3521,6 +3521,16 @@ async function confirmerPaiement() {
     const numero_telephone = document.getElementById('numero_telephone').value.trim();
     const adresse_facturation = document.getElementById('adresse_facturation').value.trim();
     const factureSansDetail = document.getElementById('factureSansDetail').checked;
+    const couvertsBois = document.getElementById('couvertsBois').checked;
+    
+    // Récupérer les messages et autres champs
+    const enableMessages = document.getElementById('enableMessages').checked;
+    const message_chef = enableMessages ? document.getElementById('message_chef').value.trim() : '';
+    const message_livreur = enableMessages ? document.getElementById('message_livreur').value.trim() : '';
+    const consent_cookies = document.getElementById('consent_cookies').checked;
+    const consent_sms = document.getElementById('consent_sms').checked;
+    const consent_email = document.getElementById('consent_email').checked;
+    const differentBillingAddress = document.getElementById('differentBillingAddress').checked;
 
     if (!nom || !prenom || !email || !numero_telephone) {
         alert("Merci de remplir tous les champs client obligatoires.");
@@ -3536,11 +3546,20 @@ async function confirmerPaiement() {
         societe,
         email,
         numero_telephone,
-        factureSansDetail, 
+        factureSansDetail,
+        couvertsBois,
+        // Inclure les messages et autres données
+        enableMessages,
+        message_chef,
+        message_livreur,
+        consent_cookies,
+        consent_sms,
+        consent_email,
+        differentBillingAddress,
         adresse_facturation
     };
 
-    console.log('Payload envoyé au serveur:', payload);
+    console.log('📤 Payload complet envoyé au serveur:', payload);
 
     try {
         if (moyenPaiement === 'stripe') {
@@ -3582,7 +3601,7 @@ async function confirmerPaiement() {
             console.log('🎫 Session Stripe ID reçu:', res.stripe_session_id);
             console.log('🔄 Redirection vers Stripe...');
             
-            // 🎯 CORRECTION : redirectToCheckout est SYNCHRONE
+            // Redirection vers Stripe
             const result = stripe.redirectToCheckout({ 
                 sessionId: res.stripe_session_id 
             });
@@ -3597,8 +3616,10 @@ async function confirmerPaiement() {
             return;
 
         } else {
-            // Traitement pour les autres moyens de paiement
+            // Traitement pour les autres moyens de paiement (espèces, ticket restaurant)
             console.log('Traitement autre moyen de paiement:', moyenPaiement);
+            
+            // Envoyer TOUTES les données à /confirmer_commande/
             const response = await fetch('/confirmer_commande/', {
                 method: 'POST',
                 headers: {
@@ -3608,13 +3629,22 @@ async function confirmerPaiement() {
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Erreur serveur:', errorText);
+                throw new Error(`Erreur HTTP: ${response.status} - ${errorText}`);
+            }
+            
             const res = await response.json();
+            console.log('✅ Réponse confirmer_commande:', res);
 
             if (res.success && res.commande_id) {
+                // Redirection vers la page de confirmation
                 window.location.href = `/confirmation_commande/${res.commande_id}/`;
             } else {
-                alert('Erreur lors de la confirmation de la commande : ' + (res.message || ''));
+                alert('Erreur lors de la confirmation de la commande : ' + (res.message || 'Erreur inconnue'));
+                enCoursDeTraitement = false;
+                confirmerPaiementBtn.disabled = false;
             }
         }
 
@@ -3622,11 +3652,11 @@ async function confirmerPaiement() {
         console.error("❌ Erreur complète:", error);
         console.error("Stack trace:", error.stack);
         alert("Erreur: " + error.message);
-    } finally {
         enCoursDeTraitement = false;
         confirmerPaiementBtn.disabled = false;
-        console.log('=== FIN CONFIRMER PAIEMENT ===');
     }
+    
+    console.log('=== FIN CONFIRMER PAIEMENT ===');
 }
 
 

@@ -44,3 +44,5 @@ Thumbs.db
 production_explorer/
 quit.
 0
+*.local_backup
+*.backup

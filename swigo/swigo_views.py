@@ -2694,8 +2694,30 @@ def confirmer_commande(request):
     moyen_paiement = data.get('moyen_paiement')
     societe = data.get('societe', '').strip()
     couverts_bois = data.get('couvertsBois', False)
+    
+    # 🆕 RÉCUPÉRATION DES MESSAGES ET AUTRES DONNÉES MANQUANTES
+    facture_sans_detail = data.get('factureSansDetail', False)
+    enable_messages = data.get('enableMessages', False)
+    message_chef = data.get('message_chef', '')
+    message_livreur = data.get('message_livreur', '')
+    consent_cookies = data.get('consent_cookies', False)
+    consent_sms = data.get('consent_sms', False)
+    consent_email = data.get('consent_email', False)
+    different_billing_address = data.get('differentBillingAddress', False)
+    adresse_facturation = data.get('adresse_facturation', '')
 
-    print(f"[💳] Moyen de paiement : {moyen_paiement} | Société : {societe} | Couverts bois: {couverts_bois}")
+    print(f"[💳] Moyen de paiement : {moyen_paiement}")
+    print(f"[🏢] Société : {societe}")
+    print(f"[🍴] Couverts bois: {couverts_bois}")
+    print(f"[📋] Facture sans détail: {facture_sans_detail}")
+    print(f"[💬] Messages activés: {enable_messages}")
+    print(f"[👨‍🍳] Message chef: {message_chef}")
+    print(f"[🚗] Message livreur: {message_livreur}")
+    print(f"[✅] Consentement cookies: {consent_cookies}")
+    print(f"[📱] Consentement SMS: {consent_sms}")
+    print(f"[📧] Consentement email: {consent_email}")
+    print(f"[🏠] Adresse facturation différente: {different_billing_address}")
+    print(f"[📍] Adresse facturation: {adresse_facturation}")
 
     if not moyen_paiement:
         logger.warning("❌ Moyen de paiement manquant")
@@ -2751,9 +2773,36 @@ def confirmer_commande(request):
     livraison_dt_local = localtime(livraison_dt)
     print(f"[📅] Date/heure livraison final: {livraison_dt_local}")
 
+    # 🆕 MISE À JOUR COMPLÈTE DE LA COMMANDE AVEC TOUS LES CHAMPS
     if 'couvertsBois' in data:
         commande.couverts_bois = bool(data['couvertsBois'])
         print(f"[🍴] Couverts bois mis à jour: {commande.couverts_bois}")
+    
+    if 'factureSansDetail' in data:
+        commande.facture_sans_detail = bool(data['factureSansDetail'])
+        print(f"[📋] Facture sans détail mis à jour: {commande.facture_sans_detail}")
+    
+    # Mise à jour des messages
+    if enable_messages:
+        commande.message_pour_chef = message_chef
+        commande.message_pour_livreur = message_livreur
+        print(f"[💬] Messages mis à jour - Chef: {message_chef[:50]}..., Livreur: {message_livreur[:50]}...")
+    else:
+        commande.message_pour_chef = ''
+        commande.message_pour_livreur = ''
+        print(f"[💬] Messages désactivés - champs vidés")
+    
+    # Mise à jour de l'adresse de facturation
+    if different_billing_address and adresse_facturation:
+        commande.adresse_facturation_saisie = adresse_facturation
+        print(f"[📍] Adresse de facturation mise à jour: {adresse_facturation[:50]}...")
+    
+    # Mise à jour des consentements (optionnel, selon vos besoins)
+    if hasattr(commande, 'consent_cookies'):
+        commande.consent_cookies = consent_cookies
+        commande.consent_sms = consent_sms
+        commande.consent_email = consent_email
+        print(f"[✅] Consentements mis à jour - Cookies: {consent_cookies}, SMS: {consent_sms}, Email: {consent_email}")
 
     if commande.panier:
         try:
@@ -2773,18 +2822,22 @@ def confirmer_commande(request):
 
     if hasattr(commande, 'societe'):
         commande.societe = societe
+        print(f"[🏢] Société mise à jour: {societe}")
 
     commande.moyen_paiement = moyen_paiement
 
     if moyen_paiement == "stripe":
         commande.commande_is_valid = True
         commande.is_paid = True
+        print(f"[💳] Commande marquée comme payée (Stripe)")
     else:
         commande.commande_is_valid = False
         commande.is_paid = False
+        print(f"[💳] Commande en attente de paiement ({moyen_paiement})")
 
+    # 🆕 SAUVEGARDE COMPLÈTE
     commande.save()
-    print(f"[✅] Commande validée : ID {commande.id}, paiement = {moyen_paiement}")
+    print(f"[✅] Commande {commande.id} complètement sauvegardée avec tous les champs")
 
     return JsonResponse({
         'success': True,
