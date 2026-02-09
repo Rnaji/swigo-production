@@ -496,13 +496,15 @@ def obtenir_paiements_possibles(commande):
         paiements = [
             {'id': 'stripe', 'label': 'Carte Bancaire'},
             {'id': 'especes_retrait', 'label': 'Espèces au retrait'},
-            {'id': 'ticket_retrait', 'label': 'Ticket resto au retrait'},
+            # SUPPRIMEZ cette ligne :
+            # {'id': 'ticket_retrait', 'label': 'Ticket resto au retrait'},
         ]
     else:
         paiements = [
             {'id': 'stripe', 'label': 'Carte Bancaire'},
             {'id': 'especes_livraison', 'label': 'Espèces à la livraison'},
-            {'id': 'ticket_livraison', 'label': 'Ticket resto à la livraison'},
+            # SUPPRIMEZ cette ligne :
+            # {'id': 'ticket_livraison', 'label': 'Ticket resto à la livraison'},
         ]
 
     if is_nouveau:

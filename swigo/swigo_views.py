@@ -3069,10 +3069,13 @@ def valider_commande(request):
         except VilleDesservie.DoesNotExist:
             return JsonResponse({'error': f"La ville {ville_nom} n'est pas desservie."}, status=400)
 
+# Dans valider_commande
     # Paiement
     moyen_paiement = data.get('moyen_paiement')
     is_nouveau = not Commande.objects.filter(client=client, is_paid=True).exclude(id=commande.id).exists()
-    if is_nouveau and moyen_paiement in ['especes_livraison', 'ticket_livraison', 'especes_retrait', 'ticket_retrait']:
+    
+    # MODIFIEZ CETTE CONDITION - SUPPRIMEZ LES TICKETS RESTAURANT
+    if is_nouveau and moyen_paiement in ['especes_livraison', 'especes_retrait']:
         return JsonResponse({
             'error': "Le paiement à la livraison est disponible uniquement à partir de votre deuxième commande."
         }, status=400)
@@ -3225,11 +3228,13 @@ def confirmation_commande(request, commande_id):
     montant_total = commande.panier.prix_total if commande.panier else 0
 
     # 🏷️ Affichage du moyen de paiement
+    # 🏷️ Affichage du moyen de paiement
     MOYENS_PAIEMENT_LABELS = {
         'especes_livraison': 'Espèces (à la livraison)',
         'especes_retrait': 'Espèces (au retrait)',
-        'ticket_restaurant_livraison': 'Ticket restaurant (à la livraison)',
-        'ticket_restaurant_retrait': 'Ticket restaurant (au retrait)',
+        # SUPPRIMEZ CES DEUX LIGNES :
+        # 'ticket_livraison': 'Ticket restaurant (à la livraison)',
+        # 'ticket_retrait': 'Ticket restaurant (au retrait)',
         'stripe': 'Carte bancaire (en ligne)',
     }
     moyen_affiche = MOYENS_PAIEMENT_LABELS.get(commande.moyen_paiement, commande.moyen_paiement)
