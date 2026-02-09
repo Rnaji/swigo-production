@@ -127,9 +127,6 @@ def get_heure_debut_service(jour_semaine: str, service: str, fallback: time) -> 
 # =========================
 # Estimation Livraison
 # =========================
-# =========================
-# Estimation Livraison
-# =========================
 def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = None):
     """
     Estime la prochaine heure de livraison possible selon adresse, horaires et disponibilité livreurs.
@@ -231,14 +228,16 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     if service_courant == "MIDI" and "SOIR" in services_ouverts:
         # Cas 1: Commande après le cutoff MIDI → bascule directe vers SOIR
         if maintenant.time() >= HEURE_CUTOFF_MIDI:
-            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
-            debut_possible = max(debut_possible, switch_heure)
+            # CORRECTION : Recalculer à partir de 18h30
+            heure_ouverture_soir = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
+            debut_possible = heure_ouverture_soir + timedelta(minutes=delai_total)
             service_courant = "SOIR"
             logger.debug(f"[BASCULE CUTOFF] Midi -> Soir à {debut_possible}")
         # Cas 2: L'heure estimée dépasse le cutoff MIDI → bascule aussi
-        elif debut_possible.time() > HEURE_CUTOFF_MIDI:
-            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
-            debut_possible = max(debut_possible, switch_heure)
+        elif debut_possible.time() >= HEURE_CUTOFF_MIDI:  # Changé de > à >=
+            # CORRECTION : Recalculer à partir de 18h30
+            heure_ouverture_soir = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
+            debut_possible = heure_ouverture_soir + timedelta(minutes=delai_total)
             service_courant = "SOIR"
             logger.debug(f"[BASCULE ESTIM] Midi -> Soir (estim dépasse cutoff) à {debut_possible}")
 
@@ -297,11 +296,14 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
                 j = JOURS_MAP[d.weekday()]
                 dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
                 if "MIDI" in dispo:
-                    # MODIFICATION : Utiliser 11:30 pour le jour suivant
-                    prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
+                    # ⚠️ CORRECTION : Ajouter le délai total !
+                    heure_ouverture = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
+                    prochaine_heure = heure_ouverture + timedelta(minutes=delai_total)
                     break
                 if "SOIR" in dispo:
-                    prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
+                    # ⚠️ CORRECTION : Ajouter le délai total !
+                    heure_ouverture = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
+                    prochaine_heure = heure_ouverture + timedelta(minutes=delai_total)
                     break
             logger.debug(f"[NEXT OPEN] {prochaine_heure}")
 
@@ -327,11 +329,14 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             j = JOURS_MAP[d.weekday()]
             services_dispos = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
             if "MIDI" in services_dispos:
-                # MODIFICATION : Utiliser 11:30 pour le lendemain
-                prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
+                # ⚠️ CORRECTION : Ajouter le délai total !
+                heure_ouverture = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
+                prochaine_heure = heure_ouverture + timedelta(minutes=delai_total)
                 break
             if "SOIR" in services_dispos:
-                prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
+                # ⚠️ CORRECTION : Ajouter le délai total !
+                heure_ouverture = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
+                prochaine_heure = heure_ouverture + timedelta(minutes=delai_total)
                 break
         if not prochaine_heure:
             return {'error': "Aucun créneau de livraison disponible cette semaine."}
@@ -496,15 +501,11 @@ def obtenir_paiements_possibles(commande):
         paiements = [
             {'id': 'stripe', 'label': 'Carte Bancaire'},
             {'id': 'especes_retrait', 'label': 'Espèces au retrait'},
-            # SUPPRIMEZ cette ligne :
-            # {'id': 'ticket_retrait', 'label': 'Ticket resto au retrait'},
         ]
     else:
         paiements = [
             {'id': 'stripe', 'label': 'Carte Bancaire'},
             {'id': 'especes_livraison', 'label': 'Espèces à la livraison'},
-            # SUPPRIMEZ cette ligne :
-            # {'id': 'ticket_livraison', 'label': 'Ticket resto à la livraison'},
         ]
 
     if is_nouveau:
