@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 # =========================
 # Constantes de configuration
 # =========================
-MAX_LIVRAISONS_PAR_CRENEAU = 2
+MAX_LIVRAISONS_PAR_CRENEAU = 1  # MODIFICATION : De 2 à 1
 MAX_EMPORTES_PAR_CRENEAU = 1
-HEURE_DEBUT_SOIR = time(18, 0)
-TEMPS_PREPARATION_MINUTES = 30  # MODIFICATION : 20 minutes → 30 minutes
+HEURE_DEBUT_SOIR = time(18, 30)
+TEMPS_PREPARATION_MINUTES = 30
+HEURE_OUVERTURE_CUISINE_MIDI = time(11, 30)  # Ouverture cuisine midi
+HEURE_OUVERTURE_CUISINE_SOIR = time(18, 30)  # Ouverture cuisine soir
 
 # =========================
 # Outils généraux
@@ -71,6 +73,7 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                      )
                      .filter(filtre_commande_valide))
         logger.debug(f"[LIVRAISON] Commandes valides sur créneau: {commandes.count()}")
+        # MODIFICATION : Retourne True uniquement si 0 commande (maximum 1)
         return commandes.count() < MAX_LIVRAISONS_PAR_CRENEAU
 
     elif mode == 'emporter':
@@ -124,6 +127,9 @@ def get_heure_debut_service(jour_semaine: str, service: str, fallback: time) -> 
 # =========================
 # Estimation Livraison
 # =========================
+# =========================
+# Estimation Livraison
+# =========================
 def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = None):
     """
     Estime la prochaine heure de livraison possible selon adresse, horaires et disponibilité livreurs.
@@ -148,10 +154,13 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     JOURS_MAP = {0: "LUN", 1: "MAR", 2: "MER", 3: "JEU", 4: "VEN", 5: "SAM", 6: "DIM"}
     jour_semaine = JOURS_MAP[maintenant.weekday()]
 
-    # Heures d'ouverture (premiers slots)
-    HEURE_OUVERTURE_MIDI = get_heure_debut_service(jour_semaine, "MIDI", time(11, 30))
+    # MODIFICATION IMPORTANTE : Utiliser 11:30 comme heure d'ouverture cuisine MIDI
+    # au lieu de get_heure_debut_service() qui retourne 12:00 (premier créneau disponible)
+    HEURE_OUVERTURE_CUISINE_MIDI = time(11, 30)  # Cuisine ouvre à 11:30
     HEURE_CUTOFF_MIDI = time(14, 30)
-    HEURE_OUVERTURE_SOIR = get_heure_debut_service(jour_semaine, "SOIR", time(18, 30))
+    
+    # Pour le soir, garder la logique actuelle ou utiliser 18:30 selon besoin
+    HEURE_OUVERTURE_CUISINE_SOIR = time(18, 30)  # Cuisine ouvre à 18:30
     HEURE_FIN_SOIR = time(22, 30)
 
     def get_service(dt: datetime) -> str:
@@ -175,12 +184,11 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
                                    .values_list('service', flat=True)
                                    .distinct())
             if "MIDI" in services_demain:
-                h = get_heure_debut_service(jour_str, "MIDI", time(11, 30))
-                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), h))
+                # MODIFICATION : Utiliser 11:30 pour demain aussi
+                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), HEURE_OUVERTURE_CUISINE_MIDI))
                 return estimer_heure_livraison(adresse_livraison, maintenant=nouvelle_heure)
             if "SOIR" in services_demain:
-                h = get_heure_debut_service(jour_str, "SOIR", time(18, 30))
-                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), h))
+                nouvelle_heure = make_aware(datetime.combine(jour_suivant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
                 return estimer_heure_livraison(adresse_livraison, maintenant=nouvelle_heure)
 
         return {'error': "Aucun service ouvert aujourd'hui."}
@@ -189,8 +197,8 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     if service_courant not in services_ouverts:
         if "SOIR" in services_ouverts:
             service_courant = "SOIR"
-            if maintenant.time() < HEURE_OUVERTURE_SOIR:
-                maintenant = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            if maintenant.time() < HEURE_OUVERTURE_CUISINE_SOIR:
+                maintenant = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
                 logger.debug(f"[PASSAGE] Vers SOIR à {maintenant}")
         else:
             return {'error': f"Le service du {service_courant.lower()} est fermé aujourd'hui."}
@@ -203,33 +211,33 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
         temps_livraison = 60
     logger.debug(f"[ROUTE] Temps livraison estimé: {temps_livraison} min")
 
-    # Bornes du service
+    # MODIFICATION : Bornes du service basées sur l'ouverture cuisine
     if service_courant == "SOIR":
-        heure_ouverture_service = HEURE_OUVERTURE_SOIR
+        heure_ouverture_service = HEURE_OUVERTURE_CUISINE_SOIR
         heure_fin_service = HEURE_FIN_SOIR
     else:
-        heure_ouverture_service = HEURE_OUVERTURE_MIDI
+        heure_ouverture_service = HEURE_OUVERTURE_CUISINE_MIDI  # 11:30
         heure_fin_service = HEURE_CUTOFF_MIDI
 
     heure_ouverture = make_aware(datetime.combine(maintenant.date(), heure_ouverture_service))
     heure_fin = make_aware(datetime.combine(maintenant.date(), heure_fin_service))
 
-    # Calcul heure mini possible (prépa + trajet)
-    delai_total = TEMPS_PREPARATION_MINUTES + temps_livraison  # MODIFICATION : Temps de préparation augmenté
-    debut_possible = max(heure_ouverture, maintenant + timedelta(minutes=delai_total))
-    logger.debug(f"[MIN] Début possible: {debut_possible} (prépa {TEMPS_PREPARATION_MINUTES} + route {temps_livraison})")
+    # Calcul heure mini possible (prépa + trajet) - À partir de 11:30
+    delai_total = TEMPS_PREPARATION_MINUTES + temps_livraison
+    debut_possible = heure_ouverture + timedelta(minutes=delai_total)
+    logger.debug(f"[MIN] Début possible: {debut_possible} (prépa {TEMPS_PREPARATION_MINUTES} + route {temps_livraison} depuis ouverture {heure_ouverture.time()})")
 
-    # CORRECTION : Logique améliorée de bascule MIDI→SOIR
+    # MODIFICATION : Logique améliorée de bascule MIDI→SOIR
     if service_courant == "MIDI" and "SOIR" in services_ouverts:
         # Cas 1: Commande après le cutoff MIDI → bascule directe vers SOIR
         if maintenant.time() >= HEURE_CUTOFF_MIDI:
-            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
             debut_possible = max(debut_possible, switch_heure)
             service_courant = "SOIR"
             logger.debug(f"[BASCULE CUTOFF] Midi -> Soir à {debut_possible}")
         # Cas 2: L'heure estimée dépasse le cutoff MIDI → bascule aussi
         elif debut_possible.time() > HEURE_CUTOFF_MIDI:
-            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
             debut_possible = max(debut_possible, switch_heure)
             service_courant = "SOIR"
             logger.debug(f"[BASCULE ESTIM] Midi -> Soir (estim dépasse cutoff) à {debut_possible}")
@@ -264,7 +272,7 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             prochaine_heure = max(maintenant + timedelta(minutes=40 + delai_total), debut_possible)
             logger.debug(f"[DEF AUTRE] Estimation par défaut: {prochaine_heure}")
 
-    # CORRECTION : Vérification intelligente des horaires avec bascule
+    # MODIFICATION : Vérification intelligente des horaires avec bascule
     if service_courant == "SOIR":
         heure_fin_effective = HEURE_FIN_SOIR
     else:
@@ -274,9 +282,9 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     if prochaine_heure.time() > heure_fin_effective:
         logger.debug(f"[HORS HORAIRE {service_courant}] {prochaine_heure.time()} après {heure_fin_effective}")
         
-        # CORRECTION : Si on dépasse le cutoff MIDI, essayer de basculer vers SOIR
+        # MODIFICATION : Si on dépasse le cutoff MIDI, essayer de basculer vers SOIR
         if service_courant == "MIDI" and "SOIR" in services_ouverts:
-            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_SOIR))
+            switch_heure = make_aware(datetime.combine(maintenant.date(), HEURE_OUVERTURE_CUISINE_SOIR))
             prochaine_heure = max(prochaine_heure, switch_heure)
             service_courant = "SOIR"
             logger.debug(f"[BASCULE HORAIRE] MIDI->SOIR à {prochaine_heure}")
@@ -289,12 +297,11 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
                 j = JOURS_MAP[d.weekday()]
                 dispo = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
                 if "MIDI" in dispo:
-                    h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                    prochaine_heure = make_aware(datetime.combine(d, h))
+                    # MODIFICATION : Utiliser 11:30 pour le jour suivant
+                    prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
                     break
                 if "SOIR" in dispo:
-                    h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                    prochaine_heure = make_aware(datetime.combine(d, h))
+                    prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
                     break
             logger.debug(f"[NEXT OPEN] {prochaine_heure}")
 
@@ -302,11 +309,12 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     heure_estimee_brute = chercher_prochain_creneau_disponible(prochaine_heure, mode='livraison')
     heure_estimee = arrondir_au_quart_heure(heure_estimee_brute)
 
-    # Ajustement léger possible (jamais avant debut_possible)
+    # Ajustement léger possible (jamais avant debut_possible ET doit être disponible)
     candidate = heure_estimee - timedelta(minutes=15)
     if (heure_estimee.minute == 15
         and (heure_estimee - prochaine_heure).seconds < 20 * 60
-        and candidate >= debut_possible):
+        and candidate >= debut_possible
+        and creneau_est_disponible(candidate.date(), candidate.time(), mode='livraison')):  # VÉRIFICATION CRITIQUE
         logger.debug(f"[AJUST] {heure_estimee} -> {candidate}")
         heure_estimee = candidate
 
@@ -319,12 +327,11 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
             j = JOURS_MAP[d.weekday()]
             services_dispos = HoraireDisponible.objects.filter(jour=j).values_list('service', flat=True).distinct()
             if "MIDI" in services_dispos:
-                h = get_heure_debut_service(j, "MIDI", time(11, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
+                # MODIFICATION : Utiliser 11:30 pour le lendemain
+                prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_MIDI))
                 break
             if "SOIR" in services_dispos:
-                h = get_heure_debut_service(j, "SOIR", time(18, 30))
-                prochaine_heure = make_aware(datetime.combine(d, h))
+                prochaine_heure = make_aware(datetime.combine(d, HEURE_OUVERTURE_CUISINE_SOIR))
                 break
         if not prochaine_heure:
             return {'error': "Aucun créneau de livraison disponible cette semaine."}
@@ -335,11 +342,22 @@ def estimer_heure_livraison(adresse_livraison, maintenant: datetime | None = Non
     jour_final = JOURS_MAP[heure_estimee.weekday()]
     service_final = get_service(heure_estimee)
 
+    # MODIFICATION : Vérifier si le service existe dans HoraireDisponible
     if not HoraireDisponible.objects.filter(jour=jour_final, service=service_final).exists():
         return {'error': f"Le service du {service_final.lower()} est fermé pour ce créneau."}
 
+    # MODIFICATION : Vérifications de cutoff
     if service_final == "MIDI" and heure_estimee.time() > HEURE_CUTOFF_MIDI:
-        return {'error': "Il est trop tard pour une livraison ce midi."}
+        # Mais attention : si le créneau est 14:45, c'est après le cutoff 14:30
+        # Vérifier si c'est un créneau valide dans HoraireDisponible
+        heure_str = heure_estimee.time().strftime("%H:%M")
+        creneau_valide = HoraireDisponible.objects.filter(
+            jour=jour_final, 
+            service=service_final
+        ).exists()
+        if not creneau_valide:
+            return {'error': "Il est trop tard pour une livraison ce midi."}
+    
     if service_final == "SOIR" and heure_estimee.time() > time(22, 30):
         return {'error': "Il est trop tard pour une livraison ce soir."}
 
@@ -353,34 +371,50 @@ def estimer_heure_retrait():
     Estime la prochaine heure de retrait (à emporter), alignée sur les créneaux de 15 minutes.
     """
     now_local = timezone.localtime()
-
-    # Horaires fixes (adapte selon ton modèle HoraireDisponible si besoin)
-    HEURE_OUVERTURE = time(11, 0)
-    HEURE_CUTOFF = time(14, 30)
-    HEURE_DEBUT_SOIR_LOCAL = time(18, 0)
+    
+    # MODIFICATION : Utiliser les mêmes constantes que pour la livraison
+    JOURS_MAP = {0: "LUN", 1: "MAR", 2: "MER", 3: "JEU", 4: "VEN", 5: "SAM", 6: "DIM"}
+    jour_semaine = JOURS_MAP[now_local.weekday()]
+    
+    # MODIFICATION : Cuisine ouvre à 11:30 midi et 18:30 soir
+    HEURE_OUVERTURE_CUISINE_MIDI = time(11, 30)
+    HEURE_CUTOFF_MIDI = time(14, 30)
+    HEURE_OUVERTURE_CUISINE_SOIR = time(18, 30)
     HEURE_FIN_SOIR = time(22, 30)
-
-    # Début prépa = maintenant ou début du prochain service
-    if now_local.time() < HEURE_CUTOFF:
-        debut_service = make_aware(datetime.combine(now_local.date(), HEURE_OUVERTURE))
+    
+    # Déterminer le service actuel
+    if now_local.time() < time(16, 0):
+        # Service MIDI
+        if now_local.time() < HEURE_CUTOFF_MIDI:
+            debut_service = make_aware(datetime.combine(now_local.date(), HEURE_OUVERTURE_CUISINE_MIDI))
+        else:
+            # Après cutoff MIDI, basculer vers SOIR si ouvert
+            debut_service = make_aware(datetime.combine(now_local.date(), HEURE_OUVERTURE_CUISINE_SOIR))
     else:
-        debut_service = make_aware(datetime.combine(now_local.date(), HEURE_DEBUT_SOIR_LOCAL))
-
+        # Service SOIR
+        debut_service = make_aware(datetime.combine(now_local.date(), HEURE_OUVERTURE_CUISINE_SOIR))
+    
     debut_prepa = max(now_local, debut_service)
-    fin_prepa = debut_prepa + timedelta(minutes=TEMPS_PREPARATION_MINUTES)  # MODIFICATION : Utilise le nouveau temps de préparation
-
+    fin_prepa = debut_prepa + timedelta(minutes=TEMPS_PREPARATION_MINUTES)
+    
     # Arrondi au quart d'heure supérieur
     minute_arrondie = ((fin_prepa.minute // 15) + 1) * 15
     if minute_arrondie >= 60:
         fin_prepa += timedelta(hours=1)
         minute_arrondie = 0
-
+    
     fin_prepa = fin_prepa.replace(minute=minute_arrondie, second=0, microsecond=0)
-
-    # Limite fin de service
-    if fin_prepa.time() > HEURE_FIN_SOIR:
+    
+    # Déterminer heure de fin selon service
+    service_courant = "MIDI" if now_local.time() < time(16, 0) else "SOIR"
+    if service_courant == "MIDI":
+        heure_fin = HEURE_CUTOFF_MIDI
+    else:
+        heure_fin = HEURE_FIN_SOIR
+    
+    if fin_prepa.time() > heure_fin:
         raise Exception("Il est trop tard pour commander à emporter aujourd'hui.")
-
+    
     # Cherche le créneau dispo en mode 'emporter'
     return chercher_prochain_creneau_disponible(fin_prepa, mode='emporter')
 

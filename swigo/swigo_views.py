@@ -994,7 +994,6 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 
 
-
 @csrf_exempt
 def programmer_pick_up(request):
     # Import des modèles et utilitaires
@@ -1014,43 +1013,75 @@ def programmer_pick_up(request):
         form = PickUpTimeForm(request.POST)
         if form.is_valid():
             heure_retrait = form.cleaned_data.get('heure_retrait')
-            service_selectionne = request.POST.get('service', 'MIDI')  # Récupérer le service choisi
-            date_pick_up = today
-
-            # Vérifier que le service sélectionné est ouvert aujourd'hui
-            jour_str = today.strftime('%a').upper()
+            service_selectionne = request.POST.get('service', 'MIDI')
+            
+            # Récupérer la date depuis le formulaire
+            date_str = request.POST.get('date_retrait')
+            try:
+                date_pick_up = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else today
+            except (ValueError, TypeError):
+                date_pick_up = today
+            
+            # Vérifier que le service sélectionné est ouvert ce jour-là
+            jour_str = date_pick_up.strftime('%a').upper()
             jour_traduit = jours_translation.get(jour_str, jour_str)
-            services_ouverts = list(HoraireDisponible.objects.filter(jour=jour_traduit).values_list('service', flat=True).distinct())
+            services_ouverts = list(HoraireDisponible.objects.filter(
+                jour=jour_traduit
+            ).values_list('service', flat=True).distinct())
             
             if service_selectionne not in services_ouverts:
-                return JsonResponse({'error': f"Le service {service_selectionne} n'est pas ouvert aujourd'hui"}, status=400)
+                return JsonResponse({
+                    'error': f"Le service {service_selectionne} n'est pas ouvert le {date_pick_up.strftime('%d/%m/%Y')}"
+                }, status=400)
 
+            # Vérifier si le restaurant est fermé ce jour-là
             if JourFermeture.est_ferme(date_pick_up):
-                motif_obj = JourFermeture.objects.filter(date_debut__lte=date_pick_up, date_fin__gte=date_pick_up).first()
+                motif_obj = JourFermeture.objects.filter(
+                    date_debut__lte=date_pick_up,
+                    date_fin__gte=date_pick_up
+                ).first()
                 motif = motif_obj.description if motif_obj else "fermeture exceptionnelle"
-                return JsonResponse({'error': f"Le restaurant est fermé ce jour-là : {motif}"}, status=400)
+                return JsonResponse({
+                    'error': f"Le restaurant est fermé le {date_pick_up.strftime('%d/%m/%Y')} : {motif}"
+                }, status=400)
 
+            # Récupérer la commande
             commande_id = request.POST.get('commande_id') or request.session.get('commande_id')
             if not commande_id:
                 return JsonResponse({'error': 'Aucune commande trouvée'}, status=400)
 
             commande = get_object_or_404(Commande, id=commande_id)
             
+            # Créer le datetime de retrait
             heure_retrait_dt = datetime.combine(date_pick_up, heure_retrait)
             heure_retrait_aware = timezone.make_aware(heure_retrait_dt)
             
+            # Vérifier si l'horaire n'est pas déjà passé (seulement pour aujourd'hui)
             if date_pick_up == now.date() and heure_retrait_aware <= now:
-                return JsonResponse({'error': "Vous ne pouvez pas sélectionner un horaire déjà passé"}, status=400)
+                return JsonResponse({
+                    'error': "Vous ne pouvez pas sélectionner un horaire déjà passé"
+                }, status=400)
 
+            # Vérifier la disponibilité du créneau
             if creneau_est_disponible(date_pick_up, heure_retrait, mode='emporter'):
+                # Mettre à jour la commande
                 commande.is_commande_a_emporter = True
                 commande.heure_pick_up_specifie = heure_retrait_aware
-                commande.service_pick_up = service_selectionne  # Stocker le service choisi
+                commande.date_livraison_specifiee = date_pick_up
+                commande.heure_livraison_specifiee = heure_retrait
+                commande.service_pick_up = service_selectionne
                 commande.save()
+                
                 return redirect('swigo:renseigner_commande')
             else:
-                return JsonResponse({'error': "Ce créneau est complet, veuillez en choisir un autre."}, status=400)
-        return JsonResponse({'error': "Données invalides", 'form_errors': form.errors}, status=400)
+                return JsonResponse({
+                    'error': f"Le créneau {heure_retrait} le {date_pick_up.strftime('%d/%m/%Y')} est complet, veuillez en choisir un autre."
+                }, status=400)
+        
+        return JsonResponse({
+            'error': "Données invalides",
+            'form_errors': form.errors
+        }, status=400)
 
     # --- GET METHOD ---
 
@@ -1199,7 +1230,7 @@ def programmer_pick_up(request):
         horaires_complets[date.strftime('%Y-%m-%d')] = horaires_par_service_complet
 
     # DEBUG : Afficher les informations
-    print(f"[DEBUG] Horaires disponibles aujourd'hui: {horaires_disponibles.get(today.strftime('%Y-%m-%d'), {})}")
+    print(f"[DEBUG] Horaires disponibles: {horaires_disponibles}")
     print(f"[DEBUG] Service actuel (sélection par défaut): {service_actuel}")
     print(f"[DEBUG] Services ouverts aujourd'hui: {services_ouverts}")
     print(f"[DEBUG] Heure estimée: {heure_estimee_str}")
@@ -1214,10 +1245,9 @@ def programmer_pick_up(request):
         }),
         'heure_estimee': heure_estimee_str,
         'service_actuel': service_actuel,
-        'services_ouverts': services_ouverts,  # Passer la liste des services ouverts
+        'services_ouverts': services_ouverts,
         'ferme': ferme
     })
-
 
 @csrf_exempt
 def verifier_code_promo(request):
