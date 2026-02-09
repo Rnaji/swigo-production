@@ -967,7 +967,7 @@ function demarrerTournee(tourneeNom) {
         // ... (ton code existant de badge, disable bouton, etc.)
 
         // 1. Génère le QR code (ici, on encode le nom de la tournée mais tu peux encoder ce que tu veux)
-        afficherQRCode(tourneeNom, `http://127.0.0.1:8000/tournees-livreurs/${tourneeNom}`);
+        afficherQRCode(tourneeNom, `http://app.enroutechef.com/tournees-livreurs/${tourneeNom}`);
 
         // 2. Persiste dans le localStorage
         localStorage.setItem(`qrcode_shown_${tourneeNom}`, "1");
@@ -993,7 +993,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const tourneeNom = div.id.replace("qrcode-", "");
         if (localStorage.getItem(`qrcode_shown_${tourneeNom}`) === "1") {
             // Génère le QR code (adapter ici le contenu à encoder si besoin)
-            afficherQRCode(tourneeNom, `http://127.0.0.1:8000/tournees-livreurs/${tourneeNom}`);
+            afficherQRCode(tourneeNom, `http://app.enroutechef.com/tournees-livreurs/${tourneeNom}`);
         }
     });
 });
