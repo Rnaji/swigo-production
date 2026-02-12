@@ -40,6 +40,9 @@ def arrondir_au_quart_heure(dt: datetime) -> datetime:
 # =========================
 # Créneaux & disponibilité
 # =========================
+# =========================
+# Créneaux & disponibilité
+# =========================
 def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
     """
     Vérifie si un créneau de 15 minutes [date, heure] est disponible
@@ -57,11 +60,10 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
 
     logger.debug(f"[CRÉNEAU] Vérif dispo {mode.upper()} — Début: {dt_debut}, Fin: {dt_fin}")
 
-    filtre_commande_valide = (
-        Q(is_delivered=False) &
-        ~Q(moyen_paiement__isnull=True) &
-        ~Q(moyen_paiement='')
-    )
+    # ✅ MODIFICATION : On compte TOUTES les commandes non livrées, 
+    #    quel que soit le statut de paiement (même Stripe en cours)
+    filtre_commande_valide = Q(is_delivered=False)
+    #    On supprime les filtres sur moyen_paiement qui excluaient les commandes Stripe en attente
 
     if mode == 'livraison':
         commandes = (Commande.objects
@@ -73,7 +75,6 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                      )
                      .filter(filtre_commande_valide))
         logger.debug(f"[LIVRAISON] Commandes valides sur créneau: {commandes.count()}")
-        # MODIFICATION : Retourne True uniquement si 0 commande (maximum 1)
         return commandes.count() < MAX_LIVRAISONS_PAR_CRENEAU
 
     elif mode == 'emporter':
