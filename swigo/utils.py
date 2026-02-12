@@ -62,30 +62,10 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
 
     logger.debug(f"[CRÉNEAU] Vérif dispo {mode.upper()} — Début: {dt_debut}, Fin: {dt_fin}")
 
-    # ⏱️ AUTO-NETTOYAGE INSTANTANÉ : 2 minutes et hop !
-    seuil_expiration = timezone.now() - timedelta(minutes=2)
-    
-    # ✅ AUTO-SUPPRESSION des commandes vides et expirées
-    #    🔥 C'EST ÇA LA MAGIE : suppression automatique en temps réel
-    commandes_expirees = Commande.objects.filter(
-        is_delivered=False,
-        is_paid=False,
-        panier_associe__articlepanier__isnull=True,
-        heure_creation__lt=seuil_expiration
-    )
-    if commandes_expirees.exists():
-        nb_expirees = commandes_expirees.count()
-        commandes_expirees.delete()
-        logger.info(f"[AUTO-NETTOYAGE] {nb_expirees} commandes vides supprimées automatiquement")
-
-    # ✅ Commandes qui comptent VRAIMENT
+    # ✅ UNIQUEMENT les commandes validées (commande_is_valid=True)
     filtre_commande_valide = (
         Q(is_delivered=False) &
-        (
-            Q(is_paid=True) |
-            Q(panier_associe__articlepanier__isnull=False) |
-            Q(heure_creation__gte=seuil_expiration)
-        )
+        Q(commande_is_valid=True)  # ← SEULEMENT les commandes validées
     )
 
     if mode == 'livraison':
@@ -96,8 +76,7 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_livraison_specifiee__gte=dt_debut.time(),
                          heure_livraison_specifiee__lt=dt_fin.time()
                      )
-                     .filter(filtre_commande_valide)
-                     .distinct())
+                     .filter(filtre_commande_valide))
         logger.debug(f"[LIVRAISON] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_LIVRAISONS_PAR_CRENEAU
 
@@ -108,8 +87,7 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_pick_up_specifie__gte=dt_debut,
                          heure_pick_up_specifie__lt=dt_fin
                      )
-                     .filter(filtre_commande_valide)
-                     .distinct())
+                     .filter(filtre_commande_valide))
         logger.debug(f"[EMPORTER] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_EMPORTES_PAR_CRENEAU
 
