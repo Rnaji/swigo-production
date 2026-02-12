@@ -41,8 +41,10 @@ def arrondir_au_quart_heure(dt: datetime) -> datetime:
 # Créneaux & disponibilité
 # =========================
 # =========================
-# Créneaux & disponibilité
-# =========================
+from django.utils import timezone
+from datetime import timedelta
+
+
 def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
     """
     Vérifie si un créneau de 15 minutes [date, heure] est disponible
@@ -60,10 +62,17 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
 
     logger.debug(f"[CRÉNEAU] Vérif dispo {mode.upper()} — Début: {dt_debut}, Fin: {dt_fin}")
 
-    # ✅ MODIFICATION : On compte TOUTES les commandes non livrées, 
-    #    quel que soit le statut de paiement (même Stripe en cours)
-    filtre_commande_valide = Q(is_delivered=False)
-    #    On supprime les filtres sur moyen_paiement qui excluaient les commandes Stripe en attente
+    # ⏱️ EXPIRATION : 5 minutes pour finaliser la commande
+    seuil_expiration = timezone.now() - timedelta(minutes=5)
+    
+    # ✅ Commandes valides = non livrées ET (payées OU créées depuis moins de 5 min)
+    filtre_commande_valide = (
+        Q(is_delivered=False) &
+        (
+            Q(is_paid=True) |  # Commandes payées (définitives)
+            Q(heure_creation__gte=seuil_expiration)  # Commandes récentes (< 5 min)
+        )
+    )
 
     if mode == 'livraison':
         commandes = (Commande.objects
