@@ -62,16 +62,29 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
 
     logger.debug(f"[CRÉNEAU] Vérif dispo {mode.upper()} — Début: {dt_debut}, Fin: {dt_fin}")
 
-    # ⏱️ EXPIRATION : 2 minutes pour ajouter un article au panier
+    # ⏱️ AUTO-NETTOYAGE INSTANTANÉ : 2 minutes et hop !
     seuil_expiration = timezone.now() - timedelta(minutes=2)
     
-    # ✅ Commandes valides = non livrées ET (payées OU avec article OU très récente)
+    # ✅ AUTO-SUPPRESSION des commandes vides et expirées
+    #    🔥 C'EST ÇA LA MAGIE : suppression automatique en temps réel
+    commandes_expirees = Commande.objects.filter(
+        is_delivered=False,
+        is_paid=False,
+        panier_associe__articlepanier__isnull=True,
+        heure_creation__lt=seuil_expiration
+    )
+    if commandes_expirees.exists():
+        nb_expirees = commandes_expirees.count()
+        commandes_expirees.delete()
+        logger.info(f"[AUTO-NETTOYAGE] {nb_expirees} commandes vides supprimées automatiquement")
+
+    # ✅ Commandes qui comptent VRAIMENT
     filtre_commande_valide = (
         Q(is_delivered=False) &
         (
-            Q(is_paid=True) |                                      # Payé = définitif
-            Q(panier_associe__articlepanier__isnull=False) |      # ✅ A au moins 1 article
-            Q(heure_creation__gte=seuil_expiration)               # Créée depuis < 2 min
+            Q(is_paid=True) |
+            Q(panier_associe__articlepanier__isnull=False) |
+            Q(heure_creation__gte=seuil_expiration)
         )
     )
 
