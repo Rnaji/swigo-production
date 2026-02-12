@@ -62,15 +62,16 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
 
     logger.debug(f"[CRÉNEAU] Vérif dispo {mode.upper()} — Début: {dt_debut}, Fin: {dt_fin}")
 
-    # ⏱️ EXPIRATION : 5 minutes pour finaliser la commande
-    seuil_expiration = timezone.now() - timedelta(minutes=5)
+    # ⏱️ EXPIRATION : 2 minutes pour ajouter un article au panier
+    seuil_expiration = timezone.now() - timedelta(minutes=2)
     
-    # ✅ Commandes valides = non livrées ET (payées OU créées depuis moins de 5 min)
+    # ✅ Commandes valides = non livrées ET (payées OU avec article OU très récente)
     filtre_commande_valide = (
         Q(is_delivered=False) &
         (
-            Q(is_paid=True) |  # Commandes payées (définitives)
-            Q(heure_creation__gte=seuil_expiration)  # Commandes récentes (< 5 min)
+            Q(is_paid=True) |                              # Payé = définitif
+            Q(panier__articlepanier__isnull=False) |      # A au moins 1 article
+            Q(heure_creation__gte=seuil_expiration)       # Créée depuis < 2 min
         )
     )
 
@@ -82,7 +83,8 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_livraison_specifiee__gte=dt_debut.time(),
                          heure_livraison_specifiee__lt=dt_fin.time()
                      )
-                     .filter(filtre_commande_valide))
+                     .filter(filtre_commande_valide)
+                     .distinct())  # 🔴 AJOUT IMPORTANT
         logger.debug(f"[LIVRAISON] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_LIVRAISONS_PAR_CRENEAU
 
@@ -93,7 +95,8 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_pick_up_specifie__gte=dt_debut,
                          heure_pick_up_specifie__lt=dt_fin
                      )
-                     .filter(filtre_commande_valide))
+                     .filter(filtre_commande_valide)
+                     .distinct())  # 🔴 AJOUT IMPORTANT
         logger.debug(f"[EMPORTER] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_EMPORTES_PAR_CRENEAU
 
