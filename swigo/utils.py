@@ -69,9 +69,9 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
     filtre_commande_valide = (
         Q(is_delivered=False) &
         (
-            Q(is_paid=True) |                              # Payé = définitif
-            Q(panier__articlepanier__isnull=False) |      # A au moins 1 article
-            Q(heure_creation__gte=seuil_expiration)       # Créée depuis < 2 min
+            Q(is_paid=True) |                                      # Payé = définitif
+            Q(panier_associe__articlepanier__isnull=False) |      # ✅ A au moins 1 article
+            Q(heure_creation__gte=seuil_expiration)               # Créée depuis < 2 min
         )
     )
 
@@ -84,7 +84,7 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_livraison_specifiee__lt=dt_fin.time()
                      )
                      .filter(filtre_commande_valide)
-                     .distinct())  # 🔴 AJOUT IMPORTANT
+                     .distinct())
         logger.debug(f"[LIVRAISON] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_LIVRAISONS_PAR_CRENEAU
 
@@ -96,7 +96,7 @@ def creneau_est_disponible(date, heure, mode: str = "livraison") -> bool:
                          heure_pick_up_specifie__lt=dt_fin
                      )
                      .filter(filtre_commande_valide)
-                     .distinct())  # 🔴 AJOUT IMPORTANT
+                     .distinct())
         logger.debug(f"[EMPORTER] Commandes valides sur créneau: {commandes.count()}")
         return commandes.count() < MAX_EMPORTES_PAR_CRENEAU
 
