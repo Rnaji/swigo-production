@@ -7038,7 +7038,7 @@ def ajouter_couscous_personnalise(request):
 
 
         if xl:
-            prix_total += Decimal("2.00")
+            prix_total += Decimal("2.90")
 
         couscous.prix_total = prix_total
         couscous.save()
