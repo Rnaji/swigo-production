@@ -1320,7 +1320,7 @@ class ViandeCouscous(models.Model):
 # -----------------------------------
 class OptionXL(models.Model):
     nom = models.CharField(max_length=100, default="Option XL")
-    supplement = models.DecimalField(max_digits=5, decimal_places=2, default=2.90)
+    supplement = models.DecimalField(max_digits=5, decimal_places=2, default=3.90)
     description = models.TextField(blank=True)
 
     def __str__(self):
