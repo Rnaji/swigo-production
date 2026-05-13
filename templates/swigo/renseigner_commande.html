@@ -2313,23 +2313,28 @@ function configurerCouscousPersonnalise(bouton) {
             }
 
             function appliquerFormule(formuleNom) {
-                maxViandes = {
-                    "Couscous Tradition": 1,
-                    "Couscous Gourmand": 2,
-                    "Couscous 2 Palmiers": 3,
-                    "Couscous Royal": 4,
-                }[formuleNom] || 0;
+    maxViandes = {
+        "Couscous Tradition": 1,
+        "Couscous Gourmand": 2,
+        "Couscous 2 Palmiers": 3,
+        "Couscous Royal": 4,
+    }[formuleNom] || 0;
 
-                if (formuleNom === "Couscous Végétarien") {
-                    blocViandes.style.display = 'none';
-                } else {
-                    blocViandes.style.display = 'block';
-                }
+    // Masquer la section viandes pour Végétarien ET Royal
+    if (formuleNom === "Couscous Végétarien" || formuleNom === "Couscous Royal") {
+        blocViandes.style.display = 'none';
+        // Pour Royal, afficher un message informatif
+        if (formuleNom === "Couscous Royal" && viandeContainer) {
+            viandeContainer.innerHTML = '<div class="alert alert-success mt-2 mb-2"><small>✅ Viandes incluses : brochette, merguez, poulet & boulettes</small></div>';
+        }
+    } else {
+        blocViandes.style.display = 'block';
+        afficherViandes();
+    }
 
-                blocAccompagnements.style.display = 'block';
-                afficherViandes();
-                afficherAccompagnements();
-            }
+    blocAccompagnements.style.display = 'block';
+    afficherAccompagnements();
+}
 
             // Sélection initiale
             const radioVeg = Array.from(radioFormules).find(r => r.value === "Couscous Végétarien");
