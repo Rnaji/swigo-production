@@ -6967,7 +6967,6 @@ from decimal import Decimal
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
-
 @csrf_exempt
 def ajouter_couscous_personnalise(request):
     if request.method != 'POST':
@@ -7036,9 +7035,15 @@ def ajouter_couscous_personnalise(request):
         else:
             print(f"⚠️ Aucun accompagnement reçu pour couscous #{couscous.id}")
 
-
+        # ✅ Ajout du prix de l'option XL depuis la base de données
         if xl:
-            prix_total += Decimal("2.90")
+            from .models import OptionXL
+            option_xl_obj = OptionXL.objects.first()
+            if option_xl_obj:
+                prix_total += option_xl_obj.supplement
+            else:
+                # Fallback au cas où l'objet n'existe pas
+                prix_total += Decimal("3.90")
 
         couscous.prix_total = prix_total
         couscous.save()
