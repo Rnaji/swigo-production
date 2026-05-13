@@ -1099,7 +1099,7 @@ class Panier(models.Model):
     commande = models.OneToOneField('Commande', on_delete=models.SET_NULL, null=True, blank=True, related_name='panier_associe')
     created_at = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)  # ✅ Ajout ici
-    frais_livraison = models.DecimalField(max_digits=5, decimal_places=2, default=3.50)
+    frais_livraison = models.DecimalField(max_digits=5, decimal_places=2, default=4.90)
     frais_gestion = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     code_promo = models.ForeignKey('CodePromo', on_delete=models.SET_NULL, null=True, blank=True)
     promotion = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
