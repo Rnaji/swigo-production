@@ -4947,8 +4947,7 @@ def get_commandes_cuisine(request):
                 'is_pickup': is_pickup,
                 'heure_emport': localtime(heure_emport).strftime('%H:%M') if heure_emport else None,
                 'heure_emport_sort': heure_emport.isoformat() if heure_emport else None,
-                'heure_livraison': localtime(heure_livraison).strftime('%H:%M') if heure_livraison else None,
-            })
+                'heure_livraison': heure_livraison.strftime('%H:%M') if heure_livraison else None,            })
 
         # Commandes à emporter sans tournée
         commandes_emporter = commandes.filter(
