@@ -217,9 +217,13 @@ let tourneeHTML = `
                         ` : ''}
                         <span>
                             ${tournee.is_pickup
-                                ? `📦 Emporté ${commandeIds} — Heure : ${tournee.heure_emport || '–'}`
-                                : `🚚 Tournée ${tournee.tournee_nom} <span class="text-muted small">(Commandes: ${commandeIds})</span>`
-                            }
+                            ? `📦 Emporté ${commandeIds} — Heure : ${tournee.heure_emport || '–'}`
+                            : `🚚 Tournée ${tournee.tournee_nom} 
+                            <span class="text-muted small">
+                                (Commandes: ${commandeIds})
+                                — Livraison : ${tournee.heure_livraison || '–'}
+                            </span>`
+                        }
                         </span>
                         ${hasCouvertsBois ? '<span class="badge bg-warning text-dark">🍴 Couverts bois</span>' : ''}
                         <span class="badge bg-success">✅ Réception cuisine</span>

@@ -4911,6 +4911,7 @@ def get_commandes_cuisine(request):
             commande = tournee_commandes.first().commande if tournee_commandes.exists() else None
             is_pickup = commande and commande.is_commande_a_emporter
             heure_emport = commande.heure_pick_up_specifie if is_pickup else None
+            heure_livraison = commande.heure_livraison if commande and not is_pickup else None
 
             cuisson_en_cours = False
             cuisson_start_times = []
@@ -4946,6 +4947,7 @@ def get_commandes_cuisine(request):
                 'is_pickup': is_pickup,
                 'heure_emport': localtime(heure_emport).strftime('%H:%M') if heure_emport else None,
                 'heure_emport_sort': heure_emport.isoformat() if heure_emport else None,
+                'heure_livraison': localtime(heure_livraison).strftime('%H:%M') if heure_livraison else None,
             })
 
         # Commandes à emporter sans tournée
