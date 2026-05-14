@@ -3697,50 +3697,60 @@ window.handleValiderCommandeModal = function () {
     validerCommandeBtn.replaceWith(validerCommandeBtn.cloneNode(true));
     const newBtn = document.getElementById('validerCommandeBtn');
 
-    newBtn.addEventListener('click', async () => {
-        // Désactiver le bouton temporairement
-        newBtn.disabled = true;
+    // Éviter les doublons d'écouteurs sur le bouton
+    if (!window.validerBtnListenerAdded) {
+        window.validerBtnListenerAdded = true;
         
-        try {
-            const response = await fetch('/get_panier_minimum/');
-            const data = await response.json();
+        newBtn.addEventListener('click', async () => {
+            // Désactiver le bouton temporairement
+            newBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/get_panier_minimum/');
+                const data = await response.json();
 
-            if (data.error) {
-                alert("Erreur : " + data.error);
-                newBtn.disabled = false;
-                return;
+                if (data.error) {
+                    alert("Erreur : " + data.error);
+                    newBtn.disabled = false;
+                    return;
+                }
+
+                const montant = parseFloat(data.montant_panier);
+                const minimum = parseFloat(data.panier_minimum);
+
+                if (montant < minimum) {
+                    alert(`⚠️ Le minimum de commande pour ${data.ville} est de ${minimum.toFixed(2)} €. Votre panier est de ${montant.toFixed(2)} €.`);
+                    newBtn.disabled = false;
+                    return;
+                }
+
+                // Fermer le panier avant d'ouvrir la modal
+                const closeBtn = document.querySelector('.panel-close-btn');
+                if (closeBtn) closeBtn.click();
+
+                setTimeout(() => {
+                    modal.show();
+                }, 200);
+
+            } catch (e) {
+                console.error("Erreur pendant la vérification du panier minimum :", e);
+                alert("Erreur lors de la vérification du panier.");
+            } finally {
+                setTimeout(() => { newBtn.disabled = false; }, 1000);
             }
+        });
+    }
 
-            const montant = parseFloat(data.montant_panier);
-            const minimum = parseFloat(data.panier_minimum);
-
-            if (montant < minimum) {
-                alert(`⚠️ Le minimum de commande pour ${data.ville} est de ${minimum.toFixed(2)} €. Votre panier est de ${montant.toFixed(2)} €.`);
-                newBtn.disabled = false;
-                return;
-            }
-
-            modal.show();
-
-        } catch (e) {
-            console.error("Erreur pendant la vérification du panier minimum :", e);
-            alert("Erreur lors de la vérification du panier.");
-        } finally {
-            // Réactiver après 1 seconde
-            setTimeout(() => { newBtn.disabled = false; }, 1000);
-        }
-    });
-
-    // 🔥 CORRECTION : Éviter les doublons d'écouteurs sur la modal
+    // 🔥 Éviter les doublons d'écouteurs sur la modal
     if (!window.modalShowListenerAdded) {
         window.modalShowListenerAdded = true;
         
         validerCommandeModal.addEventListener('show.bs.modal', function () {
-            // Éviter les exécutions multiples
-            if (this.hasAttribute('data-processing')) return;
-            this.setAttribute('data-processing', 'true');
-            
             console.log("Modal de validation de commande affiché.");
+            
+            // Éviter les appels multiples pendant le chargement
+            if (this.getAttribute('data-loading') === 'true') return;
+            this.setAttribute('data-loading', 'true');
 
             fetch('/get_adresse_livraison/', {
                 method: 'GET',
@@ -3759,8 +3769,6 @@ window.handleValiderCommandeModal = function () {
                     if (adresseLivraisonField) {
                         adresseLivraisonField.value = data.adresse_livraison;
                         console.log("Adresse de livraison récupérée :", data.adresse_livraison);
-                    } else {
-                        console.error("Champ 'adresse_livraison' introuvable dans le DOM.");
                     }
                 } else {
                     console.error("Erreur récupération adresse :", data.message || "Aucune adresse.");
@@ -3771,7 +3779,7 @@ window.handleValiderCommandeModal = function () {
             })
             .finally(() => {
                 setTimeout(() => {
-                    validerCommandeModal.removeAttribute('data-processing');
+                    validerCommandeModal.removeAttribute('data-loading');
                 }, 500);
             });
         });
