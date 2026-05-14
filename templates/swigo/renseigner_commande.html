@@ -3686,6 +3686,7 @@ window.handleValiderCommandeModal = function () {
         console.error("Élément 'validerCommandeModal' introuvable dans le DOM.");
         return;
     }
+
     if (!validerCommandeBtn) {
         console.error("Bouton 'validerCommandeBtn' introuvable dans le DOM.");
         return;
@@ -3693,97 +3694,84 @@ window.handleValiderCommandeModal = function () {
 
     const modal = new bootstrap.Modal(validerCommandeModal);
 
-    // Supprime tous les anciens handlers click pour éviter les doublons
-    validerCommandeBtn.replaceWith(validerCommandeBtn.cloneNode(true));
-    const newBtn = document.getElementById('validerCommandeBtn');
+    // ✅ Gestion du clic sans doublon
+    validerCommandeBtn.onclick = async function () {
+        validerCommandeBtn.disabled = true;
 
-    // Éviter les doublons d'écouteurs sur le bouton
-    if (!window.validerBtnListenerAdded) {
-        window.validerBtnListenerAdded = true;
-        
-        newBtn.addEventListener('click', async () => {
-            // Désactiver le bouton temporairement
-            newBtn.disabled = true;
-            
-            try {
-                const response = await fetch('/get_panier_minimum/');
-                const data = await response.json();
+        try {
+            const response = await fetch('/get_panier_minimum/');
+            const data = await response.json();
 
-                if (data.error) {
-                    alert("Erreur : " + data.error);
-                    newBtn.disabled = false;
-                    return;
-                }
-
-                const montant = parseFloat(data.montant_panier);
-                const minimum = parseFloat(data.panier_minimum);
-
-                if (montant < minimum) {
-                    alert(`⚠️ Le minimum de commande pour ${data.ville} est de ${minimum.toFixed(2)} €. Votre panier est de ${montant.toFixed(2)} €.`);
-                    newBtn.disabled = false;
-                    return;
-                }
-
-                // Fermer le panier avant d'ouvrir la modal
-                const closeBtn = document.querySelector('.panel-close-btn');
-                if (closeBtn) closeBtn.click();
-
-                setTimeout(() => {
-                    modal.show();
-                }, 200);
-
-            } catch (e) {
-                console.error("Erreur pendant la vérification du panier minimum :", e);
-                alert("Erreur lors de la vérification du panier.");
-            } finally {
-                setTimeout(() => { newBtn.disabled = false; }, 1000);
+            if (data.error) {
+                alert("Erreur : " + data.error);
+                return;
             }
-        });
-    }
 
-    // 🔥 Éviter les doublons d'écouteurs sur la modal
-    if (!window.modalShowListenerAdded) {
-        window.modalShowListenerAdded = true;
-        
-        validerCommandeModal.addEventListener('show.bs.modal', function () {
-            console.log("Modal de validation de commande affiché.");
-            
-            // Éviter les appels multiples pendant le chargement
-            if (this.getAttribute('data-loading') === 'true') return;
-            this.setAttribute('data-loading', 'true');
+            const montant = parseFloat(data.montant_panier);
+            const minimum = parseFloat(data.panier_minimum);
 
-            fetch('/get_adresse_livraison/', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
+            if (montant < minimum) {
+                alert(`⚠️ Le minimum de commande pour ${data.ville} est de ${minimum.toFixed(2)} €. Votre panier est de ${montant.toFixed(2)} €.`);
+                return;
+            }
+
+            // Fermer le panier avant d’ouvrir la modal
+            const closeBtn = document.querySelector('.panel-close-btn');
+            if (closeBtn) closeBtn.click();
+
+            setTimeout(() => {
+                modal.show();
+            }, 200);
+
+        } catch (e) {
+            console.error("Erreur pendant la vérification du panier minimum :", e);
+            alert("Erreur lors de la vérification du panier.");
+        } finally {
+            setTimeout(() => {
+                validerCommandeBtn.disabled = false;
+            }, 1000);
+        }
+    };
+
+    // ✅ Éviter les doublons sur l'ouverture de la modal
+    validerCommandeModal.onshow = null;
+
+    validerCommandeModal.addEventListener('show.bs.modal', function () {
+        console.log("Modal de validation de commande affichée.");
+
+        if (this.getAttribute('data-loading') === 'true') return;
+        this.setAttribute('data-loading', 'true');
+
+        fetch('/get_adresse_livraison/', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const adresseLivraisonField = document.getElementById('adresse_livraison');
+                if (adresseLivraisonField) {
+                    adresseLivraisonField.value = data.adresse_livraison;
                 }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    const adresseLivraisonField = document.getElementById('adresse_livraison');
-                    if (adresseLivraisonField) {
-                        adresseLivraisonField.value = data.adresse_livraison;
-                        console.log("Adresse de livraison récupérée :", data.adresse_livraison);
-                    }
-                } else {
-                    console.error("Erreur récupération adresse :", data.message || "Aucune adresse.");
-                }
-            })
-            .catch(error => {
-                console.error("Erreur requête adresse livraison :", error);
-            })
-            .finally(() => {
-                setTimeout(() => {
-                    validerCommandeModal.removeAttribute('data-loading');
-                }, 500);
-            });
+            } else {
+                console.error("Erreur récupération adresse :", data.message || "Aucune adresse.");
+            }
+        })
+        .catch(error => {
+            console.error("Erreur requête adresse livraison :", error);
+        })
+        .finally(() => {
+            setTimeout(() => {
+                validerCommandeModal.removeAttribute('data-loading');
+            }, 500);
         });
-    }
+    }, { once: false });
 };
 
 
