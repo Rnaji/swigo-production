@@ -4177,49 +4177,7 @@ document.addEventListener('DOMContentLoaded', function() {
     limitCheckboxSelection('.sauce-container', maxSauce);
 });
 
-document.addEventListener('DOMContentLoaded', function () {
-    var validerBtn = document.getElementById('validerCommandeBtn');
-    if (validerBtn) {
-        validerBtn.addEventListener('click', async function () {
-            // 1. Vérifie le panier minimum côté serveur AVANT toute action
-            try {
-                const resp = await fetch('/get_panier_minimum/');
-                const data = await resp.json();
 
-                if (data.error) {
-                    alert("Erreur lors de la vérification du panier minimum.");
-                    return;
-                }
-
-                if (data.montant_panier < data.panier_minimum) {
-                    // Affiche le warning panier
-                    const warningDiv = document.getElementById('panier-warning');
-                    if (warningDiv) {
-                        warningDiv.textContent = `⚠️ Le minimum de commande pour ${data.ville} est de ${data.panier_minimum.toFixed(2)} €. Votre panier est de ${data.montant_panier.toFixed(2)} €.`;
-                        warningDiv.style.display = 'block';
-                    }
-                    // Scroll vers les plats
-                    const platsSection = document.getElementById('masonry');
-                    if (platsSection) platsSection.scrollIntoView({ behavior: 'smooth' });
-                    return; // STOP : on n'ouvre pas la modal
-                }
-
-                // 2. Si montant OK, ferme le panier puis ouvre la modal infos client
-                var closeBtn = document.querySelector('.panel-close-btn');
-                if (closeBtn) closeBtn.click();
-
-                setTimeout(function () {
-                    var modal = new bootstrap.Modal(document.getElementById('validerCommandeModal'));
-                    modal.show();
-                }, 200);
-
-            } catch (e) {
-                alert("Erreur lors de la vérification du panier minimum.");
-                console.error(e);
-            }
-        });
-    }
-});
 
 function openMenuModal(menuId, nom, imageUrl, description, prix) {
     console.log("🟢 openMenuModal appelée avec ID =", menuId);
