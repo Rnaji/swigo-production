@@ -120,6 +120,7 @@ urlpatterns = [
     path("ajouter_menu_personnalise/", swigo_views.ajouter_menu_personnalise, name="ajouter_menu_personnalise"),
     path('api/choix_menu/<int:menu_id>/', swigo_views.api_choix_menu, name='api_choix_menu'),
     path('menus_par_categorie_ajax/', swigo_views.menus_par_categorie_ajax, name='menus_par_categorie_ajax'),
+    path("notre-menu/", swigo_views.menu_affichage, name="menu_affichage"),
     
     # =================== PAIEMENT & CONFIRMATION ===================
     path('success/', swigo_views.paiement_succes, name='stripe_success'),
@@ -214,7 +215,13 @@ urlpatterns = [
     path("production/produit/<int:produit_id>/fiche-technique/", login_required(staff_member_required(swigo_views.fiche_technique)), name="fiche_technique"),
     path("production/produit/<int:produit_id>/recette/", login_required(staff_member_required(swigo_views.recette_detail)), name="recette_detail"),
     path("production/produit/<int:produit_id>/ordre-fabrication/", login_required(staff_member_required(swigo_views.ordre_fabrication)), name="ordre_fabrication"),
+
+
 ]
+
+
+
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

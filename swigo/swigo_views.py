@@ -8737,3 +8737,13 @@ def get_plat_detail(request, plat_id):
     except Exception as e:
         logger.exception("Erreur dans get_plat_detail")
         return JsonResponse({"error": str(e)}, status=500)
+
+
+from django.shortcuts import render
+from .models import Plat, Categorie
+
+def menu_affichage(request):
+    categories = Categorie.objects.all().order_by("ordre")
+    return render(request, "swigo/menu_affichage.html", {
+        "categories": categories,
+    })
