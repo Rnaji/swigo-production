@@ -21,16 +21,21 @@
     <link rel="stylesheet" href="{% static 'assets/css/fullcalendar.main.css' %}">
     <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
 
+    {% block extra_css %}{% endblock %}
+
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{% static 'assets/flaticon/livraison-de-nourriture.png' %}" sizes="64x64">
 
     <!-- Title -->
     <title>{% block title %}En Route Chef!{% endblock %}</title>
 
-
 </head>
 
 <body class="boxed-size">
+
+
+
     <!-- Start Preloader Area -->
     <div class="preloader" id="preloader">
         <div class="preloader">
@@ -42,7 +47,6 @@
             </div>
         </div>
     </div>
-    <!-- End Preloader Area -->
 
 <!-- Start Sidebar Area -->
 <div class="sidebar-area" id="sidebar-area">
@@ -249,7 +253,7 @@
     <script src="{% static 'assets/js/custom/apexcharts.js' %}"></script>
     <script src="{% static 'assets/js/custom/custom.js' %}"></script>
     <!-- Autres fichiers JS -->
-    {% block scripts %}{% endblock %}
-
+{% block scripts %}{% endblock %}
+{% block extra_js %}{% endblock %}
 </body>
 </html>

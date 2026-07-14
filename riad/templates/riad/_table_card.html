@@ -1,0 +1,27 @@
+<div class="table-card"
+     id="table-{{ table.numero }}"
+     style="grid-column:{{ table.grid_x }}; grid-row:{{ table.grid_y }};"
+     data-table-numero="{{ table.numero }}">
+
+    <div class="table-top">
+        <span class="table-title">TABLE {{ table.numero }}</span>
+        <span class="table-time"></span>
+    </div>
+
+    <div class="table-center">
+        <span class="material-symbols-outlined table-icon">
+            table_restaurant
+        </span>
+
+        <div class="table-action">
+            Chargement...
+        </div>
+    </div>
+
+    <div class="table-bottom">
+        <div class="progress">
+            <div class="progress-bar"></div>
+        </div>
+    </div>
+
+</div>

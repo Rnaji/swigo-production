@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'swigo.apps.SwigoConfig',
     'django_extensions', 
     'parler',
+    'riad',
 ]
 
 MIDDLEWARE = [

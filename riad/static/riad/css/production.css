@@ -1,0 +1,79 @@
+/* ===================================
+   HEADER PRODUCTION
+=================================== */
+
+.production-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+}
+
+.header-left h1{
+    margin:0;
+    font-size:34px;
+    font-weight:900;
+    color:#111;
+}
+
+.header-left p{
+    margin:6px 0 0;
+    font-weight:700;
+    color:#333;
+}
+
+.header-right{
+    display:flex;
+    align-items:center;
+}
+
+.production-tabs{
+    display:flex;
+    align-items:center;
+    gap:14px;
+}
+
+.production-tab{
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    height:52px;
+
+    padding:0 22px;
+
+    border-radius:16px;
+
+    background:#e5e7eb;
+
+    color:#111827;
+
+    text-decoration:none;
+
+    font-size:18px;
+    font-weight:900;
+
+    transition:.2s;
+
+}
+
+.production-tab.active{
+
+    background:#111827;
+    color:white;
+
+}
+
+.production-tab:hover{
+
+    transform:translateY(-2px);
+
+}
+
+.production-tab.salle-tab.active{
+
+    background:#111827;
+
+}
+

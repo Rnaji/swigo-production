@@ -1,0 +1,180 @@
+{% extends "assets/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'riad/css/production.css' %}">
+<link rel="stylesheet" href="{% static 'riad/css/kitchen.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="kitchen-page">
+
+    <div class="kitchen-header">
+
+        <div class="header-left">
+
+            {% if station == "bar" %}
+                <h1>🥤 Office</h1>
+            {% else %}
+                <h1>👨‍🍳 Cuisine</h1>
+            {% endif %}
+
+            <p>
+                📋 <span id="ticketCount">{{ tickets|length }}</span> bon(s)
+                <span id="lateCount" class="late-count"></span>
+            </p>
+
+        </div>
+
+        <div class="header-right">
+
+            <div class="production-tabs">
+
+                <a href="/riad/salle/" class="production-tab salle-tab">
+                    Salle
+                </a>
+
+                <a
+                    href="/riad/kitchen/?station=kitchen"
+                    class="production-tab {% if station == 'kitchen' %}active{% endif %}">
+                    👨‍🍳 Cuisine
+                </a>
+
+                <a
+                    href="/riad/kitchen/?station=bar"
+                    class="production-tab {% if station == 'bar' %}active{% endif %}">
+                    🥤 Office
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="kitchen-board">
+
+        {% for ticket in tickets %}
+
+        <div class="kitchen-ticket">
+
+            <div class="ticket-top">
+
+                <div class="ticket-number">
+
+                    {% if ticket.ticket_type == "extra" %}
+                        🟠 SUPPLÉMENT #{{ ticket.id }}
+                    {% else %}
+                        BON #{{ ticket.id }}
+                    {% endif %}
+
+                </div>
+
+                <div
+                    class="ticket-waiting-time"
+                    data-sent-at="{{ ticket.sent_at|date:'c' }}">
+                    🟢 00:00
+                </div>
+
+            </div>
+
+            <div class="ticket-table">
+                TABLE {{ ticket.table.numero }}
+            </div>
+
+            <div class="ticket-time">
+                {{ ticket.sent_at|date:"H:i" }}
+            </div>
+
+            {% regroup ticket.items.all by section.name as sections %}
+
+            <div class="kitchen-ticket-sections">
+
+                {% for section in sections %}
+
+                <div class="kitchen-ticket-section">
+
+                    <div class="kitchen-ticket-section-title">
+
+                        {% if section.grouper == "Mocktail" %}🍹{% endif %}
+                        {% if section.grouper == "Boisson" %}🥤{% endif %}
+                        {% if section.grouper == "Eau" %}💧{% endif %}
+                        {% if section.grouper == "Entrée" %}🍴{% endif %}
+                        {% if section.grouper == "Plat" %}🍲{% endif %}
+                        {% if section.grouper == "Dessert" %}🍰{% endif %}
+                        {% if section.grouper == "Thé / Café" %}☕{% endif %}
+
+                        {{ section.grouper }}
+
+                    </div>
+
+                    {% for item in section.list %}
+
+                    <div class="kitchen-ticket-line">
+
+    <span class="qty-badge">
+        {{ item.quantity }}
+    </span>
+
+    <div class="product-name">
+        {{ item.product.name }}
+
+        {% if item.note %}
+            <div class="ticket-note">
+                📝 {{ item.note }}
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+                    {% endfor %}
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            <div class="ticket-footer">
+
+                <button
+                    class="kitchen-done-btn"
+                    data-ticket="{{ ticket.id }}">
+                    ✅ TERMINÉ
+                </button>
+
+            </div>
+
+        </div>
+
+        {% empty %}
+
+        <div class="kitchen-empty">
+
+            {% if station == "bar" %}
+                <h2>🥤 Aucun ticket Office</h2>
+                <p>Les nouvelles boissons apparaîtront ici.</p>
+            {% else %}
+                <h2>👨‍🍳 Aucun bon cuisine</h2>
+                <p>Les nouvelles commandes apparaîtront ici.</p>
+            {% endif %}
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+<audio id="newTicketSound" preload="auto">
+    <source src="{% static 'riad/sounds/new-ticket.mp3' %}" type="audio/mpeg">
+</audio>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'riad/js/kitchen.js' %}"></script>
+{% endblock %}

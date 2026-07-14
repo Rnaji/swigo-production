@@ -1,0 +1,289 @@
+{% extends "assets/base.html" %}
+{% load static %}
+
+{% block title %}Salle{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'riad/css/production.css' %}">
+<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=92">
+
+<div class="riad-wrapper">
+
+    <div class="kitchen-header">
+
+        <div class="header-left">
+
+            <h1>🪑 Salle</h1>
+
+            <p>
+                📋 Gestion des tables
+            </p>
+
+        </div>
+
+        <div class="header-right">
+
+            <div class="production-tabs">
+
+                <a
+                    href="/riad/salle/"
+                    class="production-tab salle-tab active">
+                    🪑 Salle
+                </a>
+
+                <a
+                    href="/riad/kitchen/?station=kitchen"
+                    class="production-tab">
+                    👨‍🍳 Cuisine
+                </a>
+
+                <a
+                    href="/riad/kitchen/?station=bar"
+                    class="production-tab">
+                    🥤 Office
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% for room in rooms %}
+        {% include "riad/_room.html" %}
+    {% endfor %}
+
+</div>
+
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<aside class="table-drawer" id="tableDrawer">
+
+    <button class="drawer-close" id="drawerClose">
+        ×
+    </button>
+
+    <div class="drawer-head">
+
+        <span class="drawer-room" id="drawerRoom">
+            Salle
+        </span>
+
+        <div class="drawer-title-row">
+
+            <div class="drawer-title-left">
+
+                <h2 id="drawerTitle">
+                    Table
+                </h2>
+
+                <button
+                    type="button"
+                    class="drawer-add-btn"
+                    id="drawerAddItem"
+                    title="Ajouter un produit">
+
+                    <span class="material-symbols-outlined">
+                        add
+                    </span>
+
+                </button>
+
+            </div>
+
+            <button
+                class="drawer-close"
+                id="drawerClose">
+                ×
+            </button>
+
+        </div>
+
+        <div class="drawer-meta">
+
+            <div>
+                <span>État</span>
+                <strong id="drawerAction">
+                    Libre
+                </strong>
+            </div>
+
+            <div>
+                <span>Temps</span>
+                <strong id="drawerTime">
+                    --
+                </strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="drawer-progress">
+        <div id="drawerProgressBar"></div>
+    </div>
+
+    <section class="drawer-block">
+        <div
+            class="service-timeline"
+            id="drawerTimeline">
+        </div>
+    </section>
+
+    <section class="drawer-block">
+    <div id="drawerCurrentAction"></div>
+    <div id="drawerPayment"></div>
+    </section>
+
+    <section class="drawer-block">
+
+        <details>
+
+            <summary>
+                Voir la commande détaillée
+            </summary>
+
+            <div id="drawerOrder"></div>
+
+        </details>
+
+    </section>
+
+</aside>
+
+
+<div class="add-item-overlay" id="addItemOverlay"></div>
+
+<div class="add-item-modal" id="addItemModal">
+
+    <div class="add-item-head">
+
+        <div>
+
+            <span>
+                Table sélectionnée
+            </span>
+
+            <h2 id="addItemTitle">
+                Ajouter un article
+            </h2>
+
+        </div>
+
+        <button
+            type="button"
+            id="addItemClose">
+            ×
+        </button>
+
+    </div>
+
+    <div class="add-item-body">
+
+        <div
+            class="add-item-step active"
+            id="addItemStepCategories">
+
+            <h3>
+                Que souhaitez-vous ajouter ?
+            </h3>
+
+            <div
+                class="add-item-grid"
+                id="addItemCategories">
+
+                Chargement...
+
+            </div>
+
+        </div>
+
+        <div
+            class="add-item-step"
+            id="addItemStepProducts">
+
+            <button
+                type="button"
+                class="add-back-btn"
+                id="addItemBackToCategories">
+
+                ← Retour
+
+            </button>
+
+            <h3 id="addItemCategoryTitle">
+                Produits
+            </h3>
+
+            <div
+                class="add-item-list"
+                id="addItemProducts">
+            </div>
+
+        </div>
+
+        <div
+            class="add-item-step"
+            id="addItemStepConfirm">
+
+            <button
+                type="button"
+                class="add-back-btn"
+                id="addItemBackToProducts">
+
+                ← Retour
+
+            </button>
+
+            <h3 id="addItemProductTitle">
+                Produit
+            </h3>
+
+            <div class="qty-control">
+
+                <button
+                    type="button"
+                    id="qtyMinus">
+                    −
+                </button>
+
+                <strong id="addItemQty">
+                    1
+                </strong>
+
+                <button
+                    type="button"
+                    id="qtyPlus">
+                    +
+                </button>
+
+            </div>
+
+            <h3>
+                Pour qui ?
+            </h3>
+
+            <div
+                class="guest-choice-list"
+                id="addItemGuests">
+            </div>
+
+            <button
+                type="button"
+                class="drawer-btn primary"
+                id="confirmAddItem">
+
+                Ajouter
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{% static 'riad/js/salle.js' %}?v=99"></script>
+{% endblock %}

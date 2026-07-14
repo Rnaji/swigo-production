@@ -1,0 +1,18 @@
+<div class="room-section">
+
+    <div class="room-header">
+        <div>
+            <h2 class="room-title">{{ room.name }}</h2>
+        </div>
+
+    </div>
+
+    <div class="room-grid">
+        {% for table in room.tables.all %}
+            {% if table.is_active %}
+                {% include "riad/_table_card.html" %}
+            {% endif %}
+        {% endfor %}
+    </div>
+
+</div>

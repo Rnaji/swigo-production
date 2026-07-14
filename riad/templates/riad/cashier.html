@@ -1,0 +1,285 @@
+{% extends "assets/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'riad/css/cashier.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="cashier-page">
+
+    <div class="cashier-header">
+        <div>
+            <h1>💰 Caisse</h1>
+            <p>Table {{ table.numero }}</p>
+        </div>
+
+        <a href="/riad/salle/" class="cashier-back">
+            Retour salle
+        </a>
+    </div>
+
+    <div class="cashier-layout">
+
+        <div class="cashier-card">
+            <h2>Addition</h2>
+
+            {% for guest in order.guests.all %}
+                <div class="guest-block">
+                    <h3>Convive {{ guest.guest_number }}</h3>
+
+                    {% if guest.menu %}
+                        <div class="cashier-line">
+                            <span>1 × {{ guest.menu.name }}</span>
+                            <strong>{{ guest.menu.price|floatformat:2 }} €</strong>
+                        </div>
+                    {% endif %}
+
+                    {% for choice in guest.choices.all %}
+                        {% if choice.source == "extra" %}
+                            <div class="cashier-line extra-line">
+                                <span>{{ choice.quantity }} × {{ choice.product.name }}</span>
+                                <strong>{{ choice.product.price|floatformat:2 }} €</strong>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <hr>
+
+            <div class="cashier-total-line">
+                <span>Total</span>
+                <strong><span id="total">{{ total|floatformat:2 }}</span> €</strong>
+            </div>
+
+            <div class="cashier-paid-line">
+                <span>Déjà payé</span>
+                <strong><span id="paid">{{ paid|floatformat:2 }}</span> €</strong>
+            </div>
+
+            <div class="cashier-remaining-line">
+                <span>Reste à payer</span>
+                <strong><span id="remaining">{{ remaining|floatformat:2 }}</span> €</strong>
+            </div>
+        </div>
+
+        <div class="cashier-card">
+            <h2>Paiement</h2>
+
+            <div class="payment-buttons">
+                <button type="button" onclick="payCard()">💳 Carte bancaire</button>
+                <button type="button" onclick="showCash()">💶 Espèces</button>
+                <button type="button" onclick="showMixed()">🔀 Mixte</button>
+            </div>
+
+            <div id="cashBox" class="payment-form hidden">
+                <h3>Paiement espèces</h3>
+
+                <label>Le client donne</label>
+                <input type="number" id="cashGiven" step="0.01" min="0" oninput="calculateChange()">
+
+                <p>Rendu : <strong id="change">0.00</strong> €</p>
+
+                <button type="button" onclick="payCash()">Valider espèces</button>
+            </div>
+
+            <div id="mixedBox" class="payment-form hidden">
+                <h3>Paiement mixte</h3>
+
+                <label>Carte bancaire</label>
+                <input type="number" id="mixedCard" step="0.01" min="0" oninput="calculateMixed()">
+
+                <label>Espèces données</label>
+                <input type="number" id="mixedCashGiven" step="0.01" min="0" oninput="calculateMixed()">
+
+                <p>Espèces utilisées : <strong id="mixedCashUsed">0.00</strong> €</p>
+                <p>Rendu : <strong id="mixedChange">0.00</strong> €</p>
+
+                <button type="button" onclick="payMixed()">Valider paiement mixte</button>
+            </div>
+
+            <div class="payments-history">
+                <h3>Paiements</h3>
+
+                {% for payment in payments %}
+                    <div class="cashier-line">
+                        <span>{{ payment.get_method_display }}</span>
+                        <strong>{{ payment.amount|floatformat:2 }} €</strong>
+                    </div>
+                {% empty %}
+                    <p>Aucun paiement pour l’instant.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const orderId = "{{ order.id }}";
+
+function getCookie(name) {
+    let cookieValue = null;
+
+    if (document.cookie && document.cookie !== "") {
+        const cookies = document.cookie.split(";");
+
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+
+            if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+
+    return cookieValue;
+}
+
+const csrftoken = getCookie("csrftoken");
+
+function getRemaining() {
+    return parseFloat(
+        document.getElementById("remaining").textContent.replace(",", ".")
+    );
+}
+
+function hideForms() {
+    document.getElementById("cashBox").classList.add("hidden");
+    document.getElementById("mixedBox").classList.add("hidden");
+}
+
+function showCash() {
+    hideForms();
+    document.getElementById("cashBox").classList.remove("hidden");
+}
+
+function showMixed() {
+    hideForms();
+    document.getElementById("mixedBox").classList.remove("hidden");
+}
+
+function calculateChange() {
+    const remaining = getRemaining();
+    const given = parseFloat(document.getElementById("cashGiven").value || 0);
+    const change = Math.max(given - remaining, 0);
+
+    document.getElementById("change").textContent = change.toFixed(2);
+}
+
+function calculateMixed() {
+    const remaining = getRemaining();
+    const card = parseFloat(document.getElementById("mixedCard").value || 0);
+    const cashGiven = parseFloat(document.getElementById("mixedCashGiven").value || 0);
+
+    const cashNeeded = Math.max(remaining - card, 0);
+    const cashUsed = Math.min(cashGiven, cashNeeded);
+    const change = Math.max(cashGiven - cashNeeded, 0);
+
+    document.getElementById("mixedCashUsed").textContent = cashUsed.toFixed(2);
+    document.getElementById("mixedChange").textContent = change.toFixed(2);
+}
+
+async function sendPayment(payments) {
+    const response = await fetch("/riad/api/payment/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken,
+        },
+        body: JSON.stringify({
+            order_id: orderId,
+            payments: payments
+        })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+        alert(data.error || "Erreur paiement");
+        return;
+    }
+
+    document.getElementById("paid").textContent = data.paid.toFixed(2);
+    document.getElementById("remaining").textContent = data.remaining.toFixed(2);
+
+    if (data.remaining <= 0) {
+        alert("Paiement terminé.");
+        window.location.href = "/riad/salle/";
+    } else {
+        window.location.reload();
+    }
+}
+
+function payCard() {
+    const remaining = getRemaining();
+
+    if (remaining <= 0) {
+        alert("Addition déjà réglée.");
+        return;
+    }
+
+    sendPayment([
+        {
+            method: "card",
+            amount: remaining
+        }
+    ]);
+}
+
+function payCash() {
+    const remaining = getRemaining();
+    const given = parseFloat(document.getElementById("cashGiven").value || 0);
+
+    if (given < remaining) {
+        alert("Montant insuffisant.");
+        return;
+    }
+
+    sendPayment([
+        {
+            method: "cash",
+            amount: remaining
+        }
+    ]);
+}
+
+function payMixed() {
+    const remaining = getRemaining();
+
+    const card = parseFloat(document.getElementById("mixedCard").value || 0);
+    const cashGiven = parseFloat(document.getElementById("mixedCashGiven").value || 0);
+
+    const cashNeeded = Math.max(remaining - card, 0);
+    const cashUsed = Math.min(cashGiven, cashNeeded);
+
+    if (card + cashUsed < remaining) {
+        alert("Montant insuffisant.");
+        return;
+    }
+
+    const payments = [];
+
+    if (card > 0) {
+        payments.push({
+            method: "card",
+            amount: card
+        });
+    }
+
+    if (cashUsed > 0) {
+        payments.push({
+            method: "cash",
+            amount: cashUsed
+        });
+    }
+
+    sendPayment(payments);
+}
+</script>
+
+{% endblock %}
