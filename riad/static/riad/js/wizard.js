@@ -16,6 +16,11 @@ let editingInProgress = false;
 let returnAfterEdit = null;
 let savedSectionIndex = null;
 
+let editingFormulaRestart = false;
+let guestSnapshotBeforeFormulaEdit = null;
+let allGuestsCompleteBeforeFormulaEdit = false;
+let pausedGuestProgress = null;
+
 function initWizard() {
     const guestCountEl = document.getElementById("guestCount");
 
@@ -166,6 +171,11 @@ function showCurrentSection() {
                 );
             }
 
+            if (editingFormulaRestart && choice.section_name === "Formule") {
+                restartGuestWithFormula(choice);
+                return;
+            }
+
             if (isEditing && editingChoiceIndex >= 0) {
                 applyEditedChoice(choice);
                 finishEdit();
@@ -217,6 +227,27 @@ function nextSection() {
     resetCurrent();
     renderLiveTicket();
 
+    if (allGuestsCompleteBeforeFormulaEdit) {
+        allGuestsCompleteBeforeFormulaEdit = false;
+        guestSnapshotBeforeFormulaEdit = null;
+        showRecap();
+        return;
+    }
+
+    if (pausedGuestProgress) {
+        currentGuest = pausedGuestProgress.guestNumber;
+        currentGuestChoices = [...pausedGuestProgress.choices];
+        currentFormula = pausedGuestProgress.formula;
+        currentMenu = pausedGuestProgress.menu;
+        currentSectionIndex = pausedGuestProgress.sectionIndex;
+        pausedGuestProgress = null;
+
+        updateGuestTitle();
+        renderLiveTicket();
+        showCurrentSection();
+        return;
+    }
+
     if (currentGuest < guestCount) {
         currentGuest++;
         updateGuestTitle();
@@ -224,6 +255,121 @@ function nextSection() {
     } else {
         showRecap();
     }
+}
+
+function isFormulaChoice(choice) {
+    return choice?.section_name === "Formule";
+}
+
+function getFormulaSectionIndex() {
+    if (!currentMenu) return 0;
+
+    const index = currentMenu.sections.findIndex(section => section.name === "Formule");
+
+    return index >= 0 ? index : 0;
+}
+
+function restartGuestWithFormula(choice) {
+    currentFormula = choice.product_name;
+    currentGuestChoices = [choice];
+
+    const sections = getVisibleSections();
+    const formulaIndex = sections.findIndex(section => section.name === "Formule");
+
+    currentSectionIndex = formulaIndex + 1;
+    editingFormulaRestart = false;
+
+    renderLiveTicket();
+    setTimeout(() => {
+        if (currentSectionIndex < sections.length) {
+            showCurrentSection();
+        } else {
+            nextSection();
+        }
+    }, 150);
+}
+
+function cancelFormulaRestart() {
+    if (guestSnapshotBeforeFormulaEdit) {
+        const snapshot = JSON.parse(JSON.stringify(guestSnapshotBeforeFormulaEdit));
+
+        if (!guests.find(g => g.number === snapshot.number)) {
+            guests.push(snapshot);
+            guests.sort((a, b) => a.number - b.number);
+        }
+
+        if (editingInProgress && snapshot.number === currentGuest) {
+            currentGuestChoices = [...snapshot.choices];
+            currentFormula = snapshot.formula || null;
+        }
+    }
+
+    if (pausedGuestProgress) {
+        currentGuest = pausedGuestProgress.guestNumber;
+        currentGuestChoices = [...pausedGuestProgress.choices];
+        currentFormula = pausedGuestProgress.formula;
+        currentMenu = pausedGuestProgress.menu;
+        currentSectionIndex = pausedGuestProgress.sectionIndex;
+        pausedGuestProgress = null;
+    }
+
+    guestSnapshotBeforeFormulaEdit = null;
+    allGuestsCompleteBeforeFormulaEdit = false;
+    editingFormulaRestart = false;
+    editingInProgress = false;
+    editingGuestNumber = null;
+
+    renderLiveTicket();
+    restoreAfterEdit();
+}
+
+async function startEditFormula(guestNumber) {
+    const guest = guests.find(g => g.number === guestNumber);
+    const isInProgress = guestNumber === currentGuest && !guest;
+
+    if (!guest && !isInProgress) return;
+
+    saveEditReturnContext();
+
+    allGuestsCompleteBeforeFormulaEdit = guests.length === guestCount;
+    editingFormulaRestart = true;
+    editingGuestNumber = guestNumber;
+    editingInProgress = isInProgress;
+
+    if (currentGuest !== guestNumber && currentGuestChoices.length > 0) {
+        pausedGuestProgress = {
+            guestNumber: currentGuest,
+            choices: [...currentGuestChoices],
+            formula: currentFormula,
+            menu: currentMenu,
+            sectionIndex: currentSectionIndex,
+        };
+    }
+
+    currentGuest = guestNumber;
+
+    if (guest) {
+        guestSnapshotBeforeFormulaEdit = JSON.parse(JSON.stringify(guest));
+        guests = guests.filter(g => g.number !== guestNumber);
+        currentMenu = await loadMenu(guest.menu_id);
+        currentFormula = null;
+        currentGuestChoices = [];
+    } else {
+        guestSnapshotBeforeFormulaEdit = {
+            number: guestNumber,
+            menu_id: currentMenu.id,
+            menu_name: currentMenu.name,
+            formula: currentFormula,
+            choices: [...currentGuestChoices],
+        };
+        currentFormula = null;
+        currentGuestChoices = [];
+    }
+
+    currentSectionIndex = getFormulaSectionIndex();
+
+    updateGuestTitle();
+    showCurrentSection();
 }
 
 function findChoice(guestNumber, sectionIndex) {
@@ -373,6 +519,12 @@ function finishEdit() {
 }
 
 async function startEditChoice(guestNumber, sectionIndex) {
+    const choice = findChoice(guestNumber, sectionIndex);
+
+    if (isFormulaChoice(choice)) {
+        return startEditFormula(guestNumber);
+    }
+
     const guest = guests.find(g => g.number === guestNumber);
     const isInProgress = guestNumber === currentGuest && !guest;
 
@@ -409,6 +561,11 @@ async function startEditChoice(guestNumber, sectionIndex) {
 }
 
 function goBack() {
+    if (editingFormulaRestart) {
+        cancelFormulaRestart();
+        return;
+    }
+
     if (isEditing) {
         finishEdit();
         return;
@@ -454,6 +611,8 @@ function showRecap() {
         `;
 
         guest.choices.forEach(c => {
+            const isFormula = isFormulaChoice(c);
+
             html += `
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
@@ -463,16 +622,18 @@ function showRecap() {
                     </div>
 
                     <div class="d-flex gap-2">
+                        ${isFormula ? "" : `
                         <button class="btn btn-sm btn-outline-warning choice-note"
                             data-number="${guest.number}"
                             data-index="${c.section_index}">
                             + note
                         </button>
+                        `}
 
                         <button class="btn btn-sm btn-outline-secondary edit-line"
                             data-number="${guest.number}"
                             data-index="${c.section_index}">
-                            Modifier
+                            ${isFormula ? "Changer formule" : "Modifier"}
                         </button>
                     </div>
                 </div>
@@ -535,6 +696,8 @@ function bindRecapButtons() {
 }
 
 function renderChoiceLine(guestNumber, choice) {
+    const isFormula = isFormulaChoice(choice);
+
     return `
         <div class="d-flex justify-content-between align-items-start mb-1 gap-1">
             <div class="text-muted small">
@@ -543,6 +706,7 @@ function renderChoiceLine(guestNumber, choice) {
             </div>
 
             <div class="d-flex gap-1 flex-shrink-0">
+                ${isFormula ? "" : `
                 <button type="button"
                     class="btn btn-sm btn-outline-warning choice-note py-0 px-1"
                     data-number="${guestNumber}"
@@ -550,13 +714,14 @@ function renderChoiceLine(guestNumber, choice) {
                     title="Ajouter une note">
                     + note
                 </button>
+                `}
 
                 <button type="button"
                     class="btn btn-sm btn-outline-secondary edit-line py-0 px-1"
                     data-number="${guestNumber}"
                     data-index="${choice.section_index}"
-                    title="Modifier ce plat">
-                    Modif.
+                    title="${isFormula ? "Changer la formule" : "Modifier ce plat"}">
+                    ${isFormula ? "Formule" : "Modif."}
                 </button>
             </div>
         </div>
