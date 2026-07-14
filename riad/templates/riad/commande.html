@@ -1,0 +1,153 @@
+{% extends "assets/base.html" %}
+{% load static %}
+
+{% block title %}
+Commande - Table {{ table.numero }}
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🍽️ Table {{ table.numero }}</h2>
+
+        <a href="{% url 'riad:salle' %}" class="btn btn-outline-secondary">
+            ← Retour
+        </a>
+    </div>
+
+    <div class="row">
+
+        <div class="col-md-8">
+
+            <div id="step-guests" class="text-center py-5">
+
+                <h3 class="mb-4">Nombre de convives</h3>
+
+                <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+
+                    <button type="button" class="btn btn-outline-secondary" id="minusGuest">
+                        −
+                    </button>
+
+                    <div id="guestCount" style="font-size:32px;font-weight:600;">
+                        2
+                    </div>
+
+                    <button type="button" class="btn btn-outline-secondary" id="plusGuest">
+                        +
+                    </button>
+
+                </div>
+
+                <button type="button" id="startOrder" class="btn btn-success btn-lg">
+                    Commencer
+                </button>
+
+            </div>
+
+            <div id="step-menu" class="d-none">
+
+                <h3 class="mb-4 text-center">
+                    Convive <span id="currentGuest">1 / 2</span>
+                </h3>
+
+                <div class="row">
+
+                    {% for menu in menus %}
+                    <div class="col-md-3 mb-3">
+
+                        <button
+                            type="button"
+                            class="btn btn-outline-dark w-100 p-4 menu-choice"
+                            data-menu-id="{{ menu.id }}">
+
+                            <strong>{{ menu.name }}</strong>
+
+                        </button>
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+            <div id="step-section" class="d-none"></div>
+
+            <div id="step-note" class="d-none">
+
+                <h3 class="mb-3 text-center">
+                    📝 Note pour le convive <span id="noteGuestNumber">1</span>
+                </h3>
+
+                <p class="text-muted text-center mb-4">
+                    Note destinée à la cuisine ou à l’office.
+                </p>
+
+                <textarea
+                    id="guestNoteInput"
+                    class="form-control"
+                    rows="4"
+                    placeholder="Ex : sans coriandre, sauce à part, pas trop épicé..."></textarea>
+
+                <button
+                    type="button"
+                    id="saveGuestNote"
+                    class="btn btn-dark btn-lg mt-4 w-100">
+                    Continuer
+                </button>
+
+                <button
+                    type="button"
+                    id="skipGuestNote"
+                    class="btn btn-outline-secondary mt-2 w-100">
+                    Passer sans note
+                </button>
+
+            </div>
+
+            <div id="recap" class="d-none">
+
+                <h3 class="mb-3">📋 Récapitulatif</h3>
+
+                <div id="recapContent"></div>
+
+                <button type="button" id="saveOrder" class="btn btn-primary btn-lg mt-3 w-100">
+                    Valider la commande
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm sticky-top" style="top:20px;">
+                <div class="card-body">
+
+                    <h5 class="mb-3">🧾 Commande en cours</h5>
+
+                    <div id="liveTicket">
+                        <p class="text-muted">Aucune commande</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    window.RIAD_TABLE_NUMERO = {{ table.numero }};
+</script>
+
+<script src="{% static 'riad/js/api.js' %}"></script>
+<script src="{% static 'riad/js/wizard.js' %}?v=97"></script>
+<script src="{% static 'riad/js/commande.js' %}?v=97"></script>
+
+{% endblock %}
