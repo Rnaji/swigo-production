@@ -153,7 +153,30 @@
     color: #111;
     margin-bottom: 9px;
     border-bottom: 1px dashed #d7cdb4;
-    padding-bottom: 7px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.kitchen-ticket-line.line-done {
+    background: #dcfce7;
+    border-bottom-color: #86efac;
+}
+
+.kitchen-ticket-line.line-done .product-label {
+    color: #166534;
+    text-decoration: line-through;
+    text-decoration-color: rgba(22, 101, 52, 0.45);
+}
+
+.kitchen-ticket-line.line-done .qty-badge {
+    background: #16a34a;
+}
+
+.kitchen-ticket-line.line-busy {
+    opacity: 0.7;
+    pointer-events: none;
 }
 
 .qty-badge {
@@ -172,6 +195,67 @@
 
 .product-name {
     flex: 1;
+    min-width: 0;
+}
+
+.line-done-btn {
+    flex-shrink: 0;
+    min-width: 72px;
+    min-height: 52px;
+    padding: 8px 10px;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1.1;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.line-done-btn .line-done-check {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.line-done-btn.is-done,
+.line-done-btn.is-done:hover {
+    background: #16a34a;
+    border-color: #15803d;
+    color: #ffffff;
+}
+
+.line-done-btn:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.kitchen-ticket.ticket-all-done {
+    background: #ecfdf5;
+    border-color: #4ade80;
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2), 0 6px 14px rgba(0, 0, 0, 0.18);
+}
+
+.kitchen-ticket.ticket-all-done .ticket-footer::before {
+    content: "Bon complet — toutes les lignes sont faites";
+    display: block;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 900;
+    color: #15803d;
+    margin-bottom: 10px;
+}
+
+.kitchen-ticket.ticket-all-done.ticket-warning,
+.kitchen-ticket.ticket-all-done.ticket-danger {
+    background: #ecfdf5;
+    border-color: #4ade80;
 }
 
 .kitchen-ticket-line small {
@@ -187,6 +271,31 @@
     margin-top: auto;
     border-top: 2px dashed #999;
     padding-top: 12px;
+}
+
+.kitchen-close-btn {
+    width: 100%;
+    padding: 14px;
+    font-weight: 900;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    background: #f8fafc;
+    color: #111827;
+    border: 2px solid #cbd5e1;
+}
+
+.kitchen-close-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+}
+
+.kitchen-close-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #e2e8f0;
 }
 
 .kitchen-done-btn {

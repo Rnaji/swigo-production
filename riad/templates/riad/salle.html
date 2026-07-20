@@ -1,12 +1,15 @@
-{% extends "assets/base.html" %}
+{% extends "riad/base.html" %}
 {% load static %}
 
 {% block title %}Salle{% endblock %}
 
-{% block content %}
-
+{% block extra_css %}
 <link rel="stylesheet" href="{% static 'riad/css/production.css' %}">
-<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=92">
+<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=100">
+<link rel="stylesheet" href="{% static 'riad/css/cashier.css' %}?v=1">
+{% endblock %}
+
+{% block content %}
 
 <div class="riad-wrapper">
 
@@ -184,6 +187,50 @@
 
         <div
             class="add-item-step active"
+            id="addItemStepMode">
+
+            <h3>
+                Que souhaitez-vous ajouter ?
+            </h3>
+
+            <div class="add-item-grid">
+
+                <button
+                    type="button"
+                    class="add-category-card"
+                    id="addCatalogBtn">
+
+                    <span class="material-symbols-outlined">
+                        restaurant_menu
+                    </span>
+
+                    <strong>
+                        Ajouter un produit du catalogue
+                    </strong>
+
+                </button>
+
+                <button
+                    type="button"
+                    class="add-category-card"
+                    id="addManualBtn">
+
+                    <span class="material-symbols-outlined">
+                        edit_note
+                    </span>
+
+                    <strong>
+                        Ajouter un supplément libre
+                    </strong>
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <div
+            class="add-item-step"
             id="addItemStepCategories">
 
             <h3>
@@ -261,15 +308,6 @@
 
             </div>
 
-            <h3>
-                Pour qui ?
-            </h3>
-
-            <div
-                class="guest-choice-list"
-                id="addItemGuests">
-            </div>
-
             <button
                 type="button"
                 class="drawer-btn primary"
@@ -281,9 +319,88 @@
 
         </div>
 
+        <div
+            class="add-item-step"
+            id="addItemStepManual">
+
+            <button
+                type="button"
+                class="add-back-btn"
+                id="addItemBackToMode">
+
+                ← Retour
+
+            </button>
+
+            <div class="manual-extra-form">
+
+                <h3>
+                    Supplément libre
+                </h3>
+
+                <label class="add-form-label" for="manualExtraLabel">
+                    Intitulé
+                </label>
+                <input
+                    type="text"
+                    id="manualExtraLabel"
+                    class="add-form-input"
+                    placeholder="Ex. 2 merguez supplémentaires">
+
+                <div class="manual-extra-row">
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraTotal">
+                            Prix
+                        </label>
+                        <input
+                            type="text"
+                            id="manualExtraTotal"
+                            class="add-form-input"
+                            placeholder="Ex. 6,00"
+                            inputmode="decimal">
+                    </div>
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraStation">
+                            Destination
+                        </label>
+                        <select id="manualExtraStation" class="add-form-input">
+                            <option value="kitchen">Cuisine</option>
+                            <option value="bar">Office</option>
+                        </select>
+                    </div>
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraVat">
+                            TVA
+                        </label>
+                        <select id="manualExtraVat" class="add-form-input">
+                            <option value="10.00" selected>10 %</option>
+                            <option value="5.50">5,5 %</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <button
+                    type="button"
+                    class="drawer-btn primary manual-extra-submit"
+                    id="confirmManualExtra">
+
+                    Ajouter le supplément
+
+                </button>
+
+            </div>
+
+        </div>
+
     </div>
 
 </div>
 
-<script src="{% static 'riad/js/salle.js' %}?v=99"></script>
+<script src="{% static 'riad/js/add-extra-common.js' %}?v=1"></script>
+<script src="{% static 'riad/js/payment-modal.js' %}?v=3"></script>
+<script src="{% static 'riad/js/salle.js' %}?v=112"></script>
 {% endblock %}

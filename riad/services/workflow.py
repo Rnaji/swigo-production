@@ -106,10 +106,10 @@ SERVER_WORKFLOW = {
     },
 
     "bill_requested": {
-        "title": "Encaisser",
-        "button": "Paiement effectué",
-        "type": "action",
-        "icon": "payments",
+        "title": "Présenter le récapitulatif",
+        "button": "Voir le pré-ticket",
+        "type": "open_pre_ticket",
+        "icon": "receipt_long",
         "sections": [],
     },
 

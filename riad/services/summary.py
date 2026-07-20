@@ -1,39 +1,77 @@
 from collections import defaultdict
 
+from riad.services.pricing import choice_display_name
+
 
 SERVICE_SECTION_ORDER = [
     "Mocktail",
     "Boisson",
     "Eau",
+    "Jus",
     "Entrée",
     "Plat",
     "Dessert",
+    "Coupe glacée",
     "Thé / Café",
+    "Supplément libre",
 ]
 
 
-def build_summary(order, sections=None):
-    sections_filter = set(sections) if sections else None
-    grouped = defaultdict(lambda: defaultdict(int))
+def choice_summary_section(choice):
+    if choice.source == "manual_extra":
+        return "Supplément libre"
 
+    if choice.section:
+        return choice.section.name
+
+    if choice.product and choice.product.category:
+        return choice.product.category.name
+
+    return None
+
+
+def iter_billable_choices(order):
     guests = (
         order.guests
         .prefetch_related(
             "choices__section",
             "choices__product",
+            "choices__product__category",
         )
         .all()
     )
 
     for guest in guests:
         for choice in guest.choices.all():
-            section_name = choice.section.name
-            product_name = choice.product.name
+            yield choice
 
-            if sections_filter and section_name not in sections_filter:
-                continue
+    for choice in order.table_level_choices.select_related(
+        "section",
+        "product",
+        "product__category",
+    ):
+        yield choice
 
-            grouped[section_name][product_name] += choice.quantity
+
+def build_summary(order, sections=None):
+    sections_filter = set(sections) if sections else None
+    grouped = defaultdict(lambda: defaultdict(int))
+
+    for choice in iter_billable_choices(order):
+        section_name = choice_summary_section(choice)
+
+        if not section_name:
+            continue
+
+        if choice.source == "manual_extra":
+            product_name = choice.label
+        else:
+            product_name = choice_display_name(choice)
+
+        if sections_filter and section_name not in sections_filter:
+            continue
+
+        grouped[section_name][product_name] += choice.quantity
 
     result = []
 
@@ -74,7 +112,10 @@ def build_office_summary(order):
             "Mocktail",
             "Boisson",
             "Eau",
+            "Jus",
             "Dessert",
+            "Coupe glacée",
             "Thé / Café",
+            "Supplément libre",
         ],
     )

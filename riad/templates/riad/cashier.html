@@ -1,8 +1,8 @@
-{% extends "assets/base.html" %}
+{% extends "riad/base.html" %}
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'riad/css/cashier.css' %}">
+<link rel="stylesheet" href="{% static 'riad/css/cashier.css' %}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -25,32 +25,91 @@
         <div class="cashier-card">
             <h2>Addition</h2>
 
-            {% for guest in order.guests.all %}
+            {% for row in guest_rows %}
                 <div class="guest-block">
-                    <h3>Convive {{ guest.guest_number }}</h3>
+                    <div class="guest-block-header">
+                        <h3>Convive {{ row.guest.guest_number }}</h3>
+                        {% if row.is_paid %}
+                            <span class="guest-paid-badge">Payé</span>
+                        {% endif %}
+                    </div>
 
-                    {% if guest.menu %}
-                        <div class="cashier-line">
-                            <span>1 × {{ guest.menu.name }}</span>
-                            <strong>{{ guest.menu.price|floatformat:2 }} €</strong>
+                    {% if row.guest.menu %}
+                        <div class="cashier-line menu-line">
+                            <span>{{ row.guest.menu.name }}</span>
+                            <strong>{{ row.guest.menu.price|floatformat:2 }} €</strong>
                         </div>
                     {% endif %}
 
-                    {% for choice in guest.choices.all %}
-                        {% if choice.source == "extra" %}
+                    {% for choice in row.guest.choices.all %}
+                        {% if choice.source == "replacement" and choice.supplement_amount %}
+                            <div class="cashier-line replacement-line">
+                                <span>
+                                    Remplacement par {{ choice.product.name }}
+                                </span>
+                                <strong>+{{ choice.supplement_amount|floatformat:2 }} €</strong>
+                            </div>
+                        {% elif choice.source == "extra" %}
                             <div class="cashier-line extra-line">
-                                <span>{{ choice.quantity }} × {{ choice.product.name }}</span>
-                                <strong>{{ choice.product.price|floatformat:2 }} €</strong>
+                                <span>Extra : {{ choice.quantity }} × {{ choice.product.name }}</span>
+                                <strong>{{ choice.billing_amount|floatformat:2 }} €</strong>
+                            </div>
+                        {% elif choice.source == "manual_extra" %}
+                            <div class="cashier-line manual-line">
+                                <span>Supplément libre — {{ choice.label }}</span>
+                                <strong>{{ choice.line_total|floatformat:2 }} €</strong>
                             </div>
                         {% endif %}
                     {% endfor %}
+
+                    <div class="cashier-line guest-total-line">
+                        <span>Total Client {{ row.guest.guest_number }}</span>
+                        <strong>{{ row.total|floatformat:2 }} €</strong>
+                    </div>
                 </div>
             {% endfor %}
 
+            {% if table_extras %}
+                <div class="guest-block">
+                    <h3>Extras de la table</h3>
+
+                    {% for choice in table_extras %}
+                        {% if choice.source == "extra" %}
+                            <div class="cashier-line extra-line">
+                                <span>{{ choice.quantity }} × {{ choice.product.name }}</span>
+                                <strong>{{ choice.billing_amount|floatformat:2 }} €</strong>
+                            </div>
+                        {% elif choice.source == "manual_extra" %}
+                            <div class="cashier-line manual-line">
+                                <span>{{ choice.label }}</span>
+                                <strong>{{ choice.line_total|floatformat:2 }} €</strong>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+
+                    <div class="cashier-line guest-total-line">
+                        <span>Total extras de la table</span>
+                        <strong>{{ billing.table_extras_total|floatformat:2 }} €</strong>
+                    </div>
+                </div>
+            {% endif %}
+
             <hr>
 
+            <div class="cashier-line order-subtotal-line">
+                <span>Total convives</span>
+                <strong>{{ billing.guests_total|floatformat:2 }} €</strong>
+            </div>
+
+            {% if billing.table_extras_total %}
+            <div class="cashier-line order-subtotal-line">
+                <span>Extras de la table</span>
+                <strong>{{ billing.table_extras_total|floatformat:2 }} €</strong>
+            </div>
+            {% endif %}
+
             <div class="cashier-total-line">
-                <span>Total</span>
+                <span>TOTAL GÉNÉRAL</span>
                 <strong><span id="total">{{ total|floatformat:2 }}</span> €</strong>
             </div>
 
@@ -69,20 +128,9 @@
             <h2>Paiement</h2>
 
             <div class="payment-buttons">
-                <button type="button" onclick="payCard()">💳 Carte bancaire</button>
-                <button type="button" onclick="showCash()">💶 Espèces</button>
-                <button type="button" onclick="showMixed()">🔀 Mixte</button>
-            </div>
-
-            <div id="cashBox" class="payment-form hidden">
-                <h3>Paiement espèces</h3>
-
-                <label>Le client donne</label>
-                <input type="number" id="cashGiven" step="0.01" min="0" oninput="calculateChange()">
-
-                <p>Rendu : <strong id="change">0.00</strong> €</p>
-
-                <button type="button" onclick="payCash()">Valider espèces</button>
+                <button type="button" id="btnPayCard">💳 Carte bancaire</button>
+                <button type="button" id="btnPayCash">💶 Espèces</button>
+                <button type="button" id="btnPayMixed">🔀 Mixte</button>
             </div>
 
             <div id="mixedBox" class="payment-form hidden">
@@ -102,15 +150,23 @@
 
             <div class="payments-history">
                 <h3>Paiements</h3>
+                <div id="paymentsHistory">
+                    {% for payment in payments %}
+                        <div class="cashier-line payment-history-line">
+                            <span>{{ payment.get_method_display }}</span>
+                            <strong>{{ payment.amount|floatformat:2 }} €</strong>
+                        </div>
+                    {% empty %}
+                        <p id="paymentsEmpty">Aucun paiement pour l’instant.</p>
+                    {% endfor %}
+                </div>
+            </div>
 
-                {% for payment in payments %}
-                    <div class="cashier-line">
-                        <span>{{ payment.get_method_display }}</span>
-                        <strong>{{ payment.amount|floatformat:2 }} €</strong>
-                    </div>
-                {% empty %}
-                    <p>Aucun paiement pour l’instant.</p>
-                {% endfor %}
+            <div id="paymentFinishedBlock" class="{% if remaining > 0 %}hidden{% endif %}">
+                <div class="cashier-finished-msg">✅ Paiement terminé</div>
+                <button type="button" class="cashier-finished-btn" onclick="goBackToSalle()">
+                    Retour au plan de salle
+                </button>
             </div>
         </div>
 
@@ -118,6 +174,7 @@
 
 </div>
 
+<script src="{% static 'riad/js/payment-modal.js' %}?v=2"></script>
 <script>
 const orderId = "{{ order.id }}";
 
@@ -148,27 +205,13 @@ function getRemaining() {
     );
 }
 
-function hideForms() {
-    document.getElementById("cashBox").classList.add("hidden");
+function hideMixedForm() {
     document.getElementById("mixedBox").classList.add("hidden");
 }
 
-function showCash() {
-    hideForms();
-    document.getElementById("cashBox").classList.remove("hidden");
-}
-
 function showMixed() {
-    hideForms();
+    hideMixedForm();
     document.getElementById("mixedBox").classList.remove("hidden");
-}
-
-function calculateChange() {
-    const remaining = getRemaining();
-    const given = parseFloat(document.getElementById("cashGiven").value || 0);
-    const change = Math.max(given - remaining, 0);
-
-    document.getElementById("change").textContent = change.toFixed(2);
 }
 
 function calculateMixed() {
@@ -182,6 +225,44 @@ function calculateMixed() {
 
     document.getElementById("mixedCashUsed").textContent = cashUsed.toFixed(2);
     document.getElementById("mixedChange").textContent = change.toFixed(2);
+}
+
+function renderPaymentsHistory(payments) {
+    const container = document.getElementById("paymentsHistory");
+    container.innerHTML = "";
+
+    if (!payments.length) {
+        container.innerHTML = `<p id="paymentsEmpty">Aucun paiement pour l’instant.</p>`;
+        return;
+    }
+
+    payments.forEach(payment => {
+        const line = document.createElement("div");
+        line.className = "cashier-line payment-history-line";
+        line.innerHTML = `
+            <span>${payment.method_display}</span>
+            <strong>${Number(payment.amount).toFixed(2)} €</strong>
+        `;
+        container.appendChild(line);
+    });
+}
+
+function updatePaymentSummary(data) {
+    document.getElementById("paid").textContent = Number(data.paid).toFixed(2);
+    document.getElementById("remaining").textContent = Number(data.remaining).toFixed(2);
+    renderPaymentsHistory(data.payments || []);
+
+    const finishedBlock = document.getElementById("paymentFinishedBlock");
+    const payButtons = document.querySelector(".payment-buttons");
+
+    if (data.remaining <= 0) {
+        finishedBlock.classList.remove("hidden");
+        if (payButtons) payButtons.style.display = "none";
+        hideMixedForm();
+    } else {
+        finishedBlock.classList.add("hidden");
+        if (payButtons) payButtons.style.display = "grid";
+    }
 }
 
 async function sendPayment(payments) {
@@ -199,23 +280,27 @@ async function sendPayment(payments) {
 
     const data = await response.json();
 
-    if (!data.success) {
+    if (!response.ok || !data.success) {
         alert(data.error || "Erreur paiement");
-        return;
+        return false;
     }
 
-    document.getElementById("paid").textContent = data.paid.toFixed(2);
-    document.getElementById("remaining").textContent = data.remaining.toFixed(2);
-
-    if (data.remaining <= 0) {
-        alert("Paiement terminé.");
-        window.location.href = "/riad/salle/";
-    } else {
-        window.location.reload();
-    }
+    updatePaymentSummary(data);
+    return true;
 }
 
-function payCard() {
+async function submitSinglePayment({ method, amount }) {
+    const remaining = getRemaining();
+
+    if (remaining <= 0) {
+        alert("Addition déjà réglée.");
+        return false;
+    }
+
+    return sendPayment([{ method, amount }]);
+}
+
+function openCardPaymentModal() {
     const remaining = getRemaining();
 
     if (remaining <= 0) {
@@ -223,29 +308,26 @@ function payCard() {
         return;
     }
 
-    sendPayment([
-        {
-            method: "card",
-            amount: remaining
-        }
-    ]);
+    openPaymentModal({
+        method: "card",
+        remaining,
+        onSubmit: submitSinglePayment,
+    });
 }
 
-function payCash() {
+function openCashPaymentModal() {
     const remaining = getRemaining();
-    const given = parseFloat(document.getElementById("cashGiven").value || 0);
 
-    if (given < remaining) {
-        alert("Montant insuffisant.");
+    if (remaining <= 0) {
+        alert("Addition déjà réglée.");
         return;
     }
 
-    sendPayment([
-        {
-            method: "cash",
-            amount: remaining
-        }
-    ]);
+    openPaymentModal({
+        method: "cash",
+        remaining,
+        onSubmit: submitSinglePayment,
+    });
 }
 
 function payMixed() {
@@ -257,7 +339,12 @@ function payMixed() {
     const cashNeeded = Math.max(remaining - card, 0);
     const cashUsed = Math.min(cashGiven, cashNeeded);
 
-    if (card + cashUsed < remaining) {
+    if (card > remaining + 0.001) {
+        alert("Le montant carte ne peut pas dépasser le reste à payer.");
+        return;
+    }
+
+    if (card + cashUsed < remaining - 0.001) {
         alert("Montant insuffisant.");
         return;
     }
@@ -265,21 +352,26 @@ function payMixed() {
     const payments = [];
 
     if (card > 0) {
-        payments.push({
-            method: "card",
-            amount: card
-        });
+        payments.push({ method: "card", amount: card });
     }
 
     if (cashUsed > 0) {
-        payments.push({
-            method: "cash",
-            amount: cashUsed
-        });
+        payments.push({ method: "cash", amount: cashUsed });
     }
 
     sendPayment(payments);
 }
+
+function goBackToSalle() {
+    window.location.href = "/riad/salle/";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    initPaymentModal();
+    document.getElementById("btnPayCard")?.addEventListener("click", openCardPaymentModal);
+    document.getElementById("btnPayCash")?.addEventListener("click", openCashPaymentModal);
+    document.getElementById("btnPayMixed")?.addEventListener("click", showMixed);
+});
 </script>
 
 {% endblock %}

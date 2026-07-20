@@ -102,8 +102,8 @@ SERVICE_STATUS = {
 
     "bill_requested": {
         "label": "Addition demandée",
-        "action": "Encaisser",
-        "icon": "payments",
+        "action": "Présenter le récapitulatif",
+        "icon": "receipt_long",
         "target": 300,      # 5 min
     },
 

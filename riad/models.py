@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 from .constants import SERVICE_STATUS
 from decimal import Decimal
 
@@ -189,48 +190,30 @@ class TableService(models.Model):
 
         self.save()
 
-    def get_next_status(self):
-        steps = [
-            "free",
-            "installed",
-            "ordering",
-            "ordered",
-            "drinks_served",
-            "starters_served",
-            "starters_cleared",
-            "mains_served",
-            "mains_cleared",
-            "desserts_served",
-            "desserts_cleared",
-            "coffee_served",
-            "coffee_cleared",
-            "bill_requested",
-            "paid",
-            "free",
-        ]
+    def get_next_status(self, order=None):
+        from riad.services.order_content import (
+            compute_next_status,
+            get_order_service_flags,
+        )
 
-        optional_steps = {
-            "drinks_served": self.has_drinks,
-            "starters_served": self.has_starters,
-            "starters_cleared": self.has_starters,
-            "desserts_served": self.has_desserts,
-            "desserts_cleared": self.has_desserts,
-            "coffee_served": self.has_coffee,
-            "coffee_cleared": self.has_coffee,
-        }
+        if order is None:
+            try:
+                order = self.order
+            except ObjectDoesNotExist:
+                order = None
 
-        try:
-            current_index = steps.index(self.status)
-        except ValueError:
-            return None
+        if order:
+            flags = get_order_service_flags(order)
+        else:
+            flags = {
+                "has_drinks": self.has_drinks,
+                "has_starters": self.has_starters,
+                "has_mains": True,
+                "has_desserts": self.has_desserts,
+                "has_coffee": self.has_coffee,
+            }
 
-        for next_status in steps[current_index + 1:]:
-            if next_status in optional_steps and not optional_steps[next_status]:
-                continue
-
-            return next_status
-
-        return None
+        return compute_next_status(self.status, flags)
 
     @property
     def config(self):
@@ -329,9 +312,28 @@ class Product(models.Model):
         related_name="products",
     )
     name = models.CharField(max_length=150)
+    short_name = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Nom court",
+        help_text="Libellé court pour l'affichage dans le wizard.",
+    )
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    vat_rate = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("10.00"),
+    )
     is_active = models.BooleanField(default=True)
+    sub_choice_category = models.ForeignKey(
+        ProductCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sub_choice_parents",
+        verbose_name="Catégorie de sous-choix",
+    )
 
     class Meta:
         ordering = ("category__order", "name")
@@ -426,21 +428,15 @@ class DiningOrder(models.Model):
     )
     guests_count = models.PositiveSmallIntegerField(default=0)
     is_sent_to_kitchen = models.BooleanField(default=False)
+    wizard_draft = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def total_amount(self):
-        total = Decimal("0.00")
+        from riad.services.pricing import compute_order_total
 
-        for guest in self.guests.all():
-            if guest.menu:
-                total += guest.menu.price
-
-            for choice in guest.choices.filter(source="extra"):
-                total += choice.product.price * choice.quantity
-
-        return total
+        return compute_order_total(self)
 
     def paid_amount(self):
         return sum(
@@ -452,6 +448,10 @@ class DiningOrder(models.Model):
 
     def is_fully_paid(self):
         return self.remaining_amount() <= Decimal("0.00")
+
+    @property
+    def has_wizard_draft(self):
+        return bool(self.wizard_draft) and not self.is_sent_to_kitchen
 
     def __str__(self):
         return f"Commande {self.service.table}"
@@ -476,6 +476,12 @@ class GuestOrder(models.Model):
 
     kitchen_note = models.TextField(blank=True)
 
+    menu_applied_vat_rate = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("10.00"),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -492,13 +498,30 @@ class GuestChoice(models.Model):
     SOURCE_CHOICES = [
         ("menu", "Menu"),
         ("extra", "Supplément"),
+        ("replacement", "Remplacement"),
+        ("manual_extra", "Supplément libre"),
         ("offered", "Offert"),
+    ]
+
+    STATION_CHOICES = [
+        ("kitchen", "Cuisine"),
+        ("bar", "Bar / Office"),
     ]
 
     guest = models.ForeignKey(
         GuestOrder,
         on_delete=models.CASCADE,
         related_name="choices",
+        null=True,
+        blank=True,
+    )
+
+    order = models.ForeignKey(
+        DiningOrder,
+        on_delete=models.CASCADE,
+        related_name="table_level_choices",
+        null=True,
+        blank=True,
     )
 
     section = models.ForeignKey(
@@ -512,6 +535,8 @@ class GuestChoice(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="guest_choices",
     )
 
@@ -523,8 +548,47 @@ class GuestChoice(models.Model):
         default="menu",
     )
 
+    supplement_amount = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+    )
+
+    line_total = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    label = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    station = models.CharField(
+        max_length=20,
+        choices=STATION_CHOICES,
+        blank=True,
+        default="",
+    )
+
+    replaced_product_name = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
     note = models.CharField(
         max_length=200,
+        blank=True,
+    )
+
+    applied_vat_rate = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        null=True,
         blank=True,
     )
 
@@ -534,7 +598,22 @@ class GuestChoice(models.Model):
         ordering = ("section__order", "product__name")
 
     def __str__(self):
-        return f"Convive {self.guest.guest_number} - {self.product.name}"
+        name = self.label or (self.product.name if self.product else "Choix")
+
+        if self.guest_id:
+            return f"Convive {self.guest.guest_number} - {name}"
+
+        return f"Table {self.order_id} - {name}"
+
+    @property
+    def is_table_scope(self):
+        return self.guest_id is None and self.order_id is not None
+
+    @property
+    def billing_amount(self):
+        from riad.services.pricing import choice_line_amount
+
+        return choice_line_amount(self)
     
 class KitchenTicket(models.Model):
 
@@ -642,6 +721,11 @@ class KitchenTicket(models.Model):
             return f"{station} - {title} - Table {self.table.numero}"
 
         return f"{station} - {title}"
+
+    @property
+    def all_items_done(self):
+        items = list(self.items.all())
+        return bool(items) and all(item.is_done for item in items)
     
 class KitchenTicketItem(models.Model):
 
@@ -654,11 +738,21 @@ class KitchenTicketItem(models.Model):
     section = models.ForeignKey(
         MenuSection,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
     )
 
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+
+    label = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
     )
 
     quantity = models.PositiveIntegerField(
@@ -682,7 +776,8 @@ class KitchenTicketItem(models.Model):
         )
 
     def __str__(self):
-        return f"{self.quantity} × {self.product.name}"
+        name = self.label or (self.product.name if self.product else "Article")
+        return f"{self.quantity} × {name}"
     
 
 class Payment(models.Model):
@@ -706,6 +801,8 @@ class Payment(models.Model):
         max_digits=8,
         decimal_places=2,
     )
+
+    guest_number = models.PositiveIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

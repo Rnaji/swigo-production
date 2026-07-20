@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    {% load static %}
+
+    <link rel="stylesheet" href="{% static 'assets/css/google-icon.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'riad/css/riad-base.css' %}?v=1">
+
+    {% block extra_css %}{% endblock %}
+
+    <link rel="icon" type="image/png" href="{% static 'assets/flaticon/livraison-de-nourriture.png' %}" sizes="64x64">
+
+    <title>{% block title %}Riad{% endblock %}</title>
+</head>
+<body class="riad-app">
+
+    <main class="riad-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    {% block scripts %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

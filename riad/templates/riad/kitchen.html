@@ -1,9 +1,9 @@
-{% extends "assets/base.html" %}
+{% extends "riad/base.html" %}
 {% load static %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'riad/css/production.css' %}">
-<link rel="stylesheet" href="{% static 'riad/css/kitchen.css' %}">
+<link rel="stylesheet" href="{% static 'riad/css/kitchen.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -57,7 +57,9 @@
 
         {% for ticket in tickets %}
 
-        <div class="kitchen-ticket">
+        <div
+            class="kitchen-ticket{% if ticket.all_items_done %} ticket-all-done{% endif %}"
+            data-ticket="{{ ticket.id }}">
 
             <div class="ticket-top">
 
@@ -111,23 +113,42 @@
 
                     {% for item in section.list %}
 
-                    <div class="kitchen-ticket-line">
+                    <div
+                        class="kitchen-ticket-line{% if item.is_done %} line-done{% endif %}"
+                        data-item-id="{{ item.id }}">
 
-    <span class="qty-badge">
-        {{ item.quantity }}
-    </span>
+                        {% if not item.label %}
+                        <span class="qty-badge">
+                            {{ item.quantity }}
+                        </span>
+                        {% endif %}
 
-    <div class="product-name">
-        {{ item.product.name }}
+                        <div class="product-name">
+                            <span class="product-label">
+                                {% if item.label %}
+                                    {{ item.label }}
+                                {% else %}
+                                    {{ item.product.name }}
+                                {% endif %}
+                            </span>
 
-        {% if item.note %}
-            <div class="ticket-note">
-                📝 {{ item.note }}
-            </div>
-        {% endif %}
-    </div>
+                            {% if item.note %}
+                                <div class="ticket-note">
+                                    📝 {{ item.note }}
+                                </div>
+                            {% endif %}
+                        </div>
 
-</div>
+                        <button
+                            type="button"
+                            class="line-done-btn{% if item.is_done %} is-done{% endif %}"
+                            data-item="{{ item.id }}"
+                            aria-label="{% if item.is_done %}Annuler{% else %}Marquer comme fait{% endif %}">
+                            <span class="line-done-check">{% if item.is_done %}✓{% else %}○{% endif %}</span>
+                            <span class="line-done-label">{% if item.is_done %}Fait{% else %}Fait{% endif %}</span>
+                        </button>
+
+                    </div>
 
                     {% endfor %}
 
@@ -140,9 +161,11 @@
             <div class="ticket-footer">
 
                 <button
-                    class="kitchen-done-btn"
-                    data-ticket="{{ ticket.id }}">
-                    ✅ TERMINÉ
+                    type="button"
+                    class="kitchen-close-btn"
+                    data-ticket="{{ ticket.id }}"
+                    {% if not ticket.all_items_done %}disabled{% endif %}>
+                    Clôturer le bon
                 </button>
 
             </div>
@@ -176,5 +199,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'riad/js/kitchen.js' %}"></script>
+<script src="{% static 'riad/js/kitchen.js' %}?v=4"></script>
 {% endblock %}

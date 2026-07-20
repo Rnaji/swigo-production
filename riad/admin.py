@@ -164,9 +164,9 @@ class ProductCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "price", "is_active")
+    list_display = ("name", "short_name", "category", "sub_choice_category", "price", "vat_rate", "is_active")
     list_filter = ("category", "is_active")
-    list_editable = ("price", "is_active")
+    list_editable = ("price", "vat_rate", "is_active")
     search_fields = ("name",)
     ordering = ("category__order", "name")
 

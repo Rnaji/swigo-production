@@ -1,27 +1,39 @@
-{% extends "assets/base.html" %}
+{% extends "riad/base.html" %}
 {% load static %}
 
 {% block title %}
 Commande - Table {{ table.numero }}
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'riad/css/commande.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=92">
+{% endblock %}
+
 {% block content %}
 
 <div class="container py-4">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 commande-header">
         <h2>🍽️ Table {{ table.numero }}</h2>
 
-        <a href="{% url 'riad:salle' %}" class="btn btn-outline-secondary">
-            ← Retour
-        </a>
+        <button
+            type="button"
+            id="cancelOrderBtn"
+            class="btn btn-sm btn-link text-danger text-decoration-none px-2 d-none">
+            Annuler la prise de commande
+        </button>
     </div>
 
     <div class="row">
 
-        <div class="col-md-8">
+        <div class="col-md-8 commande-wizard wizard-loading">
 
-            <div id="step-guests" class="text-center py-5">
+            <div class="wizard-loading-indicator" aria-hidden="true">
+                Chargement…
+            </div>
+
+            <div id="step-guests" class="commande-wizard-step text-center py-5 d-none">
 
                 <h3 class="mb-4">Nombre de convives</h3>
 
@@ -47,7 +59,7 @@ Commande - Table {{ table.numero }}
 
             </div>
 
-            <div id="step-menu" class="d-none">
+            <div id="step-menu" class="commande-wizard-step d-none">
 
                 <h3 class="mb-4 text-center">
                     Convive <span id="currentGuest">1 / 2</span>
@@ -74,9 +86,9 @@ Commande - Table {{ table.numero }}
 
             </div>
 
-            <div id="step-section" class="d-none"></div>
+            <div id="step-section" class="commande-wizard-step d-none"></div>
 
-            <div id="step-note" class="d-none">
+            <div id="step-note" class="commande-wizard-step d-none">
 
                 <h3 class="mb-3 text-center">
                     📝 Note pour le convive <span id="noteGuestNumber">1</span>
@@ -108,7 +120,7 @@ Commande - Table {{ table.numero }}
 
             </div>
 
-            <div id="recap" class="d-none">
+            <div id="recap" class="commande-wizard-step d-none">
 
                 <h3 class="mb-3">📋 Récapitulatif</h3>
 
@@ -127,7 +139,15 @@ Commande - Table {{ table.numero }}
             <div class="card shadow-sm sticky-top" style="top:20px;">
                 <div class="card-body">
 
-                    <h5 class="mb-3">🧾 Commande en cours</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">🧾 Commande en cours</h5>
+                        <button
+                            type="button"
+                            id="wizardAddExtraBtn"
+                            class="btn btn-sm btn-outline-primary d-none">
+                            + Ajouter un extra
+                        </button>
+                    </div>
 
                     <div id="liveTicket">
                         <p class="text-muted">Aucune commande</p>
@@ -142,12 +162,181 @@ Commande - Table {{ table.numero }}
 
 </div>
 
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <p id="cancelOrderModalMessage" class="mb-0"></p>
+            </div>
+            <div class="modal-footer flex-column flex-sm-row justify-content-sm-between gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Continuer la commande
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmCancelOrderBtn">
+                    Oui, annuler la commande
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="add-item-overlay" id="addItemOverlay"></div>
+
+<div class="add-item-modal" id="addItemModal">
+
+    <div class="add-item-head">
+
+        <div>
+            <span>Commande en cours</span>
+            <h2 id="addItemTitle">Ajouter un extra</h2>
+        </div>
+
+        <button type="button" id="addItemClose">×</button>
+
+    </div>
+
+    <div class="add-item-body">
+
+        <div class="add-item-step active" id="addItemStepMode">
+
+            <h3>Que souhaitez-vous ajouter ?</h3>
+
+            <div class="add-item-grid">
+
+                <button type="button" class="add-category-card" id="addCatalogBtn">
+                    <span class="material-symbols-outlined">restaurant_menu</span>
+                    <strong>Produit du catalogue</strong>
+                </button>
+
+                <button type="button" class="add-category-card" id="addManualBtn">
+                    <span class="material-symbols-outlined">edit_note</span>
+                    <strong>Supplément libre</strong>
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="add-item-step" id="addItemStepCategories">
+
+            <h3>Catégorie</h3>
+
+            <div class="add-item-grid" id="addItemCategories">
+                Chargement...
+            </div>
+
+        </div>
+
+        <div class="add-item-step" id="addItemStepProducts">
+
+            <button type="button" class="add-back-btn" id="addItemBackToCategories">
+                ← Retour
+            </button>
+
+            <h3 id="addItemCategoryTitle">Produits</h3>
+
+            <div class="add-item-list" id="addItemProducts"></div>
+
+        </div>
+
+        <div class="add-item-step" id="addItemStepConfirm">
+
+            <button type="button" class="add-back-btn" id="addItemBackToProducts">
+                ← Retour
+            </button>
+
+            <h3 id="addItemProductTitle">Produit</h3>
+
+            <div class="qty-control">
+                <button type="button" id="qtyMinus">−</button>
+                <strong id="addItemQty">1</strong>
+                <button type="button" id="qtyPlus">+</button>
+            </div>
+
+            <h3>Pour qui ?</h3>
+
+            <div class="guest-choice-list" id="addItemGuests"></div>
+
+            <button type="button" class="drawer-btn primary" id="confirmAddItem">
+                Ajouter
+            </button>
+
+        </div>
+
+        <div class="add-item-step" id="addItemStepManual">
+
+            <button type="button" class="add-back-btn" id="addItemBackToMode">
+                ← Retour
+            </button>
+
+            <div class="manual-extra-form">
+
+                <h3>Supplément libre</h3>
+
+                <label class="add-form-label" for="manualExtraLabel">Intitulé</label>
+                <input
+                    type="text"
+                    id="manualExtraLabel"
+                    class="add-form-input"
+                    placeholder="Ex. 2 merguez supplémentaires">
+
+                <div class="manual-extra-row">
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraTotal">Prix</label>
+                        <input
+                            type="text"
+                            id="manualExtraTotal"
+                            class="add-form-input"
+                            placeholder="Ex. 6,00"
+                            inputmode="decimal">
+                    </div>
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraStation">Destination</label>
+                        <select id="manualExtraStation" class="add-form-input">
+                            <option value="kitchen">Cuisine</option>
+                            <option value="bar">Office</option>
+                        </select>
+                    </div>
+
+                    <div class="manual-extra-field">
+                        <label class="add-form-label" for="manualExtraVat">TVA</label>
+                        <select id="manualExtraVat" class="add-form-input">
+                            <option value="10.00" selected>10 %</option>
+                            <option value="5.50">5,5 %</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <h3>Pour qui ?</h3>
+
+                <div class="guest-choice-list" id="wizardManualGuests"></div>
+
+                <button
+                    type="button"
+                    class="drawer-btn primary manual-extra-submit"
+                    id="confirmManualExtra">
+                    Ajouter le supplément
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
 <script>
     window.RIAD_TABLE_NUMERO = {{ table.numero }};
 </script>
+{{ order.wizard_draft|json_script:"riad-wizard-draft" }}
 
 <script src="{% static 'riad/js/api.js' %}"></script>
-<script src="{% static 'riad/js/wizard.js' %}?v=98"></script>
-<script src="{% static 'riad/js/commande.js' %}?v=98"></script>
+<script src="{% static 'riad/js/add-extra-common.js' %}?v=1"></script>
+<script src="{% static 'riad/js/wizard.js' %}?v=109"></script>
+<script src="{% static 'riad/js/commande.js' %}?v=106"></script>
 
 {% endblock %}

@@ -1,0 +1,130 @@
+{% extends "riad/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'riad/css/pre_ticket.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'riad/css/payment-modal.css' %}?v=1">
+{% endblock %}
+
+{% block title %}Pré-ticket — Table {{ pre_ticket.table_number }}{% endblock %}
+
+{% block content %}
+
+<div class="pre-ticket-page">
+
+    <div class="pre-ticket-toolbar no-print">
+        <a href="/riad/salle/" class="pre-ticket-back">← Retour salle</a>
+        <button type="button" class="pre-ticket-print-btn" onclick="window.print()">
+            Imprimer
+        </button>
+    </div>
+
+    <article class="pre-ticket-document" id="preTicketDocument">
+
+        <header class="ticket-header">
+            <p class="ticket-restaurant-name">{{ pre_ticket.restaurant.name }}</p>
+            <p class="ticket-restaurant-address">{{ pre_ticket.restaurant.address }}</p>
+            <p class="ticket-restaurant-city">{{ pre_ticket.restaurant.city }}</p>
+        </header>
+
+        <p class="ticket-title">PRÉ-TICKET</p>
+
+        <p class="ticket-disclaimer">{{ pre_ticket.disclaimer_line }}</p>
+
+        <div class="ticket-meta">
+            <p>Table {{ pre_ticket.table_number }}</p>
+            <p>{{ pre_ticket.generated_at|date:"d/m/Y H:i" }}</p>
+            <p>Commande #{{ pre_ticket.order_id }}</p>
+        </div>
+
+        <div class="ticket-body">
+            {% for line in pre_ticket.items %}
+                <div class="ticket-line">
+                    <span class="ticket-line-label">{{ line.display_label }}</span>
+                    <span class="ticket-line-amount">{{ line.amount_display }}</span>
+                </div>
+            {% endfor %}
+
+            {% if pre_ticket.extras %}
+                <p class="ticket-section-title">Extras</p>
+
+                {% for line in pre_ticket.extras %}
+                    <div class="ticket-line">
+                        <span class="ticket-line-label">{{ line.display_label }}</span>
+                        <span class="ticket-line-amount">{{ line.amount_display }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        {% if pre_ticket.vat_summary.rates %}
+            <div class="ticket-vat">
+                <p class="ticket-section-title">TVA</p>
+
+                {% for row in pre_ticket.vat_summary.rates %}
+                    <div class="ticket-vat-rate">
+                        <div class="ticket-vat-line">
+                            <span>{{ row.rate_display }}</span>
+                            <span>HT {{ row.base_ht_display }}</span>
+                        </div>
+                        <div class="ticket-vat-line ticket-vat-indent">
+                            <span>TVA {{ row.vat_amount_display }}</span>
+                        </div>
+                        <div class="ticket-vat-line ticket-vat-indent">
+                            <span>TTC {{ row.ttc_display }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="ticket-total">
+            <span class="ticket-total-separator">------------------------------</span>
+            <div class="ticket-line ticket-line-total">
+                <span class="ticket-line-label">TOTAL TTC</span>
+                <span class="ticket-line-amount">{{ pre_ticket.totals.grand_total_display }}</span>
+            </div>
+        </div>
+
+    </article>
+
+    <aside class="pre-ticket-ops no-print">
+        <h2>Récapitulatif</h2>
+
+        <div class="pre-ticket-ops-summary">
+            <div><span>Total</span><strong>{{ pre_ticket.totals.grand_total_display }}</strong></div>
+            <div><span>Payé</span><strong>{{ paid|floatformat:2 }} €</strong></div>
+            <div><span>Reste</span><strong>{{ remaining|floatformat:2 }} €</strong></div>
+        </div>
+
+        {% if service.status != "paid" %}
+            <div class="pre-ticket-ops-actions">
+                <button type="button" id="btnTrackCard" class="pre-ticket-ops-btn">Carte bancaire</button>
+                <button type="button" id="btnTrackCash" class="pre-ticket-ops-btn">Espèces</button>
+            </div>
+
+            <button type="button" id="btnMarkPaidExternal" class="pre-ticket-mark-paid-btn">
+                Paiement enregistré
+            </button>
+        {% else %}
+            <div class="pre-ticket-paid-msg">Paiement terminé</div>
+            <button type="button" class="pre-ticket-mark-paid-btn" onclick="window.location.href='/riad/salle/'">
+                Retour au plan de salle
+            </button>
+        {% endif %}
+    </aside>
+
+</div>
+
+<script>
+    window.RIAD_PRE_TICKET = {
+        orderId: "{{ order.id }}",
+        tableNumero: {{ table.numero }},
+        serviceStatus: "{{ service.status }}",
+        remaining: {{ remaining|floatformat:2 }},
+    };
+</script>
+<script src="{% static 'riad/js/payment-modal.js' %}?v=5"></script>
+<script src="{% static 'riad/js/pre_ticket.js' %}?v=3"></script>
+
+{% endblock %}

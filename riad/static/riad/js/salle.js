@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    initPaymentModal();
     refreshAllTables();
 
     setInterval(updateLocalTimers, 1000);
@@ -9,7 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    document.getElementById("drawerClose")?.addEventListener("click", closeDrawer);
+    document.querySelectorAll("#tableDrawer .drawer-close").forEach(btn => {
+        btn.addEventListener("click", closeDrawer);
+    });
     document.getElementById("drawerOverlay")?.addEventListener("click", closeDrawer);
 
     document.getElementById("drawerAddItem")?.addEventListener("click", openAddItemModal);
@@ -19,6 +22,21 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("addItemBackToCategories")?.addEventListener("click", () => {
         showAddStep("addItemStepCategories");
     });
+
+    document.getElementById("addItemBackToMode")?.addEventListener("click", () => {
+        showAddStep("addItemStepMode");
+    });
+
+    document.getElementById("addCatalogBtn")?.addEventListener("click", () => {
+        showAddStep("addItemStepCategories");
+    });
+
+    document.getElementById("addManualBtn")?.addEventListener("click", () => {
+        resetManualExtraForm();
+        showAddStep("addItemStepManual");
+    });
+
+    document.getElementById("confirmManualExtra")?.addEventListener("click", confirmManualExtra);
 
     document.getElementById("addItemBackToProducts")?.addEventListener("click", () => {
         showAddStep("addItemStepProducts");
@@ -49,12 +67,11 @@ let selectedProduct = null;
 let selectedGuest = "table";
 let selectedQty = 1;
 
-const ADD_GROUPS = [
-    { name: "Plat", icon: "restaurant", categories: ["Plat", "Supplément"] },
-    { name: "Entrée", icon: "restaurant_menu", categories: ["Entrée"] },
-    { name: "Dessert", icon: "icecream", categories: ["Dessert"] },
-    { name: "Boisson", icon: "local_bar", categories: ["Boisson", "Eau"] },
-    { name: "Mocktail", icon: "local_bar", categories: ["Mocktail"] },
+const ADD_GROUPS = window.RIAD_ADD_GROUPS || [
+    { name: "Boissons", icon: "local_bar", categories: ["Boisson", "Eau", "Jus"] },
+    { name: "Mocktails", icon: "local_bar", categories: ["Mocktail"] },
+    { name: "Desserts", icon: "icecream", categories: ["Dessert"] },
+    { name: "Coupes glacées", icon: "icecream", categories: ["Coupe glacée"] },
     { name: "Thé / Café", icon: "local_cafe", categories: ["Thé / Café"] },
 ];
 
@@ -66,6 +83,7 @@ async function refreshAllTables() {
         tableState[table.numero] = table;
         updateTableCard(table);
     });
+
 }
 
 function updateTableCard(table) {
@@ -150,7 +168,7 @@ function renderDrawer(data) {
     renderTimeline(data.timeline || []);
     renderCurrentAction(data.next_action);
     renderPaymentPanel(data);
-    renderOrderDetails(data.order);
+    renderOrderDetails(data.order, data.status);
 
     colorDrawer(data.alert);
 }
@@ -269,7 +287,14 @@ function renderCurrentAction(action) {
     actionCard.innerHTML = html;
     container.appendChild(actionCard);
 
-    document.getElementById("drawerNextStep").addEventListener("click", nextStep);
+    const nextBtn = document.getElementById("drawerNextStep");
+    if (action.type === "open_commande") {
+        nextBtn.addEventListener("click", openCommandeWizard);
+    } else if (action.type === "open_pre_ticket") {
+        nextBtn.addEventListener("click", () => openPreTicket(action.pre_ticket_url));
+    } else {
+        nextBtn.addEventListener("click", nextStep);
+    }
 }
 
 function getActionIcon(action) {
@@ -302,7 +327,11 @@ function getSectionIcon(section) {
     return "•";
 }
 
-function renderOrderDetails(order) {
+function formatMoney(amount) {
+    return `${Number(amount || 0).toFixed(2).replace(".", ",")} €`;
+}
+
+function renderOrderDetails(order, serviceStatus = null) {
     const container = document.getElementById("drawerOrder");
     container.innerHTML = "";
 
@@ -311,27 +340,214 @@ function renderOrderDetails(order) {
         return;
     }
 
+    const canPayGuestShare =
+        serviceStatus === "bill_requested";
+
     order.guests.forEach(guest => {
         const guestEl = document.createElement("div");
         guestEl.className = "guest-card";
 
+        const paidBadge = guest.is_paid
+            ? `<span class="guest-paid-badge">Payé</span>`
+            : "";
+
         let html = `
-            <strong>Client ${guest.guest_number}</strong>
-            <div class="guest-menu">${guest.menu || "Sans menu"}</div>
+            <div class="guest-card-header">
+                <strong>Client ${guest.guest_number}</strong>
+                ${paidBadge}
+            </div>
         `;
 
-        guest.choices.forEach(choice => {
+        if (guest.menu) {
             html += `
-                <div class="choice-line">
-                    <span class="choice-section">${choice.section}</span>
-                    ${choice.quantity} × ${choice.product}
+                <div class="guest-menu-line">
+                    ${guest.menu} — ${formatMoney(guest.menu_price)}
                 </div>
             `;
+        } else {
+            html += `<div class="guest-menu">${guest.menu || "Sans menu"}</div>`;
+        }
+
+        html += `<div class="order-detail-lines">`;
+
+        guest.choices.forEach(choice => {
+            html += renderOrderChoiceLine(choice);
         });
+
+        html += `</div>`;
+
+        html += `
+            <div class="guest-card-total">
+                Total du client ${formatMoney(guest.total)}
+            </div>
+        `;
+
+        if (canPayGuestShare && !guest.is_paid && Number(guest.remaining || 0) > 0) {
+            html += `
+                <div class="guest-pay-share">
+                    <span class="guest-pay-share-label">Suivi interne — part de ce client (non fiscal)</span>
+                    <div class="guest-pay-share-actions">
+                        <button type="button"
+                            class="guest-pay-share-btn"
+                            data-guest="${guest.guest_number}"
+                            data-amount="${guest.remaining}"
+                            data-method="card">
+                            💳 CB
+                        </button>
+                        <button type="button"
+                            class="guest-pay-share-btn"
+                            data-guest="${guest.guest_number}"
+                            data-amount="${guest.remaining}"
+                            data-method="cash">
+                            💶 Espèces
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
         guestEl.innerHTML = html;
         container.appendChild(guestEl);
     });
+
+    if (order.table_extras && order.table_extras.length > 0) {
+        const tableExtrasEl = document.createElement("div");
+        tableExtrasEl.className = "guest-card table-extras-card";
+
+        let html = `
+            <strong>Extras de la table</strong>
+            <div class="order-detail-lines">
+        `;
+
+        order.table_extras.forEach(choice => {
+            html += renderOrderChoiceLine(choice);
+        });
+
+        html += `
+            </div>
+            <div class="guest-card-total table-extras-total">
+                Total extras de la table ${formatMoney(order.table_extras_total)}
+            </div>
+        `;
+
+        tableExtrasEl.innerHTML = html;
+        container.appendChild(tableExtrasEl);
+    }
+
+    const summaryEl = document.createElement("div");
+    summaryEl.className = "order-billing-summary";
+    summaryEl.innerHTML = `
+        <div class="order-billing-line">
+            <span>Total convives</span>
+            <strong>${formatMoney(order.guests_total)}</strong>
+        </div>
+        ${Number(order.table_extras_total || 0) > 0 ? `
+            <div class="order-billing-line">
+                <span>Extras de la table</span>
+                <strong>${formatMoney(order.table_extras_total)}</strong>
+            </div>
+        ` : ""}
+        <div class="order-billing-grand-total">
+            <span>TOTAL GÉNÉRAL</span>
+            <strong>${formatMoney(order.total)}</strong>
+        </div>
+    `;
+    container.appendChild(summaryEl);
+
+    container.querySelectorAll(".delete-choice-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            deleteOrderChoice(parseInt(button.dataset.choiceId, 10));
+        });
+    });
+
+    container.querySelectorAll(".guest-pay-share-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            openDrawerGuestPayment(
+                parseInt(button.dataset.guest, 10),
+                parseFloat(button.dataset.amount),
+                button.dataset.method
+            );
+        });
+    });
+}
+
+function getOrderDetailCategory(choice) {
+    if (choice.source === "extra" || choice.source === "manual_extra") {
+        return "EXTRA";
+    }
+
+    return (choice.section || "—").toUpperCase();
+}
+
+function getOrderDetailProductName(choice) {
+    let name = choice.product || "";
+
+    if (choice.source === "replacement") {
+        name = `Remplacement par ${name}`;
+    } else if (choice.source === "extra") {
+        name = `Extra : ${name}`;
+    } else if (choice.source === "manual_extra") {
+        name = `Supplément libre — ${name}`;
+    }
+
+    if (choice.quantity > 1 && choice.source !== "manual_extra") {
+        return `${choice.quantity} × ${name}`;
+    }
+
+    return name;
+}
+
+function formatOrderDetailPrice(choice) {
+    if (choice.source === "menu" || choice.source === "offered") {
+        return "";
+    }
+
+    const amount = Number(choice.line_amount) || 0;
+
+    if (amount <= 0) {
+        return "";
+    }
+
+    if (choice.source === "replacement") {
+        return `+${amount.toFixed(2)} €`;
+    }
+
+    return `${amount.toFixed(2)} €`;
+}
+
+function renderOrderChoiceLine(choice) {
+    const category = getOrderDetailCategory(choice);
+    const productName = getOrderDetailProductName(choice);
+    const price = formatOrderDetailPrice(choice);
+    const deletable =
+        (choice.source === "extra" || choice.source === "manual_extra") && choice.id;
+
+    const replacementNote =
+        choice.source === "replacement" && choice.replaced_product_name
+            ? `<div class="order-detail-sub">↳ remplace ${choice.replaced_product_name}</div>`
+            : "";
+
+    return `
+        <div class="order-detail-line">
+            <span class="order-detail-cat">${category}</span>
+            <div class="order-detail-content">
+                <div class="order-detail-main">
+                    <span class="order-detail-name">${productName}</span>
+                    <span class="order-detail-end">
+                        ${price ? `<span class="order-detail-price">${price}</span>` : ""}
+                        ${deletable ? `
+                            <button type="button"
+                                class="order-detail-delete delete-choice-btn"
+                                data-choice-id="${choice.id}"
+                                title="Supprimer"
+                                aria-label="Supprimer">×</button>
+                        ` : ""}
+                    </span>
+                </div>
+                ${replacementNote}
+            </div>
+        </div>
+    `;
 }
 
 function colorDrawer(alert) {
@@ -373,6 +589,17 @@ async function nextStep() {
     }
 }
 
+function openCommandeWizard() {
+    if (!selectedTableNumero) return;
+    window.location.href = `/riad/table/${selectedTableNumero}/commande/`;
+}
+
+function openPreTicket(url) {
+    const targetUrl = url || (tableState[selectedTableNumero]?.pre_ticket_url);
+    if (!targetUrl) return;
+    window.location.href = targetUrl;
+}
+
 async function openAddItemModal() {
     if (!selectedTableNumero) return;
 
@@ -387,7 +614,7 @@ async function openAddItemModal() {
     selectedGuest = "table";
     selectedQty = 1;
 
-    showAddStep("addItemStepCategories");
+    showAddStep("addItemStepMode");
 
     const container = document.getElementById("addItemCategories");
     container.innerHTML = "Chargement...";
@@ -474,12 +701,95 @@ function renderAddProducts(group) {
     showAddStep("addItemStepProducts");
 }
 
+function resetManualExtraForm() {
+    const labelInput = document.getElementById("manualExtraLabel");
+    const totalInput = document.getElementById("manualExtraTotal");
+    const stationInput = document.getElementById("manualExtraStation");
+    const vatInput = document.getElementById("manualExtraVat");
+
+    if (labelInput) labelInput.value = "";
+    if (totalInput) totalInput.value = "";
+    if (stationInput) stationInput.value = "kitchen";
+    if (vatInput) vatInput.value = "10.00";
+}
+
+async function confirmManualExtra() {
+    if (!selectedTableNumero) return;
+
+    const label = document.getElementById("manualExtraLabel").value.trim();
+    const lineTotal = document.getElementById("manualExtraTotal").value.trim();
+    const station = document.getElementById("manualExtraStation").value;
+    const vatRate = document.getElementById("manualExtraVat")?.value || "10.00";
+
+    if (!label) {
+        alert("L'intitulé est obligatoire.");
+        return;
+    }
+
+    if (!lineTotal) {
+        alert("Le prix total TTC est obligatoire.");
+        return;
+    }
+
+    const response = await fetch(
+        `/riad/api/table/${selectedTableNumero}/add-manual-extra/`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({
+                label,
+                line_total: lineTotal,
+                station,
+                vat_rate: vatRate,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        alert(data.error || "Impossible d'ajouter le supplément libre.");
+        return;
+    }
+
+    closeAddItemModal();
+    await openDrawer(selectedTableNumero);
+}
+
+async function deleteOrderChoice(choiceId) {
+    if (!selectedTableNumero) return;
+
+    if (!window.confirm("Supprimer cette ligne de la commande ?")) {
+        return;
+    }
+
+    const response = await fetch(
+        `/riad/api/table/${selectedTableNumero}/choice/${choiceId}/delete/`,
+        {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        alert(data.error || "Suppression impossible.");
+        return;
+    }
+
+    await openDrawer(selectedTableNumero);
+}
+
 function renderAddConfirm() {
     document.getElementById("addItemProductTitle").textContent = selectedProduct.name;
 
     updateQty();
-    renderGuestChoices();
-
     showAddStep("addItemStepConfirm");
 }
 
@@ -549,7 +859,6 @@ async function confirmAddItem() {
         body: JSON.stringify({
             product_id: selectedProduct.id,
             quantity: selectedQty,
-            guest_number: selectedGuest,
         }),
     });
 
@@ -607,27 +916,36 @@ function renderPaymentPanel(data) {
     const paid = Number(data.order.paid || 0);
     const remaining = Math.max(Number(data.order.remaining || 0), 0);
     const payments = data.order.payments || [];
+    const preTicketUrl = `/riad/table/${data.id}/pre-ticket/`;
 
     let html = `
         <div class="payment-panel">
 
             <div class="payment-title">
-                💰 Encaissement
+                📄 Récapitulatif non fiscal
             </div>
+
+            <p class="payment-disclaimer">
+                Document interne — le ticket officiel est émis par la caisse homologuée.
+            </p>
+
+            <a href="${preTicketUrl}" class="drawer-btn primary pre-ticket-link-btn">
+                Voir / Imprimer le pré-ticket
+            </a>
 
             <div class="payment-summary">
                 <div>
-                    <span>Total</span>
+                    <span>Total indicatif</span>
                     <strong>${total.toFixed(2)} €</strong>
                 </div>
 
                 <div>
-                    <span>Déjà payé</span>
+                    <span>Suivi interne</span>
                     <strong>${paid.toFixed(2)} €</strong>
                 </div>
 
                 <div class="payment-remaining">
-                    <span>Reste</span>
+                    <span>Reste indicatif</span>
                     <strong id="drawerRemaining">${remaining.toFixed(2)} €</strong>
                 </div>
             </div>
@@ -636,13 +954,16 @@ function renderPaymentPanel(data) {
     if (payments.length > 0) {
         html += `
             <div class="payment-history">
-                <h4>Historique</h4>
+                <h4>Suivi interne (non fiscal)</h4>
         `;
 
         payments.forEach(payment => {
+            const guestLabel = payment.guest_number
+                ? ` — Client ${payment.guest_number}`
+                : "";
             html += `
                 <div class="payment-history-line">
-                    <span>${payment.method_display}</span>
+                    <span>${payment.method_display}${guestLabel}</span>
                     <strong>${Number(payment.amount).toFixed(2)} €</strong>
                 </div>
             `;
@@ -651,10 +972,10 @@ function renderPaymentPanel(data) {
         html += `</div>`;
     }
 
-    if (remaining <= 0) {
+    if (data.status === "paid") {
         html += `
             <div class="payment-finished">
-                ✅ Paiement terminé
+                ✅ Paiement enregistré dans la caisse homologuée
             </div>
 
             <button class="drawer-btn primary" onclick="freeTableAfterPayment()">
@@ -662,22 +983,31 @@ function renderPaymentPanel(data) {
             </button>
         `;
     } else {
+        if (remaining > 0) {
+            html += `
+                <div class="payment-tracking-label">Répartition interne (non fiscal)</div>
+                <div class="payment-buttons-drawer">
+                    <button type="button" onclick="openDrawerCardPayment(${remaining})">
+                        💳 Suivi CB
+                    </button>
+
+                    <button type="button" onclick="openDrawerCashPayment(${remaining})">
+                        💶 Suivi espèces
+                    </button>
+
+                    <button type="button" onclick="showDrawerMixed(${remaining})">
+                        🔀 Suivi mixte
+                    </button>
+                </div>
+
+                <div id="drawerPaymentForm"></div>
+            `;
+        }
+
         html += `
-            <div class="payment-buttons-drawer">
-                <button type="button" onclick="drawerPayCard(${remaining})">
-                    💳 Carte bancaire
-                </button>
-
-                <button type="button" onclick="showDrawerCash(${remaining})">
-                    💶 Espèces
-                </button>
-
-                <button type="button" onclick="showDrawerMixed(${remaining})">
-                    🔀 Mixte
-                </button>
-            </div>
-
-            <div id="drawerPaymentForm"></div>
+            <button class="drawer-btn primary mark-paid-external-btn" onclick="markPaidInExternalCashier()">
+                Paiement enregistré dans la caisse homologuée
+            </button>
         `;
     }
 
@@ -686,61 +1016,59 @@ function renderPaymentPanel(data) {
     container.innerHTML = html;
 }
 
-function drawerPayCard(amount) {
-    sendDrawerPayment([
-        {
-            method: "card",
-            amount: amount
-        }
-    ]);
-}
+function openDrawerGuestPayment(guestNumber, amount, method) {
+    const order = tableState[selectedTableNumero]?.order;
+    const orderRemaining = Number(order?.remaining || 0);
+    const guestRemaining = Number(amount || 0);
 
-function showDrawerCash(remaining) {
-    const form = document.getElementById("drawerPaymentForm");
-
-    form.innerHTML = `
-        <div class="drawer-payment-form">
-            <h3>Paiement espèces</h3>
-
-            <label>Le client donne</label>
-            <input
-                type="number"
-                id="drawerCashGiven"
-                step="0.01"
-                min="0"
-                oninput="calculateDrawerCash(${remaining})"
-            >
-
-            <p>Rendu : <strong id="drawerCashChange">0.00</strong> €</p>
-
-            <button type="button" class="drawer-btn primary" onclick="validateDrawerCash(${remaining})">
-                Valider espèces
-            </button>
-        </div>
-    `;
-}
-
-function calculateDrawerCash(remaining) {
-    const given = Number(document.getElementById("drawerCashGiven").value || 0);
-    const change = Math.max(given - remaining, 0);
-
-    document.getElementById("drawerCashChange").textContent = `${change.toFixed(2)} €`;
-}
-
-function validateDrawerCash(remaining) {
-    const given = Number(document.getElementById("drawerCashGiven").value || 0);
-
-    if (given < remaining) {
-        alert("Montant insuffisant.");
+    if (!order || !order.exists || orderRemaining <= 0 || guestRemaining <= 0) {
         return;
     }
 
-    sendDrawerPayment([
-        {
-            method: "cash",
-            amount: remaining
-        }
-    ]);
+    openPaymentModal({
+        method,
+        remaining: Math.min(orderRemaining, guestRemaining),
+        prefillAmount: guestRemaining,
+        title: `Suivi interne — Client ${guestNumber}`,
+        amountLabel: "Montant suivi (indicatif)",
+        fullButtonLabel: "Part complète du client",
+        onSubmit: ({ method: paymentMethod, amount: paymentAmount }) =>
+            submitDrawerGuestPayment({
+                guestNumber,
+                method: paymentMethod,
+                amount: paymentAmount,
+            }),
+    });
+}
+
+async function submitDrawerGuestPayment({ guestNumber, method, amount }) {
+    return sendDrawerPayment([{ method, amount, guest_number: guestNumber }]);
+}
+
+function openDrawerCardPayment(remaining) {
+    openPaymentModal({
+        method: "card",
+        remaining,
+        title: "Suivi interne — CB",
+        amountLabel: "Montant suivi (indicatif)",
+        fullButtonLabel: "Tout le reste indicatif",
+        onSubmit: submitDrawerSinglePayment,
+    });
+}
+
+function openDrawerCashPayment(remaining) {
+    openPaymentModal({
+        method: "cash",
+        remaining,
+        title: "Suivi interne — Espèces",
+        amountLabel: "Montant suivi (indicatif)",
+        fullButtonLabel: "Tout le reste indicatif",
+        onSubmit: submitDrawerSinglePayment,
+    });
+}
+
+async function submitDrawerSinglePayment({ method, amount }) {
+    return sendDrawerPayment([{ method, amount }]);
 }
 
 function showDrawerMixed(remaining) {
@@ -748,7 +1076,7 @@ function showDrawerMixed(remaining) {
 
     form.innerHTML = `
         <div class="drawer-payment-form">
-            <h3>Paiement mixte</h3>
+            <h3>Suivi mixte (non fiscal)</h3>
 
             <label>Carte bancaire</label>
             <input
@@ -772,7 +1100,7 @@ function showDrawerMixed(remaining) {
             <p>Rendu : <strong id="drawerMixedChange">0.00 €</strong></p>
 
             <button type="button" class="drawer-btn primary" onclick="validateDrawerMixed(${remaining})">
-                Valider paiement mixte
+                Valider le suivi interne
             </button>
         </div>
     `;
@@ -797,7 +1125,12 @@ function validateDrawerMixed(remaining) {
     const cashNeeded = Math.max(remaining - card, 0);
     const cashUsed = Math.min(cashGiven, cashNeeded);
 
-    if (card + cashUsed < remaining) {
+    if (card > remaining + 0.001) {
+        alert("Le montant carte ne peut pas dépasser le reste à payer.");
+        return;
+    }
+
+    if (card + cashUsed < remaining - 0.001) {
         alert("Montant insuffisant.");
         return;
     }
@@ -826,7 +1159,7 @@ async function sendDrawerPayment(payments) {
 
     if (!order || !order.exists) {
         alert("Aucune commande.");
-        return;
+        return false;
     }
 
     const response = await fetch("/riad/api/payment/", {
@@ -843,8 +1176,42 @@ async function sendDrawerPayment(payments) {
 
     const data = await response.json();
 
-    if (!data.success) {
+    if (!response.ok || !data.success) {
         alert(data.error || "Erreur paiement.");
+        return false;
+    }
+
+    await openDrawer(selectedTableNumero);
+    return true;
+}
+
+async function markPaidInExternalCashier() {
+    if (!selectedTableNumero) return;
+
+    const confirmed = window.confirm(
+        "Confirmer que le paiement a été saisi dans la caisse homologuée ?\n\n" +
+        "Cette action marque la commande comme réglée dans Riad.\n" +
+        "Aucun ticket fiscal ne sera généré ici."
+    );
+
+    if (!confirmed) return;
+
+    const response = await fetch(
+        `/riad/api/table/${selectedTableNumero}/mark-paid-external/`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({}),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        alert(data.error || "Impossible de marquer la commande comme réglée.");
         return;
     }
 

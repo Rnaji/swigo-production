@@ -1,0 +1,187 @@
+/* Commande wizard — Riad Les 2 Palmiers */
+
+.commande-wizard {
+    --riad-ivory: #fffdf9;
+    --riad-cream: #faf6f0;
+    --riad-border: #e8dece;
+    --riad-border-hover: #d4b896;
+    --riad-gold: #b8954f;
+    --riad-gold-dark: #8f6f32;
+    --riad-text: #4a3f35;
+    --riad-text-muted: #7a6f63;
+    --riad-selected-bg: linear-gradient(145deg, #f8f0e4 0%, #efe2cc 100%);
+    --riad-shadow: 0 2px 8px rgba(74, 52, 32, 0.07);
+    --riad-shadow-hover: 0 6px 16px rgba(184, 149, 79, 0.18);
+    --riad-radius: 12px;
+    min-height: 220px;
+}
+
+.commande-wizard.wizard-loading .commande-wizard-step {
+    display: none !important;
+}
+
+.commande-wizard.wizard-loading .wizard-loading-indicator {
+    display: flex;
+}
+
+.wizard-loading-indicator {
+    display: none;
+    min-height: 180px;
+    align-items: center;
+    justify-content: center;
+    color: var(--riad-text-muted);
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+
+.commande-wizard #step-menu,
+.commande-wizard #step-section,
+.commande-wizard #recap {
+    width: 100%;
+}
+
+.commande-wizard #step-menu .row,
+.commande-wizard #step-section .row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    margin: 0;
+    width: 100%;
+}
+
+@media (min-width: 576px) {
+    .commande-wizard #step-menu .row,
+    .commande-wizard #step-section .row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 992px) {
+    .commande-wizard #step-menu .row,
+    .commande-wizard #step-section .row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.commande-wizard #step-menu .row > [class*="col-"],
+.commande-wizard #step-section .row > [class*="col-"] {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0 !important;
+}
+
+.commande-wizard .product-choice,
+.commande-wizard .subchoice-product,
+.commande-wizard .menu-choice {
+    width: 100%;
+    min-height: 4.25rem;
+    padding: 0.65rem 0.75rem !important;
+    border-radius: var(--riad-radius) !important;
+    border: 1px solid var(--riad-border) !important;
+    background: var(--riad-ivory) !important;
+    color: var(--riad-text) !important;
+    box-shadow: var(--riad-shadow);
+    font-size: clamp(0.82rem, 1.5vw, 0.93rem);
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    hyphens: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease,
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+.commande-wizard .menu-choice strong {
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.commande-wizard .product-choice:hover,
+.commande-wizard .subchoice-product:hover,
+.commande-wizard .menu-choice:hover {
+    border-color: var(--riad-border-hover) !important;
+    background: #fffef9 !important;
+    box-shadow: var(--riad-shadow-hover);
+    transform: translateY(-1px);
+    color: var(--riad-text) !important;
+}
+
+.commande-wizard .product-choice:focus-visible,
+.commande-wizard .subchoice-product:focus-visible,
+.commande-wizard .menu-choice:focus-visible {
+    outline: 2px solid var(--riad-gold);
+    outline-offset: 2px;
+}
+
+.commande-wizard .product-choice.btn-success,
+.commande-wizard .subchoice-product.btn-success,
+.commande-wizard .menu-choice.btn-success {
+    background: var(--riad-selected-bg) !important;
+    border-color: var(--riad-gold) !important;
+    color: var(--riad-gold-dark) !important;
+    box-shadow: 0 4px 14px rgba(184, 149, 79, 0.22);
+    transform: none;
+    font-weight: 600;
+}
+
+.commande-wizard .product-choice:disabled,
+.commande-wizard .subchoice-product:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.commande-wizard #step-section h4,
+.commande-wizard #step-menu h3 {
+    color: var(--riad-text);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-bottom: 1rem !important;
+}
+
+.commande-wizard #step-section .text-muted {
+    color: var(--riad-text-muted) !important;
+    font-size: 0.9rem;
+}
+
+.commande-wizard #step-section > .d-flex.mb-3,
+.commande-wizard #btnBackMenuEdit {
+    margin-bottom: 0.75rem !important;
+}
+
+.commande-wizard #btnBack,
+.commande-wizard #btnBackMenuEdit {
+    border-radius: 10px;
+    border-color: var(--riad-border);
+    color: var(--riad-text-muted);
+    background: var(--riad-cream);
+}
+
+.commande-wizard #btnBack:hover,
+.commande-wizard #btnBackMenuEdit:hover {
+    border-color: var(--riad-border-hover);
+    background: var(--riad-ivory);
+    color: var(--riad-text);
+}
+
+.commande-header #cancelOrderBtn {
+    font-size: 0.82rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+.commande-header #cancelOrderBtn:hover,
+.commande-header #cancelOrderBtn:focus {
+    opacity: 1;
+    text-decoration: underline !important;
+}

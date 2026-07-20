@@ -1,27 +1,128 @@
+const togglingItems = new Set();
+const closingTickets = new Set();
+
 document.addEventListener("DOMContentLoaded", () => {
-    initKitchenDoneButtons();
+    initTicketFooterButtons();
+    initLineDoneButtons();
     initWaitingTimers();
     markNewTickets();
 });
 
-function initKitchenDoneButtons() {
-    const buttons = document.querySelectorAll(".kitchen-done-btn");
-
-    buttons.forEach(button => {
+function initTicketFooterButtons() {
+    document.querySelectorAll(".kitchen-close-btn").forEach(button => {
         button.addEventListener("click", () => {
             const ticketId = button.dataset.ticket;
+            if (!ticketId || closingTickets.has(ticketId) || button.disabled) return;
 
-            if (!ticketId) return;
-
-            markTicketDone(ticketId, button);
+            closeTicket(ticketId, button);
         });
     });
 }
 
-function markTicketDone(ticketId, button) {
-    const ticketEl = button.closest(".kitchen-ticket");
+function initLineDoneButtons() {
+    document.querySelectorAll(".kitchen-ticket-line").forEach(line => {
+        const button = line.querySelector(".line-done-btn");
+        if (!button) return;
 
-    fetch(`/riad/kitchen/ticket/${ticketId}/done/`, {
+        const toggle = () => {
+            const itemId = button.dataset.item;
+            if (!itemId || togglingItems.has(itemId)) return;
+
+            toggleLineDone(itemId, line, button);
+        };
+
+        button.addEventListener("click", event => {
+            event.stopPropagation();
+            toggle();
+        });
+
+        line.addEventListener("click", event => {
+            if (event.target.closest(".line-done-btn")) return;
+            toggle();
+        });
+    });
+}
+
+function toggleLineDone(itemId, lineEl, buttonEl) {
+    togglingItems.add(itemId);
+    lineEl.classList.add("line-busy");
+    buttonEl.disabled = true;
+
+    fetch(`/riad/kitchen/item/${itemId}/toggle/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCsrfToken(),
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Erreur serveur");
+        }
+
+        return response.json();
+    })
+    .then(data => {
+        applyLineDoneState(lineEl, buttonEl, data.is_done);
+
+        const ticketEl = lineEl.closest(".kitchen-ticket");
+        if (ticketEl) {
+            updateTicketAllDoneState(ticketEl, data.all_items_done);
+            updateCloseButton(ticketEl, data.all_items_done);
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        alert("Impossible de mettre à jour la ligne.");
+    })
+    .finally(() => {
+        togglingItems.delete(itemId);
+        lineEl.classList.remove("line-busy");
+        buttonEl.disabled = false;
+    });
+}
+
+function applyLineDoneState(lineEl, buttonEl, isDone) {
+    lineEl.classList.toggle("line-done", isDone);
+    buttonEl.classList.toggle("is-done", isDone);
+
+    const check = buttonEl.querySelector(".line-done-check");
+    const label = buttonEl.querySelector(".line-done-label");
+
+    if (check) {
+        check.textContent = isDone ? "✓" : "○";
+    }
+
+    if (label) {
+        label.textContent = "Fait";
+    }
+
+    buttonEl.setAttribute(
+        "aria-label",
+        isDone ? "Annuler la validation" : "Marquer comme fait"
+    );
+}
+
+function updateTicketAllDoneState(ticketEl, allDone) {
+    ticketEl.classList.toggle("ticket-all-done", Boolean(allDone));
+}
+
+function updateCloseButton(ticketEl, allDone) {
+    const button = ticketEl.querySelector(".kitchen-close-btn");
+    if (!button) return;
+
+    button.disabled = !allDone;
+}
+
+function closeTicket(ticketId, button) {
+    const ticketEl = button.closest(".kitchen-ticket");
+    const originalText = button.textContent;
+
+    closingTickets.add(ticketId);
+    button.disabled = true;
+    button.textContent = "Clôture...";
+
+    fetch(`/riad/kitchen/ticket/${ticketId}/close/`, {
         method: "POST",
         headers: {
             "X-CSRFToken": getCsrfToken(),
@@ -42,7 +143,12 @@ function markTicketDone(ticketId, button) {
     })
     .catch(error => {
         console.error(error);
-        alert("Impossible de terminer le bon.");
+        alert("Impossible de clôturer le bon.");
+        button.disabled = false;
+        button.textContent = originalText;
+    })
+    .finally(() => {
+        closingTickets.delete(ticketId);
     });
 }
 
