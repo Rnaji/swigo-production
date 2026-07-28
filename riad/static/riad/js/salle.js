@@ -1,5 +1,32 @@
 const SALLE_POLL_MS = 5000;
 
+function getTableId(table) {
+    if (!table || typeof table !== "object") {
+        return null;
+    }
+    return table.table_id ?? table.id ?? null;
+}
+
+function getTableNumber(table) {
+    if (!table || typeof table !== "object") {
+        return null;
+    }
+    return table.table_number ?? table.numero ?? table.number ?? null;
+}
+
+function isCompleteTablePayload(table) {
+    return Boolean(table && getTableNumber(table) != null && table.status);
+}
+
+function storeTableState(table) {
+    const numero = getTableNumber(table);
+    if (numero == null) {
+        return null;
+    }
+    tableState[numero] = table;
+    return numero;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     initPaymentModal();
     refreshAllTables();
@@ -113,15 +140,22 @@ async function refreshAllTables() {
     const response = await fetch("/riad/api/salle/");
     const data = await response.json();
 
-    data.tables.forEach(table => {
-        tableState[table.numero] = table;
+    (data.tables || []).forEach(table => {
+        if (!isCompleteTablePayload(table)) {
+            return;
+        }
+        storeTableState(table);
         updateTableCard(table);
     });
-
 }
 
 function updateTableCard(table) {
-    const card = document.getElementById(`table-${table.numero}`);
+    const numero = getTableNumber(table);
+    if (numero == null) {
+        return;
+    }
+
+    const card = document.getElementById(`table-${numero}`);
     if (!card) return;
 
     card.querySelector(".table-time").textContent = table.elapsed_text || "";
@@ -134,7 +168,7 @@ function updateTableCard(table) {
     card.classList.remove("normal", "warning", "danger", "none", "selected");
     card.classList.add(table.alert || "none");
 
-    if (String(selectedTableNumero) === String(table.numero)) {
+    if (String(selectedTableNumero) === String(numero)) {
         card.classList.add("selected");
     }
 }
@@ -160,15 +194,29 @@ function updateLocalTimers() {
 }
 
 async function openDrawer(numero, existingData = null) {
+    if (numero == null || numero === "" || numero === "undefined") {
+        console.error("Invalid table number for drawer", numero, existingData);
+        return;
+    }
+
     selectedTableNumero = numero;
 
-    const data = existingData || await (async () => {
+    let data = existingData;
+    if (!isCompleteTablePayload(data)) {
         const response = await fetch(`/riad/api/table/${numero}/details/`);
-        return response.json();
-    })();
+        if (!response.ok) {
+            console.error("Failed to load table details", numero, response.status);
+            return;
+        }
+        data = await response.json();
+    }
 
-    tableState[data.numero] = data;
+    if (!isCompleteTablePayload(data)) {
+        console.error("Invalid table data for drawer", data);
+        return;
+    }
 
+    storeTableState(data);
     updateTableCard(data);
     renderDrawer(data);
 
@@ -178,7 +226,7 @@ async function openDrawer(numero, existingData = null) {
 
 function renderDrawerFromState(numero) {
     const data = tableState[numero];
-    if (!data) {
+    if (!isCompleteTablePayload(data)) {
         return;
     }
     renderDrawer(data);
@@ -196,10 +244,17 @@ function closeDrawer() {
 }
 
 function renderDrawer(data) {
+    if (!isCompleteTablePayload(data)) {
+        console.error("Invalid table data for drawer", data);
+        return;
+    }
+
+    const numero = getTableNumber(data);
+
     document.getElementById("drawerRoom").textContent = data.room || "";
-    document.getElementById("drawerTitle").textContent = `Table ${data.numero}`;
-    document.getElementById("drawerAction").textContent = data.action || data.label || "Libre";
-    document.getElementById("drawerTime").textContent = data.elapsed_text || "--";
+    document.getElementById("drawerTitle").textContent = `Table ${numero}`;
+    document.getElementById("drawerAction").textContent = data.action || data.label || "";
+    document.getElementById("drawerTime").textContent = data.elapsed_text || "";
 
     const progress = Math.min(data.progress || 0, 100);
     document.getElementById("drawerProgressBar").style.width = `${progress}%`;
@@ -629,6 +684,7 @@ async function nextStep() {
     if (!selectedTableNumero) return;
     if (isNextStepLoading) return;
 
+    const activeTableNumero = selectedTableNumero;
     isNextStepLoading = true;
 
     const button = document.getElementById("drawerNextStep");
@@ -637,24 +693,72 @@ async function nextStep() {
         button.textContent = "Validation...";
     }
 
-    const response = await fetch(`/riad/api/table/${selectedTableNumero}/next/`, {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": getCookie("csrftoken"),
-        },
-    });
+    try {
+        console.debug("SALLE ACTION BEFORE", {
+            selectedTableNumero: activeTableNumero,
+            currentTable: tableState[activeTableNumero] || null,
+        });
 
-    const data = await response.json();
+        const response = await fetch(`/riad/api/table/${activeTableNumero}/next/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+        });
 
-    tableState[data.numero] = data;
-    updateTableCard(data);
+        const data = await response.json();
+        console.debug("SALLE ACTION RESPONSE", {
+            ok: response.ok,
+            status: response.status,
+            data,
+        });
 
-    isNextStepLoading = false;
+        if (!response.ok) {
+            alert(data.error || "Impossible de valider cette action.");
+            await openDrawer(activeTableNumero);
+            return;
+        }
 
-    await openDrawer(data.numero, data);
+        if (!isCompleteTablePayload(data)) {
+            console.error("SALLE ACTION incomplete payload", data);
+            await refreshAllTables();
+            await openDrawer(activeTableNumero);
+            return;
+        }
 
-    if (data.status === "ordering") {
-        window.location.href = `/riad/table/${data.numero}/commande/`;
+        const refreshedNumero = getTableNumber(data);
+        storeTableState(data);
+        updateTableCard(data);
+
+        // Conserver la table ouverte ; ne fermer que si elle est réellement libérée.
+        if (data.status === "free") {
+            await refreshAllTables();
+            closeDrawer();
+            window.dispatchEvent(new CustomEvent("riad:tasks-updated"));
+            return;
+        }
+
+        selectedTableNumero = refreshedNumero;
+        await openDrawer(refreshedNumero, data);
+
+        console.debug("SALLE ACTION AFTER", {
+            selectedTableNumero,
+            tableState: tableState[selectedTableNumero] || null,
+        });
+
+        window.dispatchEvent(new CustomEvent("riad:tasks-updated"));
+
+        if (data.status === "ordering") {
+            window.location.href = `/riad/table/${refreshedNumero}/commande/`;
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Erreur réseau.");
+        if (activeTableNumero) {
+            await openDrawer(activeTableNumero);
+        }
+    } finally {
+        isNextStepLoading = false;
     }
 }
 

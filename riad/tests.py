@@ -1644,6 +1644,70 @@ class BillTaskTests(OrderContentTestMixin, TestCase):
         self.assertEqual(compute_next_status("coffee_cleared", flags), "bill_requested")
 
 
+class SalleNextStepDrawerContractTests(OrderContentTestMixin, TestCase):
+    """
+    Contrat API pour le drawer Salle : une réponse d'erreur ne doit jamais
+    ressembler à un payload de table (sinon « Table undefined » / faux Libre).
+    """
+
+    def test_successful_next_step_returns_complete_table_payload(self):
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "coffee_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        response = self.client.post(f"/riad/api/table/{self.table.numero}/next/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.assertEqual(data["numero"], self.table.numero)
+        self.assertEqual(data["id"], self.table.id)
+        self.assertIn("status", data)
+        self.assertEqual(data["status"], "bill_requested")
+        self.assertIn("room", data)
+        self.assertIn("elapsed_text", data)
+        self.assertIn("next_action", data)
+        self.assertNotEqual(data.get("status"), "free")
+
+    def test_blocked_clear_next_step_error_has_no_table_numero(self):
+        self.create_guest(1, [
+            ("Entrée", "Salade marocaine", "menu"),
+            ("Plat", "Couscous Royal", "menu"),
+        ])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "drinks_served"
+        self.service.save(update_fields=["status", "updated_at"])
+        self.create_kitchen_lines("Entrée", [(self.products["Salade marocaine"], False)])
+
+        response = self.client.post(f"/riad/api/table/{self.table.numero}/next/")
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+
+        self.assertFalse(data.get("success", True))
+        self.assertIn("error", data)
+        self.assertNotIn("numero", data)
+        self.assertNotIn("status", data)
+        self.assertNotIn("elapsed_text", data)
+
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.status, "drinks_served")
+
+    def test_table_details_after_next_keeps_same_numero(self):
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "coffee_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        before = self.build_table_details_prepared()
+        response = self.client.post(f"/riad/api/table/{self.table.numero}/next/")
+        self.assertEqual(response.status_code, 200)
+        after = response.json()
+
+        self.assertEqual(before["numero"], after["numero"])
+        self.assertEqual(before["id"], after["id"])
+        self.assertEqual(after["numero"], self.table.numero)
+
+
 class PaymentDeleteTests(OrderContentTestMixin, TestCase):
     def setUp(self):
         super().setUp()
