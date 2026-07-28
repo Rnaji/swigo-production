@@ -1,5 +1,8 @@
 # riad/services/timeline.py
 
+from riad.services.order_content import SERVICE_STEPS
+from riad.services.workflow_engine import get_timeline_stage_state
+
 TIMELINE_STEPS = [
     {
         "key": "installed",
@@ -51,130 +54,61 @@ TIMELINE_STEPS = [
     },
 ]
 
-
-STEP_STATES_BY_STATUS = {
-    "free": {},
-
+STAGE_DEFINITIONS = {
     "installed": {
-        "installed": "action",
+        "serve_status": "installed",
+        "clear_status": None,
+        "complete_at": "ordering",
     },
-
-    "ordering": {
-        "installed": "done",
-        "ordered": "action",
-    },
-
     "ordered": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "action",
+        "serve_status": "ordering",
+        "clear_status": None,
+        "complete_at": "ordered",
     },
-
-    "drinks_served": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "action",
+    "drinks": {
+        "serve_status": "drinks_served",
+        "clear_status": None,
+        "complete_at": "drinks_served",
     },
-
-    "starters_served": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "action",
+    "starters": {
+        "serve_status": "starters_served",
+        "clear_status": "starters_cleared",
     },
-
-    "starters_cleared": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "action",
+    "mains": {
+        "serve_status": "mains_served",
+        "clear_status": "mains_cleared",
     },
-
-    "mains_served": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "action",
+    "desserts": {
+        "serve_status": "desserts_served",
+        "clear_status": "desserts_cleared",
     },
-
-    "mains_cleared": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "action",
+    "coffee": {
+        "serve_status": "coffee_served",
+        "clear_status": "coffee_cleared",
     },
-
-    "desserts_served": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "action",
-    },
-
-    "desserts_cleared": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "action",
-    },
-
-    "coffee_served": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "done",
-        "payment": "action",
-    },
-
-    "coffee_cleared": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "done",
-        "payment": "action",
-    },
-
-    "bill_requested": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "done",
-        "payment": "action",
-    },
-
-    "paid": {
-        "installed": "done",
-        "ordered": "done",
-        "drinks": "done",
-        "starters": "done",
-        "mains": "done",
-        "desserts": "done",
-        "coffee": "done",
-        "payment": "done",
+    "payment": {
+        "serve_status": "bill_requested",
+        "clear_status": "paid",
     },
 }
+
+WORKFLOW_ICON_TO_STAGE = {
+    "table_restaurant": "installed",
+    "edit_note": "ordered",
+    "local_bar": "drinks",
+    "restaurant_menu": "starters",
+    "restaurant": "mains",
+    "icecream": "desserts",
+    "local_cafe": "coffee",
+    "receipt_long": "payment",
+}
+
+
+def _status_index(status):
+    try:
+        return SERVICE_STEPS.index(status)
+    except ValueError:
+        return -1
 
 
 def should_show_step(service, step):
@@ -186,9 +120,19 @@ def should_show_step(service, step):
     return bool(getattr(service, condition, False))
 
 
-def build_timeline(service):
-    status_map = STEP_STATES_BY_STATUS.get(service.status, {})
+def get_stage_visual_state(stage_key, service, order=None, *, workflow_snapshot=None):
+    """
+    Détermine l'état visuel d'un pictogramme de timeline via workflow_engine.
+    """
+    return get_timeline_stage_state(
+        stage_key,
+        service,
+        order,
+        workflow_snapshot=workflow_snapshot,
+    )
 
+
+def build_timeline(service, order=None, *, workflow_snapshot=None):
     timeline = []
 
     for step in TIMELINE_STEPS:
@@ -201,7 +145,12 @@ def build_timeline(service):
             "key": key,
             "icon": step["icon"],
             "label": step["label"],
-            "state": status_map.get(key, "future"),
+            "state": get_stage_visual_state(
+                key,
+                service,
+                order,
+                workflow_snapshot=workflow_snapshot,
+            ),
         })
 
     return timeline

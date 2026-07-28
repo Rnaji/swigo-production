@@ -1,8 +1,35 @@
+const SALLE_POLL_MS = 5000;
+
 document.addEventListener("DOMContentLoaded", () => {
     initPaymentModal();
     refreshAllTables();
 
-    setInterval(updateLocalTimers, 1000);
+    if (!window._riadSalleLocalTimer) {
+        window._riadSalleLocalTimer = setInterval(updateLocalTimers, 1000);
+    }
+    if (!window._riadSallePollTimer) {
+        window._riadSallePollTimer = setInterval(refreshAllTablesIfVisible, SALLE_POLL_MS);
+    }
+    if (!window._riadSalleTasksListener) {
+        window._riadSalleTasksListener = true;
+        window.addEventListener("riad:tasks-updated", async () => {
+            await refreshAllTables();
+            if (selectedTableNumero) {
+                const cached = tableState[selectedTableNumero];
+                if (cached) {
+                    renderDrawerFromState(selectedTableNumero);
+                } else {
+                    await openDrawer(selectedTableNumero);
+                }
+            }
+        });
+    }
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            refreshAllTables();
+        }
+    });
 
     document.querySelectorAll(".table-card").forEach(card => {
         card.addEventListener("click", () => {
@@ -16,6 +43,14 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("drawerOverlay")?.addEventListener("click", closeDrawer);
 
     document.getElementById("drawerAddItem")?.addEventListener("click", openAddItemModal);
+    document.getElementById("drawerCoversMinus")?.addEventListener("click", () => {
+        const current = parseInt(document.getElementById("drawerCoversCount")?.textContent || "0", 10);
+        updateCoversCount(Math.max(current - 1, 0));
+    });
+    document.getElementById("drawerCoversPlus")?.addEventListener("click", () => {
+        const current = parseInt(document.getElementById("drawerCoversCount")?.textContent || "0", 10);
+        updateCoversCount(current + 1);
+    });
     document.getElementById("addItemClose")?.addEventListener("click", closeAddItemModal);
     document.getElementById("addItemOverlay")?.addEventListener("click", closeAddItemModal);
 
@@ -75,6 +110,13 @@ const ADD_GROUPS = window.RIAD_ADD_GROUPS || [
     { name: "Thé / Café", icon: "local_cafe", categories: ["Thé / Café"] },
 ];
 
+async function refreshAllTablesIfVisible() {
+    if (document.hidden) {
+        return;
+    }
+    await refreshAllTables();
+}
+
 async function refreshAllTables() {
     const response = await fetch("/riad/api/salle/");
     const data = await response.json();
@@ -125,11 +167,13 @@ function updateLocalTimers() {
     });
 }
 
-async function openDrawer(numero) {
+async function openDrawer(numero, existingData = null) {
     selectedTableNumero = numero;
 
-    const response = await fetch(`/riad/api/table/${numero}/details/`);
-    const data = await response.json();
+    const data = existingData || await (async () => {
+        const response = await fetch(`/riad/api/table/${numero}/details/`);
+        return response.json();
+    })();
 
     tableState[data.numero] = data;
 
@@ -138,6 +182,14 @@ async function openDrawer(numero) {
 
     document.getElementById("tableDrawer").classList.add("open");
     document.getElementById("drawerOverlay").classList.add("open");
+}
+
+function renderDrawerFromState(numero) {
+    const data = tableState[numero];
+    if (!data) {
+        return;
+    }
+    renderDrawer(data);
 }
 
 function closeDrawer() {
@@ -166,9 +218,10 @@ function renderDrawer(data) {
     }
 
     renderTimeline(data.timeline || []);
-    renderCurrentAction(data.next_action);
+    renderCurrentAction(data.next_action, data);
+    renderCoversControl(data);
     renderPaymentPanel(data);
-    renderOrderDetails(data.order, data.status);
+    renderOrderDetails(data.order);
 
     colorDrawer(data.alert);
 }
@@ -208,7 +261,7 @@ function renderTimeline(timeline) {
     });
 }
 
-function renderCurrentAction(action) {
+function renderCurrentAction(action, tableData = null) {
     const container = document.getElementById("drawerCurrentAction");
     container.innerHTML = "";
 
@@ -278,20 +331,37 @@ function renderCurrentAction(action) {
         html += `</div>`;
     }
 
-    html += `
-        <button class="drawer-btn primary next-action-button" id="drawerNextStep">
-            ${action.button || "Valider"}
-        </button>
-    `;
+    if (action.type !== "open_pre_ticket" && action.type !== "wait") {
+        html += `
+            <button class="drawer-btn primary next-action-button" id="drawerNextStep">
+                ${action.button || "Valider"}
+            </button>
+        `;
+    }
+
+    if (
+        tableData?.order?.exists &&
+        tableData.order.is_sent_to_kitchen &&
+        !["free", "paid"].includes(tableData.status)
+    ) {
+        html += `
+            <a class="drawer-btn secondary next-action-button"
+               href="/riad/table/${tableData.numero}/commande/?mode=add_guest">
+                + Ajouter un client
+            </a>
+        `;
+    }
 
     actionCard.innerHTML = html;
     container.appendChild(actionCard);
 
     const nextBtn = document.getElementById("drawerNextStep");
+    if (!nextBtn) {
+        return;
+    }
+
     if (action.type === "open_commande") {
         nextBtn.addEventListener("click", openCommandeWizard);
-    } else if (action.type === "open_pre_ticket") {
-        nextBtn.addEventListener("click", () => openPreTicket(action.pre_ticket_url));
     } else {
         nextBtn.addEventListener("click", nextStep);
     }
@@ -331,7 +401,50 @@ function formatMoney(amount) {
     return `${Number(amount || 0).toFixed(2).replace(".", ",")} €`;
 }
 
-function renderOrderDetails(order, serviceStatus = null) {
+function renderCoversControl(data) {
+    const block = document.getElementById("drawerCoversBlock");
+    const countEl = document.getElementById("drawerCoversCount");
+
+    if (!block || !countEl) {
+        return;
+    }
+
+    const order = data.order;
+
+    if (!order?.exists || data.status === "free") {
+        block.classList.add("d-none");
+        return;
+    }
+
+    block.classList.remove("d-none");
+    countEl.textContent = String(order.guests_count ?? 0);
+}
+
+async function updateCoversCount(newCount) {
+    if (!selectedTableNumero || newCount < 0) {
+        return;
+    }
+
+    const response = await fetch(`/riad/api/table/${selectedTableNumero}/covers/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({ guests_count: newCount }),
+    });
+
+    if (!response.ok) {
+        return;
+    }
+
+    const data = await response.json();
+    tableState[data.numero] = data;
+    updateTableCard(data);
+    renderDrawer(data);
+}
+
+function renderOrderDetails(order) {
     const container = document.getElementById("drawerOrder");
     container.innerHTML = "";
 
@@ -339,9 +452,6 @@ function renderOrderDetails(order, serviceStatus = null) {
         container.innerHTML = `<div class="empty-state">Aucune commande.</div>`;
         return;
     }
-
-    const canPayGuestShare =
-        serviceStatus === "bill_requested";
 
     order.guests.forEach(guest => {
         const guestEl = document.createElement("div");
@@ -381,30 +491,6 @@ function renderOrderDetails(order, serviceStatus = null) {
                 Total du client ${formatMoney(guest.total)}
             </div>
         `;
-
-        if (canPayGuestShare && !guest.is_paid && Number(guest.remaining || 0) > 0) {
-            html += `
-                <div class="guest-pay-share">
-                    <span class="guest-pay-share-label">Suivi interne — part de ce client (non fiscal)</span>
-                    <div class="guest-pay-share-actions">
-                        <button type="button"
-                            class="guest-pay-share-btn"
-                            data-guest="${guest.guest_number}"
-                            data-amount="${guest.remaining}"
-                            data-method="card">
-                            💳 CB
-                        </button>
-                        <button type="button"
-                            class="guest-pay-share-btn"
-                            data-guest="${guest.guest_number}"
-                            data-amount="${guest.remaining}"
-                            data-method="cash">
-                            💶 Espèces
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
 
         guestEl.innerHTML = html;
         container.appendChild(guestEl);
@@ -457,16 +543,6 @@ function renderOrderDetails(order, serviceStatus = null) {
     container.querySelectorAll(".delete-choice-btn").forEach(button => {
         button.addEventListener("click", () => {
             deleteOrderChoice(parseInt(button.dataset.choiceId, 10));
-        });
-    });
-
-    container.querySelectorAll(".guest-pay-share-btn").forEach(button => {
-        button.addEventListener("click", () => {
-            openDrawerGuestPayment(
-                parseInt(button.dataset.guest, 10),
-                parseFloat(button.dataset.amount),
-                button.dataset.method
-            );
         });
     });
 }
@@ -582,7 +658,7 @@ async function nextStep() {
 
     isNextStepLoading = false;
 
-    await openDrawer(data.numero);
+    await openDrawer(data.numero, data);
 
     if (data.status === "ordering") {
         window.location.href = `/riad/table/${data.numero}/commande/`;
@@ -592,12 +668,6 @@ async function nextStep() {
 function openCommandeWizard() {
     if (!selectedTableNumero) return;
     window.location.href = `/riad/table/${selectedTableNumero}/commande/`;
-}
-
-function openPreTicket(url) {
-    const targetUrl = url || (tableState[selectedTableNumero]?.pre_ticket_url);
-    if (!targetUrl) return;
-    window.location.href = targetUrl;
 }
 
 async function openAddItemModal() {
@@ -897,6 +967,12 @@ function getCookie(name) {
 }
 
 
+function paymentMethodShortLabel(method) {
+    if (method === "card") return "💳 CB";
+    if (method === "cash") return "💶 Espèces";
+    return method;
+}
+
 function renderPaymentPanel(data) {
     const container = document.getElementById("drawerPayment");
     if (!container) return;
@@ -961,10 +1037,14 @@ function renderPaymentPanel(data) {
             const guestLabel = payment.guest_number
                 ? ` — Client ${payment.guest_number}`
                 : "";
+            const deleteBtn = data.status !== "paid" && payment.id
+                ? `<button type="button" class="payment-delete-btn" onclick="confirmDeleteInternalPayment(${payment.id})" aria-label="Supprimer ce paiement">✕</button>`
+                : "";
             html += `
                 <div class="payment-history-line">
-                    <span>${payment.method_display}${guestLabel}</span>
-                    <strong>${Number(payment.amount).toFixed(2)} €</strong>
+                    <span class="payment-history-label">${paymentMethodShortLabel(payment.method)}${guestLabel}</span>
+                    <strong class="payment-history-amount">${Number(payment.amount).toFixed(2).replace(".", ",")} €</strong>
+                    ${deleteBtn}
                 </div>
             `;
         });
@@ -994,10 +1074,6 @@ function renderPaymentPanel(data) {
                     <button type="button" onclick="openDrawerCashPayment(${remaining})">
                         💶 Suivi espèces
                     </button>
-
-                    <button type="button" onclick="showDrawerMixed(${remaining})">
-                        🔀 Suivi mixte
-                    </button>
                 </div>
 
                 <div id="drawerPaymentForm"></div>
@@ -1014,35 +1090,6 @@ function renderPaymentPanel(data) {
     html += `</div>`;
 
     container.innerHTML = html;
-}
-
-function openDrawerGuestPayment(guestNumber, amount, method) {
-    const order = tableState[selectedTableNumero]?.order;
-    const orderRemaining = Number(order?.remaining || 0);
-    const guestRemaining = Number(amount || 0);
-
-    if (!order || !order.exists || orderRemaining <= 0 || guestRemaining <= 0) {
-        return;
-    }
-
-    openPaymentModal({
-        method,
-        remaining: Math.min(orderRemaining, guestRemaining),
-        prefillAmount: guestRemaining,
-        title: `Suivi interne — Client ${guestNumber}`,
-        amountLabel: "Montant suivi (indicatif)",
-        fullButtonLabel: "Part complète du client",
-        onSubmit: ({ method: paymentMethod, amount: paymentAmount }) =>
-            submitDrawerGuestPayment({
-                guestNumber,
-                method: paymentMethod,
-                amount: paymentAmount,
-            }),
-    });
-}
-
-async function submitDrawerGuestPayment({ guestNumber, method, amount }) {
-    return sendDrawerPayment([{ method, amount, guest_number: guestNumber }]);
 }
 
 function openDrawerCardPayment(remaining) {
@@ -1071,89 +1118,6 @@ async function submitDrawerSinglePayment({ method, amount }) {
     return sendDrawerPayment([{ method, amount }]);
 }
 
-function showDrawerMixed(remaining) {
-    const form = document.getElementById("drawerPaymentForm");
-
-    form.innerHTML = `
-        <div class="drawer-payment-form">
-            <h3>Suivi mixte (non fiscal)</h3>
-
-            <label>Carte bancaire</label>
-            <input
-                type="number"
-                id="drawerMixedCard"
-                step="0.01"
-                min="0"
-                oninput="calculateDrawerMixed(${remaining})"
-            >
-
-            <label>Espèces données</label>
-            <input
-                type="number"
-                id="drawerMixedCash"
-                step="0.01"
-                min="0"
-                oninput="calculateDrawerMixed(${remaining})"
-            >
-
-            <p>Espèces utilisées : <strong id="drawerMixedCashUsed">0.00 €</strong></p>
-            <p>Rendu : <strong id="drawerMixedChange">0.00 €</strong></p>
-
-            <button type="button" class="drawer-btn primary" onclick="validateDrawerMixed(${remaining})">
-                Valider le suivi interne
-            </button>
-        </div>
-    `;
-}
-
-function calculateDrawerMixed(remaining) {
-    const card = Number(document.getElementById("drawerMixedCard").value || 0);
-    const cashGiven = Number(document.getElementById("drawerMixedCash").value || 0);
-
-    const cashNeeded = Math.max(remaining - card, 0);
-    const cashUsed = Math.min(cashGiven, cashNeeded);
-    const change = Math.max(cashGiven - cashNeeded, 0);
-
-    document.getElementById("drawerMixedCashUsed").textContent = `${cashUsed.toFixed(2)} €`;
-    document.getElementById("drawerMixedChange").textContent = `${change.toFixed(2)} €`;
-}
-
-function validateDrawerMixed(remaining) {
-    const card = Number(document.getElementById("drawerMixedCard").value || 0);
-    const cashGiven = Number(document.getElementById("drawerMixedCash").value || 0);
-
-    const cashNeeded = Math.max(remaining - card, 0);
-    const cashUsed = Math.min(cashGiven, cashNeeded);
-
-    if (card > remaining + 0.001) {
-        alert("Le montant carte ne peut pas dépasser le reste à payer.");
-        return;
-    }
-
-    if (card + cashUsed < remaining - 0.001) {
-        alert("Montant insuffisant.");
-        return;
-    }
-
-    const payments = [];
-
-    if (card > 0) {
-        payments.push({
-            method: "card",
-            amount: card
-        });
-    }
-
-    if (cashUsed > 0) {
-        payments.push({
-            method: "cash",
-            amount: cashUsed
-        });
-    }
-
-    sendDrawerPayment(payments);
-}
-
 async function sendDrawerPayment(payments) {
     const order = tableState[selectedTableNumero]?.order;
 
@@ -1178,6 +1142,31 @@ async function sendDrawerPayment(payments) {
 
     if (!response.ok || !data.success) {
         alert(data.error || "Erreur paiement.");
+        return false;
+    }
+
+    await openDrawer(selectedTableNumero);
+    return true;
+}
+
+function confirmDeleteInternalPayment(paymentId) {
+    openPaymentDeleteConfirm({
+        onConfirm: () => deleteInternalPayment(paymentId),
+    });
+}
+
+async function deleteInternalPayment(paymentId) {
+    const response = await fetch(`/riad/api/payment/${paymentId}/delete/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+        },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        alert(data.error || "Impossible de supprimer ce paiement.");
         return false;
     }
 

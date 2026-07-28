@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
@@ -72,43 +73,6 @@ class DiningTable(models.Model):
         return f"Table {self.numero}"
 
 
-class Reservation(models.Model):
-    STATUS_CHOICES = [
-        ("reserved", "Réservée"),
-        ("installed", "Clients installés"),
-        ("cancelled", "Annulée"),
-        ("finished", "Terminée"),
-    ]
-
-    table = models.ForeignKey(
-        DiningTable,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="reservations",
-    )
-    nom = models.CharField(max_length=100)
-    telephone = models.CharField(max_length=30, blank=True)
-    personnes = models.PositiveIntegerField(default=2)
-    date_heure = models.DateTimeField()
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="reserved",
-    )
-    notes = models.TextField(blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["date_heure"]
-        verbose_name = "Réservation"
-        verbose_name_plural = "Réservations"
-
-    def __str__(self):
-        return f"{self.nom} - {self.personnes} pers - {self.date_heure:%d/%m/%Y %H:%M}"
-
-
 class TableService(models.Model):
     STATUS_CHOICES = [
         ("free", "Libre"),
@@ -135,14 +99,6 @@ class TableService(models.Model):
         related_name="current_service",
     )
 
-    reservation = models.ForeignKey(
-        Reservation,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="services",
-    )
-
     status = models.CharField(
         max_length=30,
         choices=STATUS_CHOICES,
@@ -158,6 +114,36 @@ class TableService(models.Model):
     has_desserts = models.BooleanField(default=False)
     has_coffee = models.BooleanField(default=False)
 
+    task_claimed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Tâche prise en charge à",
+    )
+
+    task_claimed_extra_ticket = models.ForeignKey(
+        "KitchenTicket",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="claimed_server_tasks",
+        verbose_name="Bon extra pris en charge",
+    )
+
+    task_claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="claimed_table_tasks",
+        verbose_name="Tâche prise en charge par",
+    )
+
+    bill_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Addition demandée à",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -172,6 +158,9 @@ class TableService(models.Model):
     def set_status(self, new_status):
         self.status = new_status
         self.status_started_at = timezone.now()
+        self.task_claimed_at = None
+        self.task_claimed_extra_ticket = None
+        self.task_claimed_by = None
 
         if new_status == "installed" and not self.installed_at:
             self.installed_at = timezone.now()
@@ -179,14 +168,20 @@ class TableService(models.Model):
         if new_status == "paid":
             self.closed_at = timezone.now()
 
+        if new_status == "bill_requested" and not self.bill_requested_at:
+            self.bill_requested_at = timezone.now()
+
         if new_status == "free":
-            self.reservation = None
             self.installed_at = None
             self.closed_at = None
+            self.bill_requested_at = None
             self.has_drinks = False
             self.has_starters = False
             self.has_desserts = False
             self.has_coffee = False
+            self.task_claimed_at = None
+            self.task_claimed_extra_ticket = None
+            self.task_claimed_by = None
 
         self.save()
 
@@ -421,26 +416,144 @@ class MenuSectionItem(models.Model):
         return f"{self.section} : {self.product.name}"
     
 class DiningOrder(models.Model):
+    STATUS_ACTIVE = "active"
+    STATUS_COMPLETED = "completed"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_COMPLETED, "Terminée"),
+        (STATUS_CANCELLED, "Annulée"),
+    ]
+
     service = models.OneToOneField(
         TableService,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="order",
     )
-    guests_count = models.PositiveSmallIntegerField(default=0)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+    )
+    guests_count = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Personnes présentes",
+        help_text="Nombre de couverts pour les statistiques.",
+    )
     is_sent_to_kitchen = models.BooleanField(default=False)
     wizard_draft = models.JSONField(null=True, blank=True)
+
+    table_numero = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Numéro de table (archivé)",
+    )
+    service_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Installation clients",
+    )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Clôture",
+    )
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Annulation",
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Paiement caisse homologuée",
+    )
+    bill_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Addition demandée (archivé)",
+    )
+    total_ttc = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    card_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    cash_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    duration_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    service_period = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        help_text="midi ou soir (snapshot à la clôture)",
+    )
+    timeline_snapshot = models.JSONField(
+        null=True,
+        blank=True,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ("-completed_at", "-created_at")
+        verbose_name = "Commande"
+        verbose_name_plural = "Commandes"
+
+    @property
+    def is_active(self):
+        return self.status == self.STATUS_ACTIVE
+
+    @property
+    def is_completed(self):
+        return self.status == self.STATUS_COMPLETED
+
+    @property
+    def display_table_numero(self):
+        if self.table_numero is not None:
+            return self.table_numero
+        if self.service_id and self.service:
+            return self.service.table.numero
+        return None
+
     def total_amount(self):
+        if self.total_ttc is not None and self.status == self.STATUS_COMPLETED:
+            return self.total_ttc
         from riad.services.pricing import compute_order_total
 
         return compute_order_total(self)
 
     def paid_amount(self):
+        if self.status == self.STATUS_COMPLETED:
+            return self.card_amount + self.cash_amount
+        from riad.services.prefetched_data import (
+            PrefetchMissingError,
+            get_prefetched_payments,
+        )
+
+        try:
+            payments = get_prefetched_payments(self)
+        except PrefetchMissingError:
+            payments = list(self.payments.all())
+
         return sum(
-            payment.amount for payment in self.payments.all()
+            (payment.amount for payment in payments),
+            Decimal("0.00"),
         )
 
     def remaining_amount(self):
@@ -454,7 +567,10 @@ class DiningOrder(models.Model):
         return bool(self.wizard_draft) and not self.is_sent_to_kitchen
 
     def __str__(self):
-        return f"Commande {self.service.table}"
+        table_label = self.display_table_numero
+        if table_label is not None:
+            return f"Commande #{self.pk} - Table {table_label}"
+        return f"Commande #{self.pk}"
 
 
 class GuestOrder(models.Model):
@@ -591,6 +707,9 @@ class GuestChoice(models.Model):
         null=True,
         blank=True,
     )
+
+    is_cancelled = models.BooleanField(default=False)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -767,6 +886,45 @@ class KitchenTicketItem(models.Model):
 
     is_done = models.BooleanField(
         default=False,
+    )
+
+    done_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Marqué fait à",
+    )
+
+    serve_batch_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Lot de service",
+    )
+
+    serve_claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="claimed_kitchen_items",
+        verbose_name="Pris en charge par",
+    )
+
+    serve_claimed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Pris en charge à",
+    )
+
+    is_served = models.BooleanField(
+        default=False,
+        verbose_name="Servi",
+    )
+
+    served_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Servi à",
     )
 
     class Meta:

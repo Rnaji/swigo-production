@@ -6,9 +6,15 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction
 
-from riad.services.pre_ticket import build_pre_ticket
+from riad.services.pre_ticket import build_pre_ticket, build_internal_payment_tracking
 from riad.services.vat import MENU_VAT_RATE, parse_vat_rate
 from riad.services.table_details import build_table_details
+from riad.services.perf import log_endpoint_perf
+from riad.services.prefetch import (
+    load_order_for_details,
+    prefetch_orders_for_table_details,
+    prefetch_workflow_items_for_orders,
+)
 
 from riad.services.pricing import (
     choice_line_amount,
@@ -19,12 +25,31 @@ from riad.services.pricing import (
     build_order_billing,
 )
 from riad.services.replacement_rules import compute_replacement_supplement
+from riad.services.guest_orders import (
+    create_guest_from_payload,
+    delete_or_cancel_guest,
+    get_next_guest_number,
+    send_guest_choices_to_kitchen,
+)
 from riad.services.kitchen_dispatch import (
     build_ticket_items_from_choices,
     send_choice_to_kitchen,
 )
 from riad.services.kitchen_routing import station_for_product
 from riad.services.order_content import sync_service_flags_from_order
+from riad.services.tasks import (
+    build_task_list,
+    iter_active_services_with_orders,
+    serialize_serve_item_task,
+    serialize_workflow_task,
+)
+from riad.services.serve_tasks import (
+    claim_serve_task,
+    complete_serve_task,
+    is_serve_task_key,
+    release_serve_task,
+)
+from riad.services.serve_tasks import mark_item_ready, mark_item_not_ready
 
 from django.db.models import Prefetch, Case, When, IntegerField, Q
 
@@ -44,10 +69,6 @@ from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
-from .models import DiningOrder, Payment
-
-from .models import DiningTable, DiningOrder, Payment
-
 from .models import (
     Room,
     DiningTable,
@@ -62,6 +83,7 @@ from .models import (
     Product,
     KitchenTicket,
     KitchenTicketItem,
+    Payment,
 )
 
 
@@ -132,18 +154,11 @@ def serialize_table_service(table, service):
         "room": table.room.name,
         "next_status": next_status,
         "next_status_label": get_next_action_label(next_status),
-        "reservation": None,
 
         # Affichage identique au panneau de droite
         "action": workflow["title"],
         "icon": get_action_icon(workflow["title"]),
     })
-
-    if service.reservation:
-        data["reservation"] = {
-            "nom": service.reservation.nom,
-            "personnes": service.reservation.personnes,
-        }
 
     return data
 
@@ -193,6 +208,220 @@ def salle(request):
     })
 
 
+def tasks_view(request):
+    return render(request, "riad/tasks.html")
+
+
+@require_GET
+@log_endpoint_perf("tasks")
+def api_tasks(request):
+    tasks = build_task_list(
+        iter_active_services_with_orders(),
+        current_user=request.user,
+    )
+
+    return JsonResponse({
+        "tasks": tasks,
+        "count": len(tasks),
+    })
+
+
+@require_POST
+def api_task_claim(request, service_id):
+    service = get_object_or_404(
+        TableService.objects.select_related("table", "table__room"),
+        id=service_id,
+    )
+
+    if service.status in {"free", "reserved"}:
+        return JsonResponse(
+            {"success": False, "error": "Cette table n'a pas de tâche active."},
+            status=400,
+        )
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    task_key = payload.get("task_key", "workflow")
+
+    if is_serve_task_key(task_key):
+        task, error = claim_serve_task(service, task_key, request.user)
+        if error:
+            status = 409 if "plus disponible" in error else 400
+            return JsonResponse({"success": False, "error": error}, status=status)
+
+        order = DiningOrder.objects.filter(service=service).first()
+        return JsonResponse({
+            "success": True,
+            "task": serialize_serve_item_task(
+                service,
+                task,
+                current_user=request.user,
+            ),
+        })
+
+    if service.task_claimed_at:
+        return JsonResponse(
+            {"success": False, "error": "Cette tâche est déjà prise en charge."},
+            status=409,
+        )
+
+    service.task_claimed_at = timezone.now()
+    service.task_claimed_extra_ticket = None
+    service.task_claimed_by = (
+        request.user if request.user.is_authenticated else None
+    )
+    service.save(
+        update_fields=[
+            "task_claimed_at",
+            "task_claimed_extra_ticket",
+            "task_claimed_by",
+            "updated_at",
+        ]
+    )
+
+    order = DiningOrder.objects.filter(service=service).first()
+    redirect_url = None
+
+    if service.status in ("installed", "ordering"):
+        redirect_url = f"/riad/table/{service.table.numero}/commande/?from=tasks"
+        if service.status == "installed":
+            service.status = "ordering"
+            service.status_started_at = timezone.now()
+            service.save(
+                update_fields=[
+                    "status",
+                    "status_started_at",
+                    "task_claimed_at",
+                    "task_claimed_extra_ticket",
+                    "task_claimed_by",
+                    "updated_at",
+                ]
+            )
+
+    task = serialize_workflow_task(service, order, current_user=request.user)
+
+    return JsonResponse({
+        "success": True,
+        "task": task,
+        "redirect_url": redirect_url,
+    })
+
+
+@require_POST
+def api_task_release(request, service_id):
+    service = get_object_or_404(TableService, id=service_id)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    task_key = payload.get("task_key", "workflow")
+
+    if is_serve_task_key(task_key):
+        success, error = release_serve_task(service, task_key, request.user)
+        if not success:
+            status = 403 if error and "autre serveur" in error else 400
+            return JsonResponse({"success": False, "error": error}, status=status)
+        return JsonResponse({"success": True})
+
+    if not service.task_claimed_at:
+        return JsonResponse(
+            {"success": False, "error": "Cette tâche n'est pas prise en charge."},
+            status=400,
+        )
+
+    if request.user.is_authenticated:
+        if service.task_claimed_by_id and service.task_claimed_by_id != request.user.id:
+            return JsonResponse(
+                {"success": False, "error": "Cette tâche est prise par un autre serveur."},
+                status=403,
+            )
+
+    service.task_claimed_at = None
+    service.task_claimed_extra_ticket = None
+    service.task_claimed_by = None
+    service.save(
+        update_fields=[
+            "task_claimed_at",
+            "task_claimed_extra_ticket",
+            "task_claimed_by",
+            "updated_at",
+        ]
+    )
+
+    return JsonResponse({"success": True})
+
+
+@require_POST
+@log_endpoint_perf("task_complete")
+def api_task_complete(request, service_id):
+    service = get_object_or_404(
+        TableService.objects.select_related("table", "table__room"),
+        id=service_id,
+    )
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    task_key = payload.get("task_key")
+    if not task_key or not is_serve_task_key(task_key):
+        return JsonResponse(
+            {"success": False, "error": "Tâche de service invalide."},
+            status=400,
+        )
+
+    order = DiningOrder.objects.filter(service=service).first()
+    success, error = complete_serve_task(service, order, task_key, request.user)
+    if not success:
+        status = 403 if error and "autre serveur" in error else 400
+        return JsonResponse({"success": False, "error": error}, status=status)
+
+    return JsonResponse({"success": True})
+
+
+@require_POST
+def api_task_serve_extra(request, ticket_id):
+    ticket = get_object_or_404(
+        KitchenTicket.objects.select_related("service", "order"),
+        id=ticket_id,
+        ticket_type="extra",
+    )
+
+    service = ticket.service
+    if not service:
+        return JsonResponse(
+            {"success": False, "error": "Service introuvable."},
+            status=400,
+        )
+
+    from riad.services.serve_tasks import extra_batch_task_key, extra_available_task_key
+
+    batch_id = None
+    first_item = ticket.items.filter(is_done=True, is_served=False).first()
+    if first_item and first_item.serve_batch_id:
+        batch_id = first_item.serve_batch_id
+        task_key = extra_batch_task_key(batch_id)
+    else:
+        task_key = extra_available_task_key(ticket.id)
+        task, error = claim_serve_task(service, task_key, request.user)
+        if error:
+            return JsonResponse({"success": False, "error": error}, status=400)
+        task_key = task["task_key"]
+
+    order = ticket.order
+    success, error = complete_serve_task(service, order, task_key, request.user)
+    if not success:
+        return JsonResponse({"success": False, "error": error}, status=400)
+
+    return JsonResponse({"success": True, "ticket_id": ticket.id})
+
+
 def install_table(request, table_id):
     table = get_object_or_404(DiningTable, id=table_id)
 
@@ -217,6 +446,7 @@ def install_table(request, table_id):
     return redirect("riad:salle")
 
 
+@log_endpoint_perf("table_detail")
 def api_table_detail(request, numero):
     table = get_object_or_404(
         DiningTable.objects.select_related("room"),
@@ -225,17 +455,21 @@ def api_table_detail(request, numero):
 
     service = get_or_create_service(table)
 
-    order = (
-    DiningOrder.objects
-    .filter(service=service)
-    .first()
-)
+    order = load_order_for_details(
+        DiningOrder.objects.filter(service=service).first()
+    )
+    if order:
+        prefetch_workflow_items_for_orders(
+            [order],
+            services_by_order_id={order.id: service},
+        )
 
     return JsonResponse(
         build_table_details(table, service, order)
     )
 
 
+@log_endpoint_perf("table_details")
 def api_table_details(request, numero):
     table = get_object_or_404(
         DiningTable.objects.select_related("room"),
@@ -244,11 +478,14 @@ def api_table_details(request, numero):
 
     service = get_or_create_service(table)
 
-    order = (
-        DiningOrder.objects
-        .filter(service=service)
-        .first()
+    order = load_order_for_details(
+        DiningOrder.objects.filter(service=service).first()
     )
+    if order:
+        prefetch_workflow_items_for_orders(
+            [order],
+            services_by_order_id={order.id: service},
+        )
 
     return JsonResponse(
         build_table_details(
@@ -259,6 +496,7 @@ def api_table_details(request, numero):
     )
 
 
+@log_endpoint_perf("salle")
 def api_salle(request):
     tables = (
         DiningTable.objects
@@ -266,20 +504,39 @@ def api_salle(request):
         .select_related("room")
         .order_by("room__order", "grid_y", "grid_x")
     )
+    table_list = list(tables)
+    table_ids = [table.id for table in table_list]
+
+    from riad.models import TableService
+
+    services_by_table_id = {
+        service.table_id: service
+        for service in TableService.objects.filter(table_id__in=table_ids)
+    }
+
+    missing_table_ids = [
+        table.id for table in table_list if table.id not in services_by_table_id
+    ]
+    for table_id in missing_table_ids:
+        table = next(item for item in table_list if item.id == table_id)
+        services_by_table_id[table_id] = get_or_create_service(table)
+
+    service_ids = [service.id for service in services_by_table_id.values()]
+    orders = prefetch_orders_for_table_details(service_ids=service_ids)
+    orders_by_service_id = {order.service_id: order for order in orders}
 
     data = []
 
-    for table in tables:
-        service = get_or_create_service(table)
-
-        order = (
-            DiningOrder.objects
-            .filter(service=service)
-            .first()
-        )
+    for table in table_list:
+        service = services_by_table_id[table.id]
+        order = orders_by_service_id.get(service.id)
 
         data.append(
-            build_table_details(table, service, order)
+            build_table_details(
+                table,
+                service,
+                order,
+            )
         )
 
     return JsonResponse({
@@ -297,11 +554,14 @@ def api_install_table(request, numero):
     service = get_or_create_service(table)
     service.set_status("installed")
 
-    order = (
-    DiningOrder.objects
-    .filter(service=service)
-    .first()
-)
+    order = load_order_for_details(
+        DiningOrder.objects.filter(service=service).first()
+    )
+    if order:
+        prefetch_workflow_items_for_orders(
+            [order],
+            services_by_order_id={order.id: service},
+        )
 
     return JsonResponse(
         build_table_details(table, service, order)
@@ -309,6 +569,8 @@ def api_install_table(request, numero):
 
 
 @require_POST
+@transaction.atomic
+@log_endpoint_perf("next_step")
 def api_next_step(request, numero):
     table = get_object_or_404(
         DiningTable.objects.select_related("room"),
@@ -324,16 +586,43 @@ def api_next_step(request, numero):
     next_status = service.get_next_status(order)
 
     if next_status:
-        if next_status == "free":
-            DiningOrder.objects.filter(service=service).delete()
+        from riad.services.order_content import CLEARING_STATUSES
+        from riad.services.service_category_readiness import (
+            CLEARING_STATUS_TO_CATEGORY,
+            get_category_items_state,
+        )
+
+        if next_status in CLEARING_STATUSES and order:
+            category = CLEARING_STATUS_TO_CATEGORY.get(next_status)
+            if category:
+                state = get_category_items_state(service, order, category)
+                if not state["all_done"] or not state["all_served"]:
+                    return JsonResponse(
+                        {
+                            "success": False,
+                            "error": (
+                                "Impossible d'avancer : tous les articles de cette "
+                                "catégorie doivent être prêts et servis."
+                            ),
+                        },
+                        status=409,
+                    )
+
+        if next_status == "free" and order:
+            from riad.services.backoffice.archive import archive_completed_order
+
+            archive_completed_order(service, order)
 
         service.set_status(next_status)
 
-    order = (
-    DiningOrder.objects
-    .filter(service=service)
-    .first()
-)
+    order = load_order_for_details(
+        DiningOrder.objects.filter(service=service).first()
+    )
+    if order:
+        prefetch_workflow_items_for_orders(
+            [order],
+            services_by_order_id={order.id: service},
+        )
 
     return JsonResponse(
         build_table_details(table, service, order)
@@ -346,12 +635,17 @@ def commande_table(request, numero):
     order, _ = DiningOrder.objects.get_or_create(service=service)
 
     menus = Menu.objects.filter(is_active=True).order_by("order")
+    add_guest_mode = request.GET.get("mode") == "add_guest"
+
+    if order.is_sent_to_kitchen and not add_guest_mode:
+        return redirect(f"/riad/salle/?table={table.numero}")
 
     return render(request, "riad/commande.html", {
         "table": table,
         "service": service,
         "order": order,
         "menus": menus,
+        "add_guest_mode": add_guest_mode,
     })
 
 
@@ -391,12 +685,155 @@ def api_save_wizard_draft(request, numero):
             status=400,
         )
 
-    guest_count = int(draft.get("guest_count") or 0)
+    guest_count = max(int(draft.get("guest_count") or 0), 0)
     order.wizard_draft = draft
     order.guests_count = guest_count
     order.save(update_fields=["wizard_draft", "guests_count", "updated_at"])
 
     return JsonResponse({"success": True})
+
+
+@require_POST
+def api_update_covers(request, numero):
+    table = get_object_or_404(
+        DiningTable.objects.select_related("room"),
+        numero=numero,
+    )
+    service = get_or_create_service(table)
+    order = DiningOrder.objects.filter(service=service).first()
+
+    if not order:
+        return JsonResponse(
+            {"success": False, "error": "Aucune commande active."},
+            status=404,
+        )
+
+    if order_is_locked(order):
+        return JsonResponse(
+            {"success": False, "error": "Commande déjà réglée."},
+            status=403,
+        )
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"success": False, "error": "JSON invalide."},
+            status=400,
+        )
+
+    covers = max(int(payload.get("guests_count", order.guests_count)), 0)
+    order.guests_count = covers
+    order.save(update_fields=["guests_count", "updated_at"])
+
+    order = load_order_for_details(order)
+    prefetch_workflow_items_for_orders(
+        [order],
+        services_by_order_id={order.id: service},
+    )
+
+    return JsonResponse(
+        build_table_details(table, service, order)
+    )
+
+
+@require_POST
+@transaction.atomic
+def api_add_order_guest(request, numero):
+    table = get_object_or_404(DiningTable, numero=numero)
+    service = get_or_create_service(table)
+    order = get_object_or_404(DiningOrder, service=service)
+
+    if order_is_locked(order):
+        return JsonResponse(
+            {"success": False, "error": "Commande déjà réglée."},
+            status=403,
+        )
+
+    if not order.is_sent_to_kitchen:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "La commande doit être envoyée en cuisine avant d'ajouter un client tardif.",
+            },
+            status=400,
+        )
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"success": False, "error": "JSON invalide."},
+            status=400,
+        )
+
+    guest_data = payload.get("guest")
+    if not isinstance(guest_data, dict):
+        return JsonResponse(
+            {"success": False, "error": "Données client invalides."},
+            status=400,
+        )
+
+    guest_number = int(guest_data.get("number") or get_next_guest_number(order))
+    if order.guests.filter(guest_number=guest_number).exists():
+        return JsonResponse(
+            {"success": False, "error": "Ce numéro de client existe déjà."},
+            status=400,
+        )
+
+    guest_data["number"] = guest_number
+    guest_order, created_choices = create_guest_from_payload(order, guest_data)
+    tickets = send_guest_choices_to_kitchen(
+        order,
+        table,
+        service,
+        created_choices,
+    )
+    sync_service_flags_from_order(service, order)
+
+    return JsonResponse({
+        "success": True,
+        "guest_number": guest_order.guest_number,
+        "tickets_created": len(tickets),
+        "total": float(compute_order_total(order)),
+    })
+
+
+@require_POST
+@transaction.atomic
+def api_delete_order_guest(request, numero):
+    table = get_object_or_404(DiningTable, numero=numero)
+    service = get_or_create_service(table)
+    order = get_object_or_404(DiningOrder, service=service)
+
+    if order_is_locked(order):
+        return JsonResponse(
+            {"success": False, "error": "Commande déjà réglée."},
+            status=403,
+        )
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"success": False, "error": "JSON invalide."},
+            status=400,
+        )
+
+    guest_number = int(payload.get("guest_number", 0))
+    confirmed = bool(payload.get("confirmed"))
+
+    result = delete_or_cancel_guest(order, guest_number, confirmed=confirmed)
+    if not result.get("success"):
+        status = 409 if result.get("requires_confirmation") else 400
+        return JsonResponse(result, status=status)
+
+    sync_service_flags_from_order(service, order)
+
+    return JsonResponse({
+        "success": True,
+        "total": float(compute_order_total(order)),
+    })
 
 
 @require_POST
@@ -414,7 +851,12 @@ def api_cancel_order(request, numero):
             status=400,
         )
 
-    DiningOrder.objects.filter(service=service).delete()
+    order = DiningOrder.objects.filter(service=service).first()
+    if order:
+        from riad.services.backoffice.archive import mark_order_cancelled
+
+        mark_order_cancelled(order)
+
     service.set_status("installed")
 
     return JsonResponse({
@@ -437,27 +879,14 @@ def api_start_order(request, numero):
     guests = payload.get("guests", [])
 
     order.guests.all().delete()
-    order.guests_count = len(guests)
-    order.save()
+
+    if "guests_count" in payload:
+        order.guests_count = max(int(payload.get("guests_count") or 0), 0)
+
+    order.save(update_fields=["guests_count", "updated_at"])
 
     for guest_data in guests:
-        menu = get_object_or_404(Menu, id=guest_data["menu_id"])
-
-        guest = GuestOrder.objects.create(
-            order=order,
-            guest_number=guest_data["number"],
-            menu=menu,
-        )
-
-        for choice_data in guest_data.get("choices", []):
-            section = get_object_or_404(MenuSection, id=choice_data["section_id"])
-            product = get_object_or_404(Product, id=choice_data["product_id"])
-
-            GuestChoice.objects.create(
-                guest=guest,
-                section=section,
-                product=product,
-            )
+        create_guest_from_payload(order, guest_data)
 
     service.has_drinks = True
     service.has_starters = True
@@ -603,15 +1032,20 @@ def kitchen_view(request):
 
 
 @require_POST
+@transaction.atomic
+@log_endpoint_perf("kitchen_toggle")
 def api_toggle_kitchen_item(request, item_id):
     item = get_object_or_404(
         KitchenTicketItem.objects.select_related("ticket"),
         id=item_id,
     )
 
-    item.is_done = not item.is_done
-    item.save(update_fields=["is_done"])
+    if item.is_done:
+        mark_item_not_ready(item)
+    else:
+        mark_item_ready(item)
 
+    item.refresh_from_db()
     ticket = item.ticket
     items_qs = KitchenTicketItem.objects.filter(ticket_id=ticket.id)
     all_done = items_qs.exists() and not items_qs.filter(is_done=False).exists()
@@ -626,12 +1060,20 @@ def api_toggle_kitchen_item(request, item_id):
 
 
 @require_POST
+@transaction.atomic
 def api_mark_all_ticket_items(request, ticket_id):
     data = json.loads(request.body) if request.body else {}
     done = bool(data.get("done", True))
 
     ticket = get_object_or_404(KitchenTicket, id=ticket_id)
-    ticket.items.update(is_done=done)
+    items = list(ticket.items.all())
+
+    if done:
+        for item in items:
+            mark_item_ready(item)
+    else:
+        for item in items:
+            mark_item_not_ready(item)
 
     items_qs = KitchenTicketItem.objects.filter(ticket_id=ticket.id)
     all_done = items_qs.exists() and not items_qs.filter(is_done=False).exists()
@@ -664,7 +1106,7 @@ def api_send_order_to_kitchen(request, numero):
     data = json.loads(request.body)
 
     guests_data = data.get("guests", [])
-    guests_count = data.get("guests_count", len(guests_data))
+    guests_count = max(int(data.get("guests_count", 0)), 0)
 
     table = get_object_or_404(DiningTable, numero=numero)
 
@@ -696,115 +1138,7 @@ def api_send_order_to_kitchen(request, numero):
     order.kitchen_tickets.all().delete()
 
     for guest_data in guests_data:
-        menu = Menu.objects.get(id=guest_data["menu_id"])
-
-        guest_order = GuestOrder.objects.create(
-            order=order,
-            guest_number=guest_data["number"],
-            menu=menu,
-            kitchen_note=guest_data.get("note", ""),
-            menu_applied_vat_rate=MENU_VAT_RATE,
-        )
-
-        for choice_data in guest_data["choices"]:
-            if choice_data["section_name"] == "Formule":
-                continue
-
-            section = MenuSection.objects.get(
-                menu=menu,
-                name=choice_data["section_name"],
-            )
-
-            sub_choice_product_name = choice_data.get("sub_choice_product_name")
-            if sub_choice_product_name:
-                product = Product.objects.get(name=sub_choice_product_name)
-            else:
-                product = Product.objects.get(name=choice_data["product_name"])
-
-            note = choice_data.get("note", "").strip()
-
-            replaced_product_name = (choice_data.get("replaced_product_name") or "").strip()
-            source = choice_data.get("source", "menu")
-            supplement_amount = parse_decimal_amount(
-                choice_data.get("supplement_amount", "0")
-            )
-
-            if replaced_product_name and replaced_product_name != product.name:
-                supplement_amount = compute_replacement_supplement(
-                    menu,
-                    section.name,
-                    replaced_product_name,
-                    product,
-                )
-                if supplement_amount > 0:
-                    source = "replacement"
-                else:
-                    source = "menu"
-                    supplement_amount = Decimal("0")
-                    replaced_product_name = ""
-            else:
-                source = "menu"
-                supplement_amount = Decimal("0")
-                replaced_product_name = ""
-
-            GuestChoice.objects.create(
-                guest=guest_order,
-                section=section,
-                product=product,
-                quantity=1,
-                source=source,
-                supplement_amount=supplement_amount,
-                replaced_product_name=replaced_product_name,
-                note=note,
-                applied_vat_rate=(
-                    product.vat_rate
-                    if source == "replacement" and supplement_amount > 0
-                    else None
-                ),
-            )
-
-        for extra_data in guest_data.get("extras", []):
-            extra_source = extra_data.get("source")
-
-            if extra_source == "extra":
-                product = Product.objects.get(id=extra_data["product_id"])
-                section = (
-                    MenuSection.objects
-                    .filter(items__product=product)
-                    .first()
-                )
-                quantity = int(extra_data.get("quantity", 1))
-
-                GuestChoice.objects.create(
-                    guest=guest_order,
-                    section=section,
-                    product=product,
-                    quantity=quantity,
-                    source="extra",
-                    applied_vat_rate=product.vat_rate,
-                )
-
-            elif extra_source == "manual_extra":
-                label = (extra_data.get("label") or "").strip()
-                if not label:
-                    continue
-
-                try:
-                    manual_vat_rate = parse_vat_rate(extra_data.get("vat_rate"))
-                except ValueError:
-                    manual_vat_rate = MENU_VAT_RATE
-
-                GuestChoice.objects.create(
-                    guest=guest_order,
-                    section=None,
-                    product=None,
-                    quantity=1,
-                    source="manual_extra",
-                    label=label,
-                    line_total=parse_decimal_amount(extra_data.get("line_total")),
-                    station=extra_data.get("station", "kitchen"),
-                    applied_vat_rate=manual_vat_rate,
-                )
+        create_guest_from_payload(order, guest_data)
 
     choices = (
         GuestChoice.objects
@@ -864,8 +1198,19 @@ def api_send_order_to_kitchen(request, numero):
         )
 
     service.status = "ordered"
+    service.task_claimed_at = None
+    service.task_claimed_extra_ticket = None
+    service.task_claimed_by = None
     sync_service_flags_from_order(service, order)
-    service.save(update_fields=["status", "updated_at"])
+    service.save(
+        update_fields=[
+            "status",
+            "task_claimed_at",
+            "task_claimed_extra_ticket",
+            "task_claimed_by",
+            "updated_at",
+        ]
+    )
 
     return JsonResponse({
         "success": True,
@@ -1125,7 +1470,9 @@ def api_delete_choice(request, numero, choice_id):
             status=400,
         )
 
-    choice.delete()
+    choice.is_cancelled = True
+    choice.cancelled_at = timezone.now()
+    choice.save(update_fields=["is_cancelled", "cancelled_at"])
 
     sync_service_flags_from_order(service, order)
 
@@ -1227,6 +1574,42 @@ def api_mark_paid_external_cashier(request, numero):
     })
 
 
+def build_payment_summary_response(order):
+    total = order.total_amount()
+    paid = order.paid_amount()
+    remaining = order.remaining_amount()
+    billing = build_order_billing(order)
+
+    return {
+        "success": True,
+        "total": float(total),
+        "paid": float(paid),
+        "remaining": float(max(remaining, Decimal("0.00"))),
+        "guests_total": float(billing["guests_total"]),
+        "table_extras_total": float(billing["table_extras_total"]),
+        "guest_billing": [
+            {
+                "guest_number": item["guest_number"],
+                "total": float(item["total"]),
+                "paid": float(item["paid"]),
+                "remaining": float(item["remaining"]),
+                "is_paid": item["is_paid"],
+            }
+            for item in billing["guests"]
+        ],
+        "payments": [
+            {
+                "id": payment.id,
+                "method": payment.method,
+                "method_display": payment.get_method_display(),
+                "amount": float(payment.amount),
+                "guest_number": payment.guest_number,
+            }
+            for payment in order.payments.all()
+        ],
+        "service_status": order.service.status,
+        "internal_tracking": build_internal_payment_tracking(order),
+    }
 
 
 @require_POST
@@ -1304,36 +1687,31 @@ def create_payment(request):
         if remaining_before <= Decimal("0.00"):
             break
 
-    total = order.total_amount()
-    paid = order.paid_amount()
-    remaining = order.remaining_amount()
-    billing = build_order_billing(order)
+    return JsonResponse(build_payment_summary_response(order))
 
-    return JsonResponse({
-        "success": True,
-        "total": float(total),
-        "paid": float(paid),
-        "remaining": float(max(remaining, Decimal("0.00"))),
-        "guests_total": float(billing["guests_total"]),
-        "table_extras_total": float(billing["table_extras_total"]),
-        "guest_billing": [
+
+@require_POST
+def delete_internal_payment(request, payment_id):
+    payment = get_object_or_404(
+        Payment.objects.select_related("order", "order__service"),
+        id=payment_id,
+    )
+    order = payment.order
+
+    if not order.service_id:
+        return JsonResponse(
+            {"success": False, "error": "Service introuvable."},
+            status=400,
+        )
+
+    if order.service.status == "paid":
+        return JsonResponse(
             {
-                "guest_number": item["guest_number"],
-                "total": float(item["total"]),
-                "paid": float(item["paid"]),
-                "remaining": float(item["remaining"]),
-                "is_paid": item["is_paid"],
-            }
-            for item in billing["guests"]
-        ],
-        "payments": [
-            {
-                "method": payment.method,
-                "method_display": payment.get_method_display(),
-                "amount": float(payment.amount),
-                "guest_number": payment.guest_number,
-            }
-            for payment in order.payments.all()
-        ],
-        "service_status": order.service.status,
-    })
+                "success": False,
+                "error": "Impossible de modifier le suivi interne après encaissement.",
+            },
+            status=400,
+        )
+
+    payment.delete()
+    return JsonResponse(build_payment_summary_response(order))

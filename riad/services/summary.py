@@ -1,5 +1,11 @@
 from collections import defaultdict
 
+from riad.services.prefetched_data import (
+    PrefetchMissingError,
+    get_prefetched_guest_choices,
+    get_prefetched_guests,
+    get_prefetched_table_extras,
+)
 from riad.services.pricing import choice_display_name
 
 
@@ -30,9 +36,10 @@ def choice_summary_section(choice):
     return None
 
 
-def iter_billable_choices(order):
+def _iter_billable_choices_from_db(order):
     guests = (
         order.guests
+        .select_related("menu")
         .prefetch_related(
             "choices__section",
             "choices__product",
@@ -43,14 +50,38 @@ def iter_billable_choices(order):
 
     for guest in guests:
         for choice in guest.choices.all():
-            yield choice
+            if not choice.is_cancelled:
+                yield choice
 
-    for choice in order.table_level_choices.select_related(
+    for choice in order.table_level_choices.filter(is_cancelled=False).select_related(
         "section",
         "product",
         "product__category",
     ):
         yield choice
+
+
+def iter_billable_choices(order):
+    """
+    Itère les choix facturables.
+    Chemin optimisé : attributs to_attr (0 SQL).
+    Fallback legacy uniquement si l'order n'a pas été préchargé.
+    """
+    try:
+        guests = get_prefetched_guests(order)
+        table_extras = get_prefetched_table_extras(order)
+    except PrefetchMissingError:
+        yield from _iter_billable_choices_from_db(order)
+        return
+
+    for guest in guests:
+        for choice in get_prefetched_guest_choices(guest):
+            if not choice.is_cancelled:
+                yield choice
+
+    for choice in table_extras:
+        if not choice.is_cancelled:
+            yield choice
 
 
 def build_summary(order, sections=None):

@@ -4,6 +4,13 @@ from riad.services.pricing import (
     build_order_billing,
     compute_order_total,
 )
+from riad.services.prefetched_data import (
+    get_prefetched_guest_choices,
+    get_prefetched_guests,
+    get_prefetched_payments,
+    get_prefetched_table_extras,
+    get_prefetched_workflow_items,
+)
 from riad.services.summary import (
     build_summary,
     build_kitchen_summary,
@@ -13,31 +20,59 @@ from riad.services.summary import (
 from riad.services.workflow import get_workflow_step
 from riad.services.timeline import build_timeline
 from riad.services.order_content import resolve_workflow_status
+from riad.services.workflow_engine import get_service_workflow_snapshot
 
 
-def build_table_details(table, service, order):
+def build_table_details(
+    table,
+    service,
+    order,
+    *,
+    workflow_snapshot=None,
+    prefetched_items=None,
+):
     """
-    Construit toutes les informations nécessaires
-    à l'affichage d'une table.
+    Construit le JSON d'affichage d'une table.
+
+    Fonction pure côté SQL : aucune requête. L'appelant doit avoir préchargé
+    order (guests/menu/choices/payments/table extras) et les kitchen items
+    via riad.services.prefetch.
     """
 
-    workflow_status = resolve_workflow_status(service, order)
+    if prefetched_items is None and order is not None:
+        prefetched_items = get_prefetched_workflow_items(order)
+
+    if workflow_snapshot is None:
+        workflow_snapshot = get_service_workflow_snapshot(
+            service,
+            order,
+            context="salle",
+            prefetched_items=prefetched_items,
+        )
+
+    read_ctx = workflow_snapshot.get("_ctx")
+    if read_ctx:
+        workflow_status = read_ctx.get_workflow_status()
+    else:
+        workflow_status = resolve_workflow_status(service, order)
+
     workflow = get_workflow_step(workflow_status)
-    timeline = build_timeline(service)
+    timeline = build_timeline(service, order, workflow_snapshot=workflow_snapshot)
+    category_action = workflow_snapshot.get("table_action")
 
     data = service.to_dict()
 
     data["id"] = table.id
     data["numero"] = table.numero
     data["room"] = table.room.name
-    data["reservation"] = None
-
-    # =====================================================
-    # WORKFLOW
-    # =====================================================
 
     data["workflow"] = workflow
     data["timeline"] = timeline
+    data["workflow_snapshot"] = {
+        "active_category": workflow_snapshot.get("active_category"),
+        "phase": workflow_snapshot.get("phase"),
+        "category_phases": workflow_snapshot.get("category_phases"),
+    }
 
     data["next_action"] = {
         "title": workflow["title"],
@@ -64,25 +99,26 @@ def build_table_details(table, service, order):
             f"/riad/table/{table.id}/pre-ticket/"
         )
 
+    if category_action:
+        data["next_action"].update(category_action)
+        if category_action.get("type") == "products" and order:
+            data["next_action"]["items"] = build_summary(
+                order,
+                sections=category_action.get("sections") or [],
+            )
+
     data["action"] = data["next_action"]["title"]
     data["icon"] = workflow.get("icon", data.get("icon"))
-
-    # =====================================================
-    # RÉSUMÉS
-    # =====================================================
 
     data["summary"] = []
     data["kitchen_summary"] = []
     data["office_summary"] = []
 
-    # =====================================================
-    # COMMANDE / ADDITION
-    # =====================================================
-
     data["order"] = {
         "exists": False,
         "id": None,
         "guests_count": 0,
+        "clients_count": 0,
         "guests": [],
         "table_extras": [],
         "guests_total": 0,
@@ -96,23 +132,24 @@ def build_table_details(table, service, order):
     if not order:
         return data
 
+    # Accès stricts : PrefetchMissingError si non préchargé (jamais de SQL ici).
+    guests = get_prefetched_guests(order)
+    payments = get_prefetched_payments(order)
+    table_extras = get_prefetched_table_extras(order)
+
     data["summary"] = build_summary(order)
     data["kitchen_summary"] = build_kitchen_summary(order)
     data["office_summary"] = build_office_summary(order)
 
-    if workflow["type"] == "products":
+    if workflow["type"] == "products" and not category_action:
         data["next_action"]["items"] = build_summary(
             order,
             sections=workflow["sections"],
         )
 
-    # =====================================================
-    # ADDITION
-    # =====================================================
-
     total = compute_order_total(order)
     paid = order.paid_amount()
-    remaining = order.remaining_amount()
+    remaining = total - paid
     billing = build_order_billing(order)
     billing_by_guest = {
         item["guest_number"]: item for item in billing["guests"]
@@ -121,6 +158,8 @@ def build_table_details(table, service, order):
     data["order"]["exists"] = True
     data["order"]["id"] = order.id
     data["order"]["guests_count"] = order.guests_count
+    data["order"]["clients_count"] = len(guests)
+    data["order"]["is_sent_to_kitchen"] = order.is_sent_to_kitchen
     data["order"]["guests_total"] = float(billing["guests_total"])
     data["order"]["table_extras_total"] = float(billing["table_extras_total"])
     data["order"]["total"] = float(total)
@@ -129,33 +168,21 @@ def build_table_details(table, service, order):
 
     data["order"]["payments"] = [
         {
+            "id": payment.id,
             "method": payment.method,
             "method_display": payment.get_method_display(),
             "amount": float(payment.amount),
             "guest_number": payment.guest_number,
         }
-        for payment in order.payments.all()
+        for payment in payments
     ]
-
-    # =====================================================
-    # COMMANDE DÉTAILLÉE
-    # =====================================================
-
-    guests = (
-        order.guests
-        .prefetch_related(
-            "choices__section",
-            "choices__product",
-        )
-        .order_by("guest_number")
-    )
 
     for guest in guests:
         guest_billing = billing_by_guest.get(guest.guest_number, {})
         guest_data = {
             "guest_number": guest.guest_number,
             "menu": guest.menu.name if guest.menu else None,
-            "menu_price": float(guest.menu.price) if guest.menu else 0,
+            "menu_price": float(guest.menu.price if guest.menu else 0),
             "total": float(guest_billing.get("total", 0)),
             "paid": float(guest_billing.get("paid", 0)),
             "remaining": float(guest_billing.get("remaining", 0)),
@@ -163,7 +190,7 @@ def build_table_details(table, service, order):
             "choices": [],
         }
 
-        for choice in guest.choices.all():
+        for choice in get_prefetched_guest_choices(guest):
             guest_data["choices"].append({
                 "id": choice.id,
                 "section": choice.section.name if choice.section else "",
@@ -178,12 +205,6 @@ def build_table_details(table, service, order):
             })
 
         data["order"]["guests"].append(guest_data)
-
-    table_extras = (
-        order.table_level_choices
-        .select_related("section", "product", "product__category")
-        .order_by("created_at")
-    )
 
     for choice in table_extras:
         data["order"]["table_extras"].append({

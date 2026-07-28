@@ -1,0 +1,38 @@
+{% extends "riad/base.html" %}
+{% load static %}
+
+{% block title %}Liste des tâches{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'riad/css/production.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'riad/css/tasks.css' %}?v=4">
+{% endblock %}
+
+{% block content %}
+
+<div class="riad-wrapper">
+
+    <div class="kitchen-header">
+
+        <div class="header-left">
+            <h1>📋 Liste des tâches</h1>
+            <p>
+                <span id="taskCount">0</span> tâche(s) en cours
+            </p>
+        </div>
+
+        {% include "riad/partials/top_navigation.html" with active_page="tasks" %}
+
+    </div>
+
+    <div id="tasksBoard" class="tasks-board">
+        <div class="tasks-empty">Chargement des tâches…</div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'riad/js/tasks.js' %}?v=9"></script>
+{% endblock %}

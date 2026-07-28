@@ -1,0 +1,149 @@
+.tasks-board {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 720px;
+}
+
+.tasks-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: #94a3b8;
+    font-size: 16px;
+    font-weight: 600;
+    background: #fff;
+    border-radius: 20px;
+    border: 1px dashed #e2e8f0;
+}
+
+.task-card {
+    background: #fff;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.task-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+}
+
+.task-card.pending {
+    border-color: #fdba74;
+    background: #fffaf5;
+}
+
+.task-card.overdue {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.task-card.claimed {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
+.task-table {
+    font-size: 22px;
+    font-weight: 900;
+    color: #111827;
+    line-height: 1.2;
+}
+
+.task-action {
+    font-size: 18px;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.35;
+}
+
+.task-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.task-item-line {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.35;
+}
+
+.task-item-note {
+    margin-top: 2px;
+    padding-left: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.task-meta {
+    font-size: 14px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.task-card.overdue .task-meta {
+    color: #dc2626;
+}
+
+.task-card.claimed .task-meta {
+    color: #2563eb;
+}
+
+.task-status-label {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #2563eb;
+}
+
+.task-actions {
+    margin-top: 4px;
+}
+
+.task-btn {
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.task-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.task-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.task-btn-claim {
+    background: #111827;
+    color: #fff;
+}
+
+.task-card.overdue .task-btn-claim {
+    background: #dc2626;
+}
+
+.task-card.pending .task-btn-claim {
+    background: #ea580c;
+}
+
+.task-btn-done {
+    background: #2563eb;
+    color: #fff;
+}

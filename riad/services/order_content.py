@@ -34,6 +34,29 @@ WORKFLOW_PRODUCT_SECTIONS = {
     "desserts_cleared": list(COFFEE_SECTIONS),
 }
 
+SERVE_PRODUCT_SEQUENCE = [
+    "ordered",
+    "drinks_served",
+    "starters_cleared",
+    "mains_cleared",
+    "desserts_cleared",
+]
+
+SERVE_PHASE_SECTION_FLAGS = {
+    "ordered": "has_drinks",
+    "drinks_served": "has_starters",
+    "starters_cleared": "has_mains",
+    "mains_cleared": "has_desserts",
+    "desserts_cleared": "has_coffee",
+}
+
+CLEARING_STATUSES = frozenset({
+    "starters_served",
+    "mains_served",
+    "desserts_served",
+    "coffee_served",
+})
+
 
 def _choice_section_name(choice):
     section_name = choice_summary_section(choice)
@@ -104,7 +127,6 @@ def optional_step_flags(flags):
         "desserts_served": flags["has_desserts"],
         "desserts_cleared": flags["has_coffee"],
         "coffee_served": flags["has_coffee"],
-        "coffee_cleared": flags["has_coffee"],
     }
 
 
@@ -125,18 +147,47 @@ def compute_next_status(current_status, flags):
     return None
 
 
+def _status_index(status):
+    try:
+        return SERVICE_STEPS.index(status)
+    except ValueError:
+        return -1
+
+
+def next_serve_product_status(current_status, flags):
+    try:
+        current_index = SERVE_PRODUCT_SEQUENCE.index(current_status)
+    except ValueError:
+        return None
+
+    for candidate in SERVE_PRODUCT_SEQUENCE[current_index + 1:]:
+        flag_name = SERVE_PHASE_SECTION_FLAGS.get(candidate)
+        if flag_name and flags.get(flag_name):
+            return candidate
+
+    return None
+
+
 def resolve_workflow_status(service, order):
     """
-    Retourne le statut dont le workflow doit être affiché,
-    en sautant les étapes produits vides pour la commande réelle.
+    Retourne le statut de phase « service produits » à afficher,
+    en sautant uniquement les catégories absentes de la commande.
+
+    Ne doit jamais sauter vers une phase de débarrassage (*_served action).
     """
     if not order:
+        return service.status
+
+    if service.status in CLEARING_STATUSES:
+        return service.status
+
+    if service.status not in SERVE_PRODUCT_SEQUENCE:
         return service.status
 
     status = service.status
     flags = get_order_service_flags(order)
 
-    for _ in range(len(SERVICE_STEPS)):
+    for _ in range(len(SERVE_PRODUCT_SEQUENCE)):
         sections = WORKFLOW_PRODUCT_SECTIONS.get(status)
         if not sections:
             return status
@@ -144,8 +195,8 @@ def resolve_workflow_status(service, order):
         if _order_has_sections(order, sections):
             return status
 
-        next_status = compute_next_status(status, flags)
-        if not next_status or next_status == status:
+        next_status = next_serve_product_status(status, flags)
+        if not next_status:
             return status
 
         status = next_status
