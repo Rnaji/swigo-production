@@ -46,7 +46,7 @@ function formatServedSinceLabel(prefix, seconds) {
     const minutes = Math.max(Math.floor(seconds / 60), 0);
 
     if (minutes <= 0) {
-        return `${prefix} depuis moins d'1 min`;
+        return `${prefix} depuis moins d'une minute`;
     }
 
     if (minutes === 1) {
@@ -392,13 +392,6 @@ async function completeTask(button) {
 
         if (isOrderTask(task)) {
             window.location.href = getCommandeUrl(task);
-            return;
-        }
-
-        if (task.action_type === "open_pre_ticket") {
-            if (task.pre_ticket_url) {
-                window.location.href = task.pre_ticket_url;
-            }
             return;
         }
 

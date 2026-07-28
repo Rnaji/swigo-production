@@ -43,14 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("drawerOverlay")?.addEventListener("click", closeDrawer);
 
     document.getElementById("drawerAddItem")?.addEventListener("click", openAddItemModal);
-    document.getElementById("drawerCoversMinus")?.addEventListener("click", () => {
-        const current = parseInt(document.getElementById("drawerCoversCount")?.textContent || "0", 10);
-        updateCoversCount(Math.max(current - 1, 0));
-    });
-    document.getElementById("drawerCoversPlus")?.addEventListener("click", () => {
-        const current = parseInt(document.getElementById("drawerCoversCount")?.textContent || "0", 10);
-        updateCoversCount(current + 1);
-    });
     document.getElementById("addItemClose")?.addEventListener("click", closeAddItemModal);
     document.getElementById("addItemOverlay")?.addEventListener("click", closeAddItemModal);
 
@@ -218,7 +210,7 @@ function renderDrawer(data) {
     }
 
     renderTimeline(data.timeline || []);
-    renderCurrentAction(data.next_action, data);
+    renderCurrentAction(data.next_action);
     renderCoversControl(data);
     renderPaymentPanel(data);
     renderOrderDetails(data.order);
@@ -261,12 +253,17 @@ function renderTimeline(timeline) {
     });
 }
 
-function renderCurrentAction(action, tableData = null) {
+function renderCurrentAction(action) {
     const container = document.getElementById("drawerCurrentAction");
     container.innerHTML = "";
 
     if (!action) {
         container.innerHTML = `<div class="empty-state">Aucune action.</div>`;
+        return;
+    }
+
+    // Le bloc paiement du drawer couvre cette étape.
+    if (action.type === "payment" || action.type === "open_pre_ticket") {
         return;
     }
 
@@ -281,6 +278,10 @@ function renderCurrentAction(action, tableData = null) {
             <strong>${action.title || "Action suivante"}</strong>
         </div>
     `;
+
+    if (action.served_since_label) {
+        html += `<div class="next-action-served-since">${action.served_since_label}</div>`;
+    }
 
     if (action.items && action.items.length > 0) {
         html += `<div class="next-action-products">`;
@@ -331,24 +332,11 @@ function renderCurrentAction(action, tableData = null) {
         html += `</div>`;
     }
 
-    if (action.type !== "open_pre_ticket" && action.type !== "wait") {
+    if (action.type !== "wait") {
         html += `
             <button class="drawer-btn primary next-action-button" id="drawerNextStep">
                 ${action.button || "Valider"}
             </button>
-        `;
-    }
-
-    if (
-        tableData?.order?.exists &&
-        tableData.order.is_sent_to_kitchen &&
-        !["free", "paid"].includes(tableData.status)
-    ) {
-        html += `
-            <a class="drawer-btn secondary next-action-button"
-               href="/riad/table/${tableData.numero}/commande/?mode=add_guest">
-                + Ajouter un client
-            </a>
         `;
     }
 
@@ -404,6 +392,9 @@ function formatMoney(amount) {
 function renderCoversControl(data) {
     const block = document.getElementById("drawerCoversBlock");
     const countEl = document.getElementById("drawerCoversCount");
+    const nounEl = document.getElementById("drawerCoversNoun");
+    const addGuestBtn = document.getElementById("drawerAddGuest");
+    const meta = block?.closest(".drawer-meta");
 
     if (!block || !countEl) {
         return;
@@ -413,35 +404,37 @@ function renderCoversControl(data) {
 
     if (!order?.exists || data.status === "free") {
         block.classList.add("d-none");
+        meta?.classList.remove("has-covers");
+        if (addGuestBtn) {
+            addGuestBtn.classList.add("d-none");
+            addGuestBtn.removeAttribute("href");
+        }
         return;
     }
 
+    const count = Number(order.guests_count ?? 0);
     block.classList.remove("d-none");
-    countEl.textContent = String(order.guests_count ?? 0);
-}
+    meta?.classList.add("has-covers");
+    countEl.textContent = String(count);
+    if (nounEl) {
+        nounEl.textContent = count <= 1 ? "personne" : "personnes";
+    }
 
-async function updateCoversCount(newCount) {
-    if (!selectedTableNumero || newCount < 0) {
+    const canAddGuest = Boolean(
+        order.is_sent_to_kitchen && !["free", "paid"].includes(data.status)
+    );
+
+    if (!addGuestBtn) {
         return;
     }
 
-    const response = await fetch(`/riad/api/table/${selectedTableNumero}/covers/`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCookie("csrftoken"),
-        },
-        body: JSON.stringify({ guests_count: newCount }),
-    });
-
-    if (!response.ok) {
-        return;
+    if (canAddGuest) {
+        addGuestBtn.classList.remove("d-none");
+        addGuestBtn.href = `/riad/table/${data.numero}/commande/?mode=add_guest`;
+    } else {
+        addGuestBtn.classList.add("d-none");
+        addGuestBtn.removeAttribute("href");
     }
-
-    const data = await response.json();
-    tableState[data.numero] = data;
-    updateTableCard(data);
-    renderDrawer(data);
 }
 
 function renderOrderDetails(order) {
@@ -988,49 +981,32 @@ function renderPaymentPanel(data) {
         return;
     }
 
-    const total = Number(data.order.total || 0);
-    const paid = Number(data.order.paid || 0);
     const remaining = Math.max(Number(data.order.remaining || 0), 0);
     const payments = data.order.payments || [];
     const preTicketUrl = `/riad/table/${data.id}/pre-ticket/`;
+    const remainingLabel = remaining <= 0 ? "Soldé" : formatMoney(remaining);
 
     let html = `
         <div class="payment-panel">
 
             <div class="payment-title">
-                📄 Récapitulatif non fiscal
+                💰 Paiement
             </div>
 
-            <p class="payment-disclaimer">
-                Document interne — le ticket officiel est émis par la caisse homologuée.
-            </p>
+            <div class="payment-due-card">
+                <span>À payer</span>
+                <strong id="drawerRemaining">${remainingLabel}</strong>
+            </div>
 
-            <a href="${preTicketUrl}" class="drawer-btn primary pre-ticket-link-btn">
-                Voir / Imprimer le pré-ticket
+            <a href="${preTicketUrl}" class="pre-ticket-link-btn">
+                📄 Voir / Imprimer le pré-ticket
             </a>
-
-            <div class="payment-summary">
-                <div>
-                    <span>Total indicatif</span>
-                    <strong>${total.toFixed(2)} €</strong>
-                </div>
-
-                <div>
-                    <span>Suivi interne</span>
-                    <strong>${paid.toFixed(2)} €</strong>
-                </div>
-
-                <div class="payment-remaining">
-                    <span>Reste indicatif</span>
-                    <strong id="drawerRemaining">${remaining.toFixed(2)} €</strong>
-                </div>
-            </div>
     `;
 
     if (payments.length > 0) {
         html += `
             <div class="payment-history">
-                <h4>Suivi interne (non fiscal)</h4>
+                <h4>Déjà enregistré</h4>
         `;
 
         payments.forEach(payment => {
@@ -1043,7 +1019,7 @@ function renderPaymentPanel(data) {
             html += `
                 <div class="payment-history-line">
                     <span class="payment-history-label">${paymentMethodShortLabel(payment.method)}${guestLabel}</span>
-                    <strong class="payment-history-amount">${Number(payment.amount).toFixed(2).replace(".", ",")} €</strong>
+                    <strong class="payment-history-amount">${formatMoney(payment.amount)}</strong>
                     ${deleteBtn}
                 </div>
             `;
@@ -1055,7 +1031,7 @@ function renderPaymentPanel(data) {
     if (data.status === "paid") {
         html += `
             <div class="payment-finished">
-                ✅ Paiement enregistré dans la caisse homologuée
+                ✅ Table soldée
             </div>
 
             <button class="drawer-btn primary" onclick="freeTableAfterPayment()">
@@ -1065,14 +1041,14 @@ function renderPaymentPanel(data) {
     } else {
         if (remaining > 0) {
             html += `
-                <div class="payment-tracking-label">Répartition interne (non fiscal)</div>
+                <div class="payment-section-label">Paiement</div>
                 <div class="payment-buttons-drawer">
                     <button type="button" onclick="openDrawerCardPayment(${remaining})">
-                        💳 Suivi CB
+                        💳 Paiement par carte
                     </button>
 
                     <button type="button" onclick="openDrawerCashPayment(${remaining})">
-                        💶 Suivi espèces
+                        💶 Paiement en espèces
                     </button>
                 </div>
 
@@ -1082,7 +1058,7 @@ function renderPaymentPanel(data) {
 
         html += `
             <button class="drawer-btn primary mark-paid-external-btn" onclick="markPaidInExternalCashier()">
-                Paiement enregistré dans la caisse homologuée
+                ✅ Clôturer la table
             </button>
         `;
     }
@@ -1096,9 +1072,9 @@ function openDrawerCardPayment(remaining) {
     openPaymentModal({
         method: "card",
         remaining,
-        title: "Suivi interne — CB",
-        amountLabel: "Montant suivi (indicatif)",
-        fullButtonLabel: "Tout le reste indicatif",
+        title: "Paiement par carte",
+        amountLabel: "Montant",
+        fullButtonLabel: "Tout le reste",
         onSubmit: submitDrawerSinglePayment,
     });
 }
@@ -1107,9 +1083,9 @@ function openDrawerCashPayment(remaining) {
     openPaymentModal({
         method: "cash",
         remaining,
-        title: "Suivi interne — Espèces",
-        amountLabel: "Montant suivi (indicatif)",
-        fullButtonLabel: "Tout le reste indicatif",
+        title: "Paiement en espèces",
+        amountLabel: "Montant",
+        fullButtonLabel: "Tout le reste",
         onSubmit: submitDrawerSinglePayment,
     });
 }

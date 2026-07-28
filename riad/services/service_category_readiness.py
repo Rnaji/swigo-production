@@ -136,21 +136,126 @@ CATEGORY_DISPLAY_CONFIG = {
     },
 }
 
+CATEGORY_NOUNS = {
+    "drinks": {
+        "one": "boisson",
+        "many": "boissons",
+        "served_one": "boisson servie",
+        "served_many": "boissons servies",
+        "ready_one": "prête",
+        "ready_many": "prêtes",
+    },
+    "starters": {
+        "one": "entrée",
+        "many": "entrées",
+        "served_one": "entrée servie",
+        "served_many": "entrées servies",
+        "ready_one": "prête",
+        "ready_many": "prêtes",
+    },
+    "mains": {
+        "one": "plat",
+        "many": "plats",
+        "served_one": "plat servi",
+        "served_many": "plats servis",
+        "ready_one": "prêt",
+        "ready_many": "prêts",
+    },
+    "desserts": {
+        "one": "dessert",
+        "many": "desserts",
+        "served_one": "dessert servi",
+        "served_many": "desserts servis",
+        "ready_one": "prêt",
+        "ready_many": "prêts",
+    },
+    "coffee": {
+        "one": "thé/café",
+        "many": "thés/cafés",
+        "served_one": "thé/café servi",
+        "served_many": "thés/cafés servis",
+        "ready_one": "prêt",
+        "ready_many": "prêts",
+    },
+}
+
 
 def _category_has_clear_step(category):
     return CATEGORY_DISPLAY_CONFIG.get(category, {}).get("has_clear_step", False)
 
 
-def get_category_phase_display(category, phase):
+def item_serve_quantity(item):
+    return max(int(getattr(item, "quantity", 1) or 1), 1)
+
+
+def count_category_progress(items):
+    served = 0
+    ready = 0
+    preparing = 0
+    for item in items:
+        qty = item_serve_quantity(item)
+        if item.is_served:
+            served += qty
+        elif item.is_done:
+            ready += qty
+        else:
+            preparing += qty
+    return {
+        "served_count": served,
+        "ready_count": ready,
+        "preparing_count": preparing,
+    }
+
+
+def format_category_serve_title(category, count):
+    nouns = CATEGORY_NOUNS.get(category) or {
+        "one": "article",
+        "many": "articles",
+    }
+    noun = nouns["one"] if count <= 1 else nouns["many"]
+    return f"Servir {max(int(count), 0)} {noun}"
+
+
+def format_category_progress_label(category, *, served=0, ready=0, preparing=0):
+    nouns = CATEGORY_NOUNS.get(category)
+    if not nouns:
+        return None
+
+    parts = []
+    if served > 0:
+        label = nouns["served_one"] if served == 1 else nouns["served_many"]
+        parts.append(f"{served} {label}")
+    if ready > 0:
+        adj = nouns["ready_one"] if ready == 1 else nouns["ready_many"]
+        parts.append(f"{ready} {adj}")
+    if preparing > 0:
+        parts.append(f"{preparing} en préparation")
+
+    if not parts:
+        return None
+    return " • ".join(parts)
+
+
+def get_category_phase_display(category, phase, state=None):
     config = CATEGORY_DISPLAY_CONFIG.get(category)
     if not config or phase in (PHASE_NOT_APPLICABLE, PHASE_CLEARED):
         return None
 
     sections = list(CATEGORY_SECTIONS.get(category, ()))
+    progress = count_category_progress((state or {}).get("items") or [])
+    served = progress["served_count"]
+    ready = progress["ready_count"]
+    preparing = progress["preparing_count"]
 
     if phase == PHASE_WAITING_KITCHEN:
+        progress_title = format_category_progress_label(
+            category,
+            served=served,
+            preparing=preparing,
+        )
+        title = progress_title if served > 0 else config["preparing_title"]
         return {
-            "title": config["preparing_title"],
+            "title": title,
             "button": "En attente cuisine",
             "type": "wait",
             "icon": config["icon_serve"],
@@ -158,13 +263,22 @@ def get_category_phase_display(category, phase):
         }
 
     if phase == PHASE_READY_TO_SERVE:
-        return {
-            "title": config["serve_title"],
+        action = {
+            "title": format_category_serve_title(category, ready or 1),
             "button": config["serve_button"],
             "type": "products",
             "icon": config["icon_serve"],
             "sections": sections,
         }
+        progress_label = format_category_progress_label(
+            category,
+            served=served,
+            ready=ready,
+            preparing=preparing,
+        )
+        if progress_label and (served > 0 or preparing > 0):
+            action["progress_label"] = progress_label
+        return action
 
     if phase == PHASE_SERVED_WAITING_CLEAR:
         return {
@@ -253,8 +367,8 @@ def get_category_workflow_items(order, category, service=None):
 
 def is_category_fully_served(service, order, category):
     """
-    True uniquement lorsque la catégorie a été entièrement servie via les tâches
-    de service : au moins une ligne active et toutes marquées servies.
+    True uniquement lorsque toutes les lignes actives de la catégorie sont
+    prêtes (is_done) et servies (is_served).
     """
     if not service or not order or category not in CATEGORY_SECTIONS:
         return False
@@ -263,7 +377,7 @@ def is_category_fully_served(service, order, category):
     if not items:
         return False
 
-    return all(item.is_served for item in items)
+    return all(item.is_done and item.is_served for item in items)
 
 
 def order_has_category_choices(order, category):
@@ -429,15 +543,20 @@ def get_ready_extra_serve_tasks(service, order):
 
 def get_category_items_state(service, order, category):
     items = get_category_workflow_items(order, category, service=service)
+    progress = count_category_progress(items)
     return {
         "has_items": bool(items),
         "all_done": bool(items) and all(item.is_done for item in items),
         "all_served": bool(items) and all(item.is_served for item in items),
+        "ready_count": progress["ready_count"],
+        "served_count": progress["served_count"],
+        "preparing_count": progress["preparing_count"],
         "items": items,
     }
 
 
 def get_clear_task_delay_seconds(service_status):
+    """Délai d'affichage carte (progress) — n'ouvre plus la tâche Débarrasser."""
     from riad.constants import SERVICE_STATUS
 
     config = SERVICE_STATUS.get(service_status, {})
@@ -445,10 +564,55 @@ def get_clear_task_delay_seconds(service_status):
 
 
 def is_clear_delay_reached(service):
-    delay_seconds = get_clear_task_delay_seconds(service.status)
-    if delay_seconds <= 0:
-        return True
-    return service.elapsed_seconds >= delay_seconds
+    """Toujours True : le débarrassage est immédiat dès que la catégorie est servie."""
+    return True
+
+
+def get_category_last_served_at(items):
+    served_ats = [item.served_at for item in items if getattr(item, "served_at", None)]
+    if not served_ats:
+        return None
+    return max(served_ats)
+
+
+def format_served_since_label(prefix, elapsed_seconds):
+    minutes = max(int(elapsed_seconds) // 60, 0)
+
+    if minutes <= 0:
+        return f"{prefix} depuis moins d'une minute"
+
+    if minutes == 1:
+        return f"{prefix} depuis 1 min"
+
+    return f"{prefix} depuis {minutes} min"
+
+
+def build_served_since_info(category, items, *, now=None):
+    """
+    Temps écoulé depuis que la catégorie est entièrement servie
+    (référence = max(served_at) des lignes).
+    """
+    if not _category_has_clear_step(category):
+        return None
+
+    last_served_at = get_category_last_served_at(items)
+    if not last_served_at:
+        return None
+
+    config = CATEGORY_DISPLAY_CONFIG.get(category) or {}
+    prefix = config.get("served_title")
+    if not prefix:
+        return None
+
+    reference = now or timezone.now()
+    elapsed_seconds = max(int((reference - last_served_at).total_seconds()), 0)
+
+    return {
+        "served_since_at": last_served_at.isoformat(),
+        "served_since_prefix": prefix,
+        "served_since_label": format_served_since_label(prefix, elapsed_seconds),
+        "served_since_seconds": elapsed_seconds,
+    }
 
 
 def is_clear_task_allowed(service, order):
@@ -483,7 +647,7 @@ def is_clear_task_allowed(service, order):
     if not is_category_fully_served(service, order, category):
         return False
 
-    return is_clear_delay_reached(service)
+    return True
 
 
 def get_category_phase(service, order, category):
@@ -499,31 +663,35 @@ def get_category_phase(service, order, category):
 
     state = get_category_items_state(service, order, category)
 
-    if not state["has_items"] or not state["all_done"]:
+    if not state["has_items"]:
         return PHASE_WAITING_KITCHEN
 
-    if not state["all_served"]:
-        return PHASE_READY_TO_SERVE
+    if state["all_served"]:
+        served_status = CATEGORY_SERVED_STATUS.get(category)
+        if not served_status:
+            return PHASE_NOT_APPLICABLE
 
-    served_status = CATEGORY_SERVED_STATUS.get(category)
-    if not served_status:
-        return PHASE_NOT_APPLICABLE
+        if not _category_has_clear_step(category):
+            if _status_index(service.status) >= _status_index(served_status):
+                return PHASE_CLEARED
+            return PHASE_SERVED_WAITING_CLEAR
 
-    if _status_index(service.status) < _status_index(served_status):
-        return PHASE_SERVED_WAITING_CLEAR
+        if service.status == served_status and is_clear_task_allowed(service, order):
+            return PHASE_READY_TO_CLEAR
 
-    if service.status != served_status:
         if cleared_status and _status_index(service.status) >= _status_index(cleared_status):
             return PHASE_CLEARED
+
+        if _status_index(service.status) < _status_index(served_status):
+            return PHASE_SERVED_WAITING_CLEAR
+
         return PHASE_SERVED_WAITING_CLEAR
 
-    if not _category_has_clear_step(category):
-        return PHASE_CLEARED
+    # Service partiel : dès qu'une ligne est prête, elle est servable.
+    if state["ready_count"] > 0:
+        return PHASE_READY_TO_SERVE
 
-    if is_clear_task_allowed(service, order):
-        return PHASE_READY_TO_CLEAR
-
-    return PHASE_SERVED_WAITING_CLEAR
+    return PHASE_WAITING_KITCHEN
 
 
 def reconcile_served_category_status(service, order, category):
@@ -574,7 +742,14 @@ def get_category_table_action(service, order, category):
     if phase in (PHASE_NOT_APPLICABLE, PHASE_CLEARED):
         return None
 
-    return get_category_phase_display(category, phase)
+    state = get_category_items_state(service, order, category)
+    action = get_category_phase_display(category, phase, state)
+    if action and phase == PHASE_READY_TO_CLEAR:
+        served_info = build_served_since_info(category, state["items"])
+        if served_info:
+            action = {**action, **served_info}
+
+    return action
 
 
 def get_active_category_table_action(service, order):

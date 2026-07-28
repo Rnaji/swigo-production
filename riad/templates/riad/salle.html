@@ -4,8 +4,8 @@
 {% block title %}Salle{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'riad/css/production.css' %}">
-<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=100">
+<link rel="stylesheet" href="{% static 'riad/css/production.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'riad/css/salle.css' %}?v=106">
 <link rel="stylesheet" href="{% static 'riad/css/cashier.css' %}?v=1">
 {% endblock %}
 
@@ -25,31 +25,11 @@
 
         </div>
 
-        <div class="header-right">
+        {% include "riad/partials/top_navigation.html" with active_page="salle" %}
 
-            <div class="production-tabs">
-
-                <a
-                    href="/riad/salle/"
-                    class="production-tab salle-tab active">
-                    🪑 Salle
-                </a>
-
-                <a
-                    href="/riad/kitchen/?station=kitchen"
-                    class="production-tab">
-                    👨‍🍳 Cuisine
-                </a>
-
-                <a
-                    href="/riad/kitchen/?station=bar"
-                    class="production-tab">
-                    🥤 Office
-                </a>
-
-            </div>
-
-        </div>
+        {% if user.is_staff %}
+        <a href="/riad/backoffice/" class="production-tab" style="margin-left:0.5rem;">📊 Back Office</a>
+        {% endif %}
 
     </div>
 
@@ -118,6 +98,21 @@
                 <strong id="drawerTime">
                     --
                 </strong>
+            </div>
+
+            <div id="drawerCoversBlock" class="d-none drawer-covers-card">
+                <span>Personnes</span>
+                <strong class="drawer-covers-count" id="drawerCoversLabel">
+                    <span aria-hidden="true">👥</span>
+                    <span id="drawerCoversCount">0</span>
+                    <span id="drawerCoversNoun">personnes</span>
+                </strong>
+                <a
+                    id="drawerAddGuest"
+                    class="drawer-add-guest d-none"
+                    href="#">
+                    ➕ Ajouter un client
+                </a>
             </div>
 
         </div>
@@ -401,6 +396,6 @@
 </div>
 
 <script src="{% static 'riad/js/add-extra-common.js' %}?v=1"></script>
-<script src="{% static 'riad/js/payment-modal.js' %}?v=3"></script>
-<script src="{% static 'riad/js/salle.js' %}?v=112"></script>
+<script src="{% static 'riad/js/payment-modal.js' %}?v=6"></script>
+<script src="{% static 'riad/js/salle.js' %}?v=119"></script>
 {% endblock %}

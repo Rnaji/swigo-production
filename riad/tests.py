@@ -640,6 +640,67 @@ class ServerTaskListTests(OrderContentTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 409)
 
+    def test_api_tasks_includes_take_order_for_installed_table(self):
+        self.service.status = "installed"
+        self.service.installed_at = timezone.now()
+        self.service.save(update_fields=["status", "installed_at", "updated_at"])
+
+        response = self.client.get("/riad/api/tasks/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        tasks = payload["tasks"]
+        order_tasks = [
+            task for task in tasks
+            if task.get("title") == "Prendre la commande"
+            and task.get("table_numero") == self.table.numero
+        ]
+        self.assertEqual(len(order_tasks), 1)
+        task = order_tasks[0]
+        self.assertTrue(task["is_order_task"])
+        self.assertEqual(task["table_numero"], self.table.numero)
+        self.assertIn("/commande/?from=tasks", task["commande_url"])
+        self.assertEqual(payload["count"], len(tasks))
+
+    def test_take_order_task_disappears_after_ordering_starts(self):
+        from riad.services.tasks import build_task_list, iter_active_services_with_orders
+
+        self.service.status = "installed"
+        self.service.installed_at = timezone.now()
+        self.service.save(update_fields=["status", "installed_at", "updated_at"])
+
+        installed_tasks = [
+            task for task in build_task_list(iter_active_services_with_orders())
+            if task.get("title") == "Prendre la commande"
+        ]
+        self.assertEqual(len(installed_tasks), 1)
+
+        self.service.set_status("ordering")
+        ordering_tasks = [
+            task for task in build_task_list(iter_active_services_with_orders())
+            if task.get("title") == "Prendre la commande"
+        ]
+        self.assertEqual(ordering_tasks, [])
+        finalize_tasks = [
+            task for task in build_task_list(iter_active_services_with_orders())
+            if task.get("is_order_task")
+        ]
+        self.assertEqual(len(finalize_tasks), 1)
+        self.assertIn("commande", finalize_tasks[0]["title"].lower())
+
+    def test_tasks_js_syntax_has_valid_isOrderTask_guard(self):
+        from pathlib import Path
+
+        source = Path(__file__).resolve().parent.joinpath("static/riad/js/tasks.js").read_text()
+        self.assertIn("if (isOrderTask(task)) {", source)
+        self.assertNotRegex(source, r"(?m)^\s*if\s+isOrderTask\(")
+
+        try:
+            import esprima
+        except ImportError:
+            return
+
+        esprima.parseScript(source)
+
     def test_take_order_task_shows_installed_since_label(self):
         from riad.services.tasks import build_task_list, iter_active_services_with_orders
 
@@ -752,7 +813,7 @@ class ServeItemTaskTests(OrderContentTestMixin, TestCase):
         self.assertIn("plat", serve_tasks[0]["title"].lower())
         self.assertLess(serve_tasks[0]["priority_score"], 100)
 
-    def test_partial_category_does_not_create_task_until_all_ready(self):
+    def test_partial_category_creates_serve_task_for_ready_lines(self):
         tajine = Product.objects.create(
             category=self.categories["Plat"],
             name="Tajine poulet",
@@ -779,12 +840,279 @@ class ServeItemTaskTests(OrderContentTestMixin, TestCase):
 
         tasks = self._serve_tasks()
         serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
-        self.assertEqual(serve_tasks, [])
-
-        from riad.services.table_details import build_table_details
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 1 plat")
+        self.assertEqual(len(serve_tasks[0]["item_ids"]), 1)
 
         details = self.build_table_details_prepared()
-        self.assertEqual(details["action"], "Plats en préparation")
+        self.assertEqual(details["action"], "Servir 1 plat")
+        self.assertIn("en préparation", details["next_action"].get("progress_label", "").lower())
+
+    def test_unclaimed_task_absorbs_new_ready_lines(self):
+        tajine = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Tajine poulet",
+            price=Decimal("15.00"),
+        )
+        pastilla = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Pastilla",
+            price=Decimal("16.00"),
+        )
+
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        guest = self.order.guests.first()
+        for product in (tajine, pastilla):
+            GuestChoice.objects.create(
+                guest=guest,
+                section=self.sections["Plat"],
+                product=product,
+                quantity=1,
+                source="extra",
+            )
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        ticket = self.create_kitchen_lines("Plat", [
+            (self.products["Couscous Royal"], True),
+            (tajine, False),
+            (pastilla, False),
+        ])
+
+        tasks = self._serve_tasks()
+        serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 1 plat")
+
+        tajine_item = ticket.items.get(product=tajine)
+        tajine_item.is_done = True
+        tajine_item.done_at = timezone.now()
+        tajine_item.save(update_fields=["is_done", "done_at"])
+
+        tasks = self._serve_tasks()
+        serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 2 plats")
+        self.assertEqual(len(serve_tasks[0]["item_ids"]), 2)
+
+        pastilla_item = ticket.items.get(product=pastilla)
+        pastilla_item.is_done = True
+        pastilla_item.done_at = timezone.now()
+        pastilla_item.save(update_fields=["is_done", "done_at"])
+
+        tasks = self._serve_tasks()
+        serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 3 plats")
+        self.assertEqual(len(serve_tasks[0]["item_ids"]), 3)
+
+    def test_complete_claimed_batch_does_not_serve_later_ready_lines(self):
+        from django.contrib.auth.models import User
+        from riad.models import KitchenTicketItem
+        from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
+
+        tajine = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Tajine poulet",
+            price=Decimal("15.00"),
+        )
+
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        guest = self.order.guests.first()
+        GuestChoice.objects.create(
+            guest=guest,
+            section=self.sections["Plat"],
+            product=tajine,
+            quantity=1,
+            source="extra",
+        )
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        ticket = self.create_kitchen_lines("Plat", [
+            (self.products["Couscous Royal"], True),
+            (tajine, False),
+        ])
+
+        user = User.objects.create_user(username="serveur_partial_batch", password="test")
+        claimed, err = claim_serve_task(self.service, available_task_key("mains"), user)
+        self.assertIsNone(err)
+
+        tajine_item = ticket.items.get(product=tajine)
+        tajine_item.is_done = True
+        tajine_item.done_at = timezone.now()
+        tajine_item.save(update_fields=["is_done", "done_at"])
+
+        ok, err = complete_serve_task(self.service, self.order, claimed["task_key"], user)
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+        couscous = KitchenTicketItem.objects.get(product=self.products["Couscous Royal"])
+        tajine_item.refresh_from_db()
+        self.assertTrue(couscous.is_served)
+        self.assertFalse(tajine_item.is_served)
+
+        tasks = self._serve_tasks()
+        serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 1 plat")
+        self.assertEqual(serve_tasks[0]["item_ids"], [tajine_item.id])
+
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.status, "starters_cleared")
+
+        user2 = User.objects.create_user(username="serveur_partial_batch2", password="test")
+        claimed2, err = claim_serve_task(self.service, available_task_key("mains"), user2)
+        self.assertIsNone(err)
+        complete_serve_task(self.service, self.order, claimed2["task_key"], user2)
+
+        tajine_item.refresh_from_db()
+        self.assertTrue(tajine_item.is_served)
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.status, "mains_served")
+
+    def test_two_servers_cannot_claim_same_available_batch(self):
+        from django.contrib.auth.models import User
+        from riad.services.serve_tasks import available_task_key, claim_serve_task
+
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+        self.create_kitchen_lines("Plat", [(self.products["Couscous Royal"], True)])
+
+        user_a = User.objects.create_user(username="serveur_a", password="test")
+        user_b = User.objects.create_user(username="serveur_b", password="test")
+
+        first, err_a = claim_serve_task(self.service, available_task_key("mains"), user_a)
+        second, err_b = claim_serve_task(self.service, available_task_key("mains"), user_b)
+
+        self.assertIsNone(err_a)
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertIsNotNone(err_b)
+
+    def test_kitchen_and_office_partial_ready_creates_one_serve_task(self):
+        self.create_guest(1, [
+            ("Plat", "Couscous Royal", "menu"),
+        ])
+        guest = self.order.guests.first()
+        tajine = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Tajine poulet",
+            price=Decimal("15.00"),
+        )
+        GuestChoice.objects.create(
+            guest=guest,
+            section=self.sections["Plat"],
+            product=tajine,
+            quantity=1,
+            source="extra",
+        )
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        self.create_kitchen_lines(
+            "Plat",
+            [(self.products["Couscous Royal"], True)],
+            station="kitchen",
+        )
+        self.create_kitchen_lines(
+            "Plat",
+            [(tajine, False)],
+            station="office",
+        )
+
+        tasks = self._serve_tasks()
+        serve_tasks = [task for task in tasks if task["action_type"] == "serve_items"]
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 1 plat")
+        details = self.build_table_details_prepared()
+        self.assertEqual(details["action"], "Servir 1 plat")
+
+    def test_clear_only_after_all_lines_served(self):
+        from django.contrib.auth.models import User
+        from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
+
+        tajine = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Tajine poulet",
+            price=Decimal("15.00"),
+        )
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        guest = self.order.guests.first()
+        GuestChoice.objects.create(
+            guest=guest,
+            section=self.sections["Plat"],
+            product=tajine,
+            quantity=1,
+            source="extra",
+        )
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+        self.create_kitchen_lines("Plat", [
+            (self.products["Couscous Royal"], True),
+            (tajine, True),
+        ])
+
+        user = User.objects.create_user(username="serveur_clear_partial", password="test")
+        claimed, _ = claim_serve_task(self.service, available_task_key("mains"), user)
+
+        # Simuler une 2e ligne devenue prête après claim : on retire un item du lot
+        # en le "déclamant" n'est pas le scénario — claim a figé les 2.
+        # On valide le lot complet puis on vérifie clear.
+        complete_serve_task(self.service, self.order, claimed["task_key"], user)
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.status, "mains_served")
+
+        tasks = self._serve_tasks()
+        self.assertTrue(any("débarrasser" in task["title"].lower() for task in tasks))
+
+    def test_complete_available_freezes_batch_without_claim(self):
+        from django.contrib.auth.models import User
+        from riad.models import KitchenTicketItem
+        from riad.services.serve_tasks import available_task_key, complete_serve_task
+
+        tajine = Product.objects.create(
+            category=self.categories["Plat"],
+            name="Tajine poulet",
+            price=Decimal("15.00"),
+        )
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        guest = self.order.guests.first()
+        GuestChoice.objects.create(
+            guest=guest,
+            section=self.sections["Plat"],
+            product=tajine,
+            quantity=1,
+            source="extra",
+        )
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+        ticket = self.create_kitchen_lines("Plat", [
+            (self.products["Couscous Royal"], True),
+            (tajine, False),
+        ])
+
+        user = User.objects.create_user(username="serveur_direct", password="test")
+        ok, err = complete_serve_task(
+            self.service,
+            self.order,
+            available_task_key("mains"),
+            user,
+        )
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+        couscous = KitchenTicketItem.objects.get(product=self.products["Couscous Royal"])
+        tajine_item = ticket.items.get(product=tajine)
+        self.assertTrue(couscous.is_served)
+        self.assertFalse(tajine_item.is_served)
 
     def test_two_ready_lines_grouped_before_claim(self):
         tajine = Product.objects.create(
@@ -1008,6 +1336,7 @@ class ServeItemTaskTests(OrderContentTestMixin, TestCase):
 
     def test_clearing_task_shows_served_since_label(self):
         from django.contrib.auth.models import User
+        from riad.models import KitchenTicketItem
         from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
 
         self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
@@ -1021,8 +1350,9 @@ class ServeItemTaskTests(OrderContentTestMixin, TestCase):
         complete_serve_task(self.service, self.order, task["task_key"], user)
 
         self.service.refresh_from_db()
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=18)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
+        KitchenTicketItem.objects.filter(ticket__order=self.order).update(
+            served_at=timezone.now() - timezone.timedelta(minutes=18),
+        )
 
         tasks = self._serve_tasks()
         clearing_tasks = [
@@ -1189,7 +1519,7 @@ class BillTaskTests(OrderContentTestMixin, TestCase):
             if "addition" in task["title"].lower()
         ]
 
-    def test_coffee_cleared_without_bill_request_has_no_bill_task(self):
+    def test_coffee_cleared_creates_bill_task(self):
         self.create_guest(1, [
             ("Plat", "Couscous Royal", "menu"),
             ("Thé / Café", "Thé à la menthe", "menu"),
@@ -1198,7 +1528,11 @@ class BillTaskTests(OrderContentTestMixin, TestCase):
         self.service.status = "coffee_cleared"
         self.service.save(update_fields=["status", "updated_at"])
 
-        self.assertEqual(len(self._bill_tasks()), 0)
+        tasks = self._bill_tasks()
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]["title"], "Apporter l'addition")
+        self.assertEqual(tasks[0]["action_type"], "action")
+        self.assertIsNone(tasks[0].get("pre_ticket_url"))
 
     def test_desserts_served_without_bill_request_has_no_bill_task(self):
         self.create_guest(1, [
@@ -1211,16 +1545,58 @@ class BillTaskTests(OrderContentTestMixin, TestCase):
 
         self.assertEqual(len(self._bill_tasks()), 0)
 
-    def test_bill_requested_creates_bill_task(self):
+    def test_bill_requested_has_no_bill_task(self):
         self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
         sync_service_flags_from_order(self.service, self.order)
         self.service.set_status("bill_requested")
         self.service.refresh_from_db()
 
-        tasks = self._bill_tasks()
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0]["title"], "Apporter l'addition")
+        self.assertEqual(len(self._bill_tasks()), 0)
         self.assertIsNotNone(self.service.bill_requested_at)
+
+    def test_complete_bill_task_advances_to_payment_without_pre_ticket_navigation(self):
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "coffee_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
+
+        tasks_before = self._bill_tasks()
+        self.assertEqual(len(tasks_before), 1)
+        self.assertIsNone(tasks_before[0].get("pre_ticket_url"))
+        self.assertNotEqual(tasks_before[0].get("action_type"), "open_pre_ticket")
+
+        response = self.client.post(f"/riad/api/table/{self.table.numero}/next/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.service.refresh_from_db()
+        self.assertEqual(self.service.status, "bill_requested")
+        self.assertIsNotNone(self.service.bill_requested_at)
+
+        self.assertEqual(data["status"], "bill_requested")
+        self.assertEqual(data["next_action"]["type"], "payment")
+        self.assertNotIn("pre_ticket_url", data["next_action"])
+        self.assertNotEqual(data["next_action"].get("type"), "open_pre_ticket")
+
+        # Aucune navigation automatique : le pré-ticket reste un lien manuel.
+        payment_html_hint = data.get("order") or {}
+        self.assertTrue(payment_html_hint.get("exists"))
+
+        details = self.build_table_details_prepared()
+        self.assertEqual(details["status"], "bill_requested")
+        self.assertEqual(details["next_action"]["type"], "payment")
+        self.assertNotIn("pre_ticket_url", details["next_action"])
+        self.assertEqual(details["action"], "Paiement")
+
+        self.assertEqual(len(self._bill_tasks()), 0)
+
+        # Le pré-ticket reste une URL manuelle (identique au bouton drawer),
+        # jamais renvoyée comme navigation automatique.
+        pre_ticket_url = f"/riad/table/{self.table.id}/pre-ticket/"
+        self.assertTrue(pre_ticket_url.endswith("/pre-ticket/"))
+        self.assertNotIn("redirect", data.get("next_action") or {})
+        self.assertIsNone((data.get("next_action") or {}).get("pre_ticket_url"))
+        self.assertNotIn("pre-ticket", str(data.get("next_action") or {}).lower())
 
     def test_explicit_bill_request_via_next_step(self):
         self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
@@ -1235,19 +1611,18 @@ class BillTaskTests(OrderContentTestMixin, TestCase):
         self.assertEqual(self.service.status, "bill_requested")
         self.assertIsNotNone(self.service.bill_requested_at)
 
-        tasks = self._bill_tasks()
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0]["title"], "Apporter l'addition")
+        self.assertEqual(len(self._bill_tasks()), 0)
 
     def test_double_bill_request_does_not_duplicate_task(self):
         self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
         sync_service_flags_from_order(self.service, self.order)
-        self.service.set_status("bill_requested")
+        self.service.status = "coffee_cleared"
+        self.service.save(update_fields=["status", "updated_at"])
 
         first_count = len(self._bill_tasks())
 
-        self.service.bill_requested_at = timezone.now()
-        self.service.save(update_fields=["bill_requested_at", "updated_at"])
+        self.service.status_started_at = timezone.now()
+        self.service.save(update_fields=["status_started_at", "updated_at"])
 
         second_count = len(self._bill_tasks())
         self.assertEqual(first_count, 1)
@@ -1974,7 +2349,7 @@ class StarterClearTaskTests(OrderContentTestMixin, TestCase):
         self.assertEqual(tasks[0]["action_type"], "serve_items")
         self.assertIn("servir", tasks[0]["title"].lower())
 
-    def test_recently_served_starter_has_no_clear_task_before_delay(self):
+    def test_recently_served_starter_creates_clear_task_immediately(self):
         from django.contrib.auth.models import User
         from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
 
@@ -1996,9 +2371,9 @@ class StarterClearTaskTests(OrderContentTestMixin, TestCase):
 
         tasks = self._starter_tasks(self._tasks())
         clear_tasks = [task for task in tasks if "débarrasser" in task["title"].lower()]
-        self.assertEqual(clear_tasks, [])
+        self.assertEqual(len(clear_tasks), 1)
 
-    def test_served_starter_after_delay_creates_clear_task(self):
+    def test_served_starter_creates_clear_task(self):
         from django.contrib.auth.models import User
         from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
 
@@ -2016,8 +2391,6 @@ class StarterClearTaskTests(OrderContentTestMixin, TestCase):
         complete_serve_task(self.service, self.order, task["task_key"], user)
 
         self.service.refresh_from_db()
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=8)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
 
         tasks = self._starter_tasks(self._tasks())
         clear_tasks = [task for task in tasks if "débarrasser" in task["title"].lower()]
@@ -2119,7 +2492,7 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
             if "servir" in task["title"].lower() and "entrée" in task["title"].lower()
         ]
 
-        self.assertEqual(details["action"], "Servir les entrées")
+        self.assertEqual(details["action"], "Servir 1 entrée")
         self.assertEqual(len(serve_tasks), 1)
 
     def test_complete_serve_updates_items_status_and_salle(self):
@@ -2149,10 +2522,10 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
             if "servir" in task["title"].lower() and "entrée" in task["title"].lower()
         ]
 
-        self.assertEqual(details["action"], "Entrées servies")
+        self.assertIn("entrées servies depuis", details["action"].lower())
         self.assertEqual(serve_tasks, [])
 
-    def test_before_clear_delay_no_clear_task_and_waiting_salle(self):
+    def test_served_starter_shows_clear_immediately_in_salle_and_tasks(self):
         from django.contrib.auth.models import User
         from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
 
@@ -2167,10 +2540,12 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         tasks = self._tasks()
         clear_tasks = [task for task in tasks if "débarrasser" in task["title"].lower()]
 
-        self.assertEqual(details["action"], "Entrées servies")
-        self.assertEqual(clear_tasks, [])
+        self.assertIn("entrées servies depuis", details["action"].lower())
+        self.assertEqual(details["next_action"]["title"], "Débarrasser les entrées")
+        self.assertEqual(len(clear_tasks), 1)
+        self.assertIsNotNone(clear_tasks[0]["served_since_label"])
 
-    def test_after_clear_delay_shows_clear_in_salle_and_tasks(self):
+    def test_clear_available_without_artificial_wait(self):
         from django.contrib.auth.models import User
         from riad.services.serve_tasks import available_task_key, claim_serve_task, complete_serve_task
 
@@ -2181,15 +2556,11 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         task, _ = claim_serve_task(self.service, available_task_key("starters"), user)
         complete_serve_task(self.service, self.order, task["task_key"], user)
 
-        self.service.refresh_from_db()
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=8)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
-
         details = self._table_details()
         tasks = self._tasks()
         clear_tasks = [task for task in tasks if "débarrasser" in task["title"].lower()]
 
-        self.assertEqual(details["action"], "Débarrasser les entrées")
+        self.assertEqual(details["next_action"]["title"], "Débarrasser les entrées")
         self.assertEqual(len(clear_tasks), 1)
 
     def test_clear_starters_advances_workflow(self):
@@ -2206,8 +2577,6 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         complete_serve_task(self.service, self.order, task["task_key"], user)
 
         self.service.refresh_from_db()
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=8)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
 
         factory = RequestFactory()
         request = factory.post(f"/riad/api/table/{self.table.numero}/next/")
@@ -2223,7 +2592,7 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.assertEqual(details["action"], "Plats en préparation")
         self.assertEqual(clear_tasks, [])
 
-    def test_partial_starter_ready_creates_no_serve_task(self):
+    def test_partial_starter_ready_creates_serve_task(self):
         self._setup_order()
         ticket_kitchen = self.create_kitchen_lines(
             "Entrée",
@@ -2242,9 +2611,10 @@ class StarterWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
             if "servir" in task["title"].lower() and "entrée" in task["title"].lower()
         ]
 
-        self.assertEqual(serve_tasks, [])
+        self.assertEqual(len(serve_tasks), 1)
+        self.assertEqual(serve_tasks[0]["title"], "Servir 1 entrée")
         details = self._table_details()
-        self.assertEqual(details["action"], "Entrées en préparation")
+        self.assertEqual(details["action"], "Servir 1 entrée")
 
     def test_all_starters_served_with_lagging_status_reconciles_salle(self):
         from riad.models import KitchenTicketItem
@@ -2348,7 +2718,7 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
 
         details = self._table_details()
         serve_tasks = self._tasks_matching(self._tasks(), "boisson")
-        self.assertEqual(details["action"], "Servir les boissons")
+        self.assertEqual(details["action"], "Servir 1 boisson")
         self.assertEqual(len(serve_tasks), 1)
 
         user = User.objects.create_user(username="serveur_drinks", password="test")
@@ -2361,7 +2731,7 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
 
         self.assertTrue(item.is_served)
         self.assertEqual(self.service.status, "drinks_served")
-        self.assertNotEqual(details["action"], "Servir les boissons")
+        self.assertNotEqual(details["action"], "Servir 1 boisson")
         self.assertFalse(self._tasks_matching(self._tasks(), "boisson"))
 
     def test_mains_workflow_serve_clear(self):
@@ -2379,7 +2749,7 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.create_kitchen_lines("Plat", [(self.products["Couscous Royal"], True)])
 
         details = self._table_details()
-        self.assertEqual(details["action"], "Servir les plats")
+        self.assertEqual(details["action"], "Servir 1 plat")
 
         user = User.objects.create_user(username="serveur_mains", password="test")
         task, _ = claim_serve_task(self.service, available_task_key("mains"), user)
@@ -2388,15 +2758,9 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.service.refresh_from_db()
         details = self._table_details()
         self.assertEqual(self.service.status, "mains_served")
-        self.assertEqual(details["action"], "Plats servis")
-        self.assertFalse(self._tasks_matching(self._tasks(), "débarrasser"))
-
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=20)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
-
-        details = self._table_details()
+        self.assertIn("plats servis depuis", details["action"].lower())
         clear_tasks = self._tasks_matching(self._tasks(), "débarrasser")
-        self.assertEqual(details["action"], "Débarrasser les plats")
+        self.assertEqual(details["next_action"]["title"], "Débarrasser les plats")
         self.assertEqual(len(clear_tasks), 1)
 
         factory = RequestFactory()
@@ -2422,7 +2786,7 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.create_kitchen_lines("Dessert", [(self.products["Pâtisseries marocaines"], True)])
 
         details = self._table_details()
-        self.assertEqual(details["action"], "Servir les desserts")
+        self.assertEqual(details["action"], "Servir 1 dessert")
 
         user = User.objects.create_user(username="serveur_desserts", password="test")
         task, _ = claim_serve_task(self.service, available_task_key("desserts"), user)
@@ -2431,8 +2795,9 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.service.refresh_from_db()
         details = self._table_details()
         self.assertEqual(self.service.status, "desserts_served")
-        self.assertEqual(details["action"], "Desserts servis")
-        self.assertFalse(self._tasks_matching(self._tasks(), "débarrasser"))
+        self.assertIn("desserts servis depuis", details["action"].lower())
+        self.assertEqual(details["next_action"]["title"], "Débarrasser les desserts")
+        self.assertTrue(self._tasks_matching(self._tasks(), "débarrasser"))
 
     def test_coffee_workflow_serve_clear(self):
         from django.contrib.auth.models import User
@@ -2449,7 +2814,7 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.create_kitchen_lines("Thé / Café", [(self.products["Thé à la menthe"], True)])
 
         details = self._table_details()
-        self.assertEqual(details["action"], "Servir les thés / cafés")
+        self.assertEqual(details["action"], "Servir 1 thé/café")
 
         user = User.objects.create_user(username="serveur_coffee", password="test")
         task, _ = claim_serve_task(self.service, available_task_key("coffee"), user)
@@ -2458,13 +2823,8 @@ class CategoryWorkflowEndToEndTests(OrderContentTestMixin, TestCase):
         self.service.refresh_from_db()
         details = self._table_details()
         self.assertEqual(self.service.status, "coffee_served")
-        self.assertEqual(details["action"], "Thés / cafés servis")
-
-        self.service.status_started_at = timezone.now() - timezone.timedelta(minutes=15)
-        self.service.save(update_fields=["status_started_at", "updated_at"])
-
-        details = self._table_details()
-        self.assertEqual(details["action"], "Débarrasser les thés / cafés")
+        self.assertIn("thés / cafés servis depuis", details["action"].lower())
+        self.assertEqual(details["next_action"]["title"], "Débarrasser les thés / cafés")
 
         factory = RequestFactory()
         request = factory.post(f"/riad/api/table/{self.table.numero}/next/")
@@ -2790,7 +3150,7 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
             expected_status="ordered",
             expected_phase=PHASE_READY_TO_SERVE,
             expected_active_category="drinks",
-            action_contains="servir les boissons",
+            action_contains="servir 1 boisson",
             task_title_contains="boisson",
             category="drinks",
         )
@@ -2811,7 +3171,7 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
             expected_status="drinks_served",
             expected_phase=PHASE_READY_TO_SERVE,
             expected_active_category="starters",
-            action_contains="servir les entrées",
+            action_contains="servir 1 entrée",
             task_title_contains="entrée",
             category="starters",
         )
@@ -2821,19 +3181,9 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
         self.assertTrue(all(item.is_served and item.served_at for item in starter_items))
         self._assert_step(
             expected_status="starters_served",
-            expected_phase=PHASE_SERVED_WAITING_CLEAR,
-            expected_active_category="starters",
-            action_contains="entrées servies",
-            task_title_excludes="débarrasser",
-            category="starters",
-        )
-
-        self._rewind_clear_delay(minutes=8)
-        self._assert_step(
-            expected_status="starters_served",
             expected_phase=PHASE_READY_TO_CLEAR,
             expected_active_category="starters",
-            action_contains="débarrasser les entrées",
+            action_contains="entrées servies depuis",
             task_title_contains="débarrasser",
             category="starters",
         )
@@ -2851,25 +3201,17 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
             expected_status="starters_cleared",
             expected_phase=PHASE_READY_TO_SERVE,
             expected_active_category="mains",
-            action_contains="servir les plats",
+            action_contains="servir 1 plat",
             task_title_contains="plat",
             category="mains",
         )
         self._serve_category("mains")
         self._assert_step(
             expected_status="mains_served",
-            expected_phase=PHASE_SERVED_WAITING_CLEAR,
-            expected_active_category="mains",
-            action_contains="plats servis",
-            task_title_excludes="débarrasser",
-            category="mains",
-        )
-        self._rewind_clear_delay(minutes=16)
-        self._assert_step(
-            expected_status="mains_served",
             expected_phase=PHASE_READY_TO_CLEAR,
             expected_active_category="mains",
-            action_contains="débarrasser les plats",
+            action_contains="plats servis depuis",
+            task_title_contains="débarrasser",
             category="mains",
         )
         self._clear_current_step()
@@ -2884,12 +3226,12 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
         self._serve_category("desserts")
         self._assert_step(
             expected_status="desserts_served",
-            expected_phase=PHASE_SERVED_WAITING_CLEAR,
+            expected_phase=PHASE_READY_TO_CLEAR,
             expected_active_category="desserts",
-            action_contains="desserts servis",
+            action_contains="desserts servis depuis",
+            task_title_contains="débarrasser",
             category="desserts",
         )
-        self._rewind_clear_delay(minutes=11)
         self._clear_current_step()
         self._assert_step(
             expected_status="desserts_cleared",
@@ -2902,17 +3244,17 @@ class FullServiceWorkflowEndToEndTests(WorkflowExclusivityMixin, OrderContentTes
         self._serve_category("coffee")
         self._assert_step(
             expected_status="coffee_served",
-            expected_phase=PHASE_SERVED_WAITING_CLEAR,
+            expected_phase=PHASE_READY_TO_CLEAR,
             expected_active_category="coffee",
-            action_contains="thés / cafés servis",
+            action_contains="thés / cafés servis depuis",
+            task_title_contains="débarrasser",
             category="coffee",
         )
-        self._rewind_clear_delay(minutes=11)
         self._clear_current_step()
         self._assert_step(expected_status="coffee_cleared", action_contains="addition")
 
         self._clear_current_step()
-        self._assert_step(expected_status="bill_requested", action_contains="récapitulatif")
+        self._assert_step(expected_status="bill_requested", action_contains="paiement")
 
         self.service.set_status("paid")
         _, _, tasks = self._collect_workflow_state()
@@ -3111,6 +3453,165 @@ class WorkflowPerformanceTests(OrderContentTestMixin, TestCase):
             lambda: client.get("/riad/api/salle/")
         )
         self.assertLessEqual(queries, 40)
+
+
+class ClearTaskImmediateTests(OrderContentTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        from django.contrib.auth.models import User
+
+        self.server = User.objects.create_user(username="clear_immediate", password="test")
+
+    def _serve_starters(self):
+        from riad.services.serve_tasks import (
+            available_task_key,
+            claim_serve_task,
+            complete_serve_task,
+        )
+
+        self.create_guest(1, [
+            ("Entrée", "Salade marocaine", "menu"),
+            ("Plat", "Couscous Royal", "menu"),
+        ])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "drinks_served"
+        self.service.save(update_fields=["status", "updated_at"])
+        self.create_kitchen_lines("Entrée", [(self.products["Salade marocaine"], True)])
+        task, _ = claim_serve_task(
+            self.service,
+            available_task_key("starters"),
+            self.server,
+        )
+        complete_serve_task(self.service, self.order, task["task_key"], self.server)
+        self.service.refresh_from_db()
+
+    def test_clear_task_visible_immediately_after_serve(self):
+        from riad.services.tasks import build_task_list, iter_active_services_with_orders
+
+        self._serve_starters()
+        tasks = build_task_list(iter_active_services_with_orders())
+        clear_tasks = [
+            task for task in tasks
+            if "débarrasser" in task["title"].lower() and "entrée" in task["title"].lower()
+        ]
+        self.assertEqual(len(clear_tasks), 1)
+
+    def test_no_artificial_wait_before_clear(self):
+        from riad.services.service_category_readiness import (
+            PHASE_READY_TO_CLEAR,
+            get_category_phase,
+            is_clear_task_allowed,
+        )
+
+        self._serve_starters()
+        self.assertTrue(is_clear_task_allowed(self.service, self.order))
+        self.assertEqual(
+            get_category_phase(self.service, self.order, "starters"),
+            PHASE_READY_TO_CLEAR,
+        )
+
+    def test_served_since_label_uses_max_served_at(self):
+        from riad.models import KitchenTicketItem
+        from riad.services.service_category_readiness import build_served_since_info
+
+        self.create_guest(1, [
+            ("Entrée", "Salade marocaine", "menu"),
+            ("Plat", "Couscous Royal", "menu"),
+        ])
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "starters_served"
+        self.service.save(update_fields=["status", "updated_at"])
+        ticket = self.create_kitchen_lines("Entrée", [
+            (self.products["Salade marocaine"], True),
+            (self.products["Salade marocaine"], True),
+        ])
+        items = list(KitchenTicketItem.objects.filter(ticket=ticket).order_by("id"))
+        older = timezone.now() - timezone.timedelta(minutes=10)
+        newer = timezone.now() - timezone.timedelta(minutes=2)
+        items[0].is_served = True
+        items[0].served_at = older
+        items[0].save(update_fields=["is_served", "served_at"])
+        items[1].is_served = True
+        items[1].served_at = newer
+        items[1].save(update_fields=["is_served", "served_at"])
+
+        info = build_served_since_info("starters", items)
+        self.assertEqual(info["served_since_label"], "Entrées servies depuis 2 min")
+        self.assertTrue(info["served_since_at"].startswith(newer.isoformat()[:19]))
+
+    def test_served_since_less_than_one_minute(self):
+        from riad.services.service_category_readiness import format_served_since_label
+
+        self.assertEqual(
+            format_served_since_label("Desserts servis", 20),
+            "Desserts servis depuis moins d'une minute",
+        )
+
+    def test_clear_disappears_after_debarrassage(self):
+        from django.test import RequestFactory
+        from riad.services.tasks import build_task_list, iter_active_services_with_orders
+        from riad.views import api_next_step
+
+        self._serve_starters()
+        factory = RequestFactory()
+        request = factory.post(f"/riad/api/table/{self.table.numero}/next/")
+        request.user = self.server
+        api_next_step(request, self.table.numero)
+
+        self.service.refresh_from_db()
+        details = self.build_table_details_prepared()
+        tasks = build_task_list(iter_active_services_with_orders())
+        clear_tasks = [
+            task for task in tasks
+            if "débarrasser" in task["title"].lower() and "entrée" in task["title"].lower()
+        ]
+
+        self.assertEqual(self.service.status, "starters_cleared")
+        self.assertEqual(clear_tasks, [])
+        self.assertNotIn("servies depuis", details["action"].lower())
+
+    def test_drinks_have_no_clear_task(self):
+        from django.contrib.auth.models import User
+        from riad.services.serve_tasks import (
+            available_task_key,
+            claim_serve_task,
+            complete_serve_task,
+        )
+        from riad.services.tasks import build_task_list, iter_active_services_with_orders
+
+        if "Boisson" not in self.sections:
+            from riad.models import MenuSection, MenuSectionItem
+
+            self.sections["Boisson"] = MenuSection.objects.create(
+                menu=self.menu,
+                name="Boisson",
+                order=10,
+            )
+            MenuSectionItem.objects.create(
+                section=self.sections["Boisson"],
+                product=self.products["Coca-Cola"],
+            )
+
+        self.create_guest(1, [("Plat", "Couscous Royal", "menu")])
+        self.create_table_extra("Coca-Cola")
+        sync_service_flags_from_order(self.service, self.order)
+        self.service.status = "ordered"
+        self.service.save(update_fields=["status", "updated_at"])
+        self.create_kitchen_lines("Boisson", [(self.products["Coca-Cola"], True)])
+
+        user = User.objects.create_user(username="clear_drinks", password="test")
+        task, _ = claim_serve_task(self.service, available_task_key("drinks"), user)
+        complete_serve_task(self.service, self.order, task["task_key"], user)
+        self.service.refresh_from_db()
+
+        tasks = build_task_list(iter_active_services_with_orders())
+        self.assertEqual(self.service.status, "drinks_served")
+        self.assertFalse(
+            any(
+                "débarrasser" in task["title"].lower() and "boisson" in task["title"].lower()
+                for task in tasks
+            )
+        )
 
 
 class PrefetchImportArchitectureTests(TestCase):

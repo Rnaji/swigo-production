@@ -15,7 +15,9 @@ from riad.services.workflow import get_workflow_step
 
 INACTIVE_STATUSES = frozenset({"free", "reserved"})
 
-POST_MEAL_WAITING_STATUSES = frozenset({"coffee_cleared"})
+# Plus de file d'attente post-repas : "Apporter l'addition" est une vraie tâche
+# à coffee_cleared, validée via /next/ vers bill_requested (paiement).
+POST_MEAL_WAITING_STATUSES = frozenset()
 
 OVERDUE_MINUTES = 5
 
@@ -39,7 +41,7 @@ CLEARING_SERVED_PREFIXES = {
     "starters_served": "Entrées servies",
     "mains_served": "Plats servis",
     "desserts_served": "Desserts servis",
-    "coffee_served": "Thé servi",
+    "coffee_served": "Thés / cafés servis",
 }
 
 TASK_EMOJI = {
@@ -71,15 +73,11 @@ def format_elapsed_since(elapsed_seconds):
 
 
 def format_served_since_label(prefix, elapsed_seconds):
-    minutes = max(int(elapsed_seconds) // 60, 0)
+    from riad.services.service_category_readiness import (
+        format_served_since_label as _format_served_since_label,
+    )
 
-    if minutes <= 0:
-        return f"{prefix} depuis moins d'1 min"
-
-    if minutes == 1:
-        return f"{prefix} depuis 1 min"
-
-    return f"{prefix} depuis {minutes} min"
+    return _format_served_since_label(prefix, elapsed_seconds)
 
 
 def format_installed_since_label(elapsed_seconds):
@@ -311,10 +309,9 @@ def serialize_workflow_task(
             }
         elif service.status == "bill_requested":
             details["next_action"] = {
-                "title": "Présenter le récapitulatif",
-                "button": "Voir le pré-ticket",
-                "type": "open_pre_ticket",
-                "pre_ticket_url": f"/riad/table/{service.table_id}/pre-ticket/",
+                "title": "Paiement",
+                "button": "",
+                "type": "payment",
             }
 
     next_action = details.get("next_action") or {}
@@ -325,11 +322,11 @@ def serialize_workflow_task(
     pre_ticket_url = next_action.get("pre_ticket_url")
     elapsed_seconds = details.get("elapsed_seconds") or 0
 
-    if service.status == "bill_requested":
+    if service.status == "coffee_cleared":
         title = "Apporter l'addition"
         icon = "receipt_long"
-        action_type = next_action.get("type", "open_pre_ticket")
-        pre_ticket_url = next_action.get("pre_ticket_url")
+        action_type = "action"
+        pre_ticket_url = None
 
     claimed = _workflow_task_is_claimed(service)
     claimed_by_me = _workflow_claim_matches_user(service, current_user)
@@ -347,9 +344,12 @@ def serialize_workflow_task(
     elapsed_label = format_elapsed_since(elapsed_seconds)
     is_order_task = service.status in ("installed", "ordering")
     take_order_task = is_take_order_task(title, service)
-    served_since_prefix = get_clearing_served_prefix(service, title)
+    served_since_prefix = (
+        next_action.get("served_since_prefix")
+        or get_clearing_served_prefix(service, title)
+    )
     served_since_at = None
-    served_since_label = None
+    served_since_label = next_action.get("served_since_label")
     installed_at = None
     installed_since_label = None
     installed_since_seconds = None
@@ -364,12 +364,24 @@ def serialize_workflow_task(
             installed_since_seconds
         )
 
-    if served_since_prefix:
+    if next_action.get("served_since_at"):
+        served_since_at = next_action["served_since_at"]
+        if isinstance(served_since_at, str):
+            from django.utils.dateparse import parse_datetime
+
+            served_since_at = parse_datetime(served_since_at) or served_since_at
+    elif served_since_prefix:
+        # Fallback : max(served_at) via snapshot / items si disponible
         served_since_at = service.status_started_at
-        served_since_label = format_served_since_label(
-            served_since_prefix,
-            service.elapsed_seconds,
-        )
+
+    if served_since_prefix and served_since_at and not served_since_label:
+        if hasattr(served_since_at, "timestamp"):
+            elapsed = max(int((timezone.now() - served_since_at).total_seconds()), 0)
+        else:
+            elapsed = service.elapsed_seconds
+        served_since_label = format_served_since_label(served_since_prefix, elapsed)
+    elif served_since_label and not served_since_at and next_action.get("served_since_at"):
+        served_since_at = next_action["served_since_at"]
 
     return {
         "id": service.id,
@@ -399,7 +411,11 @@ def serialize_workflow_task(
         "installed_at": installed_at.isoformat() if installed_at else None,
         "installed_since_label": installed_since_label,
         "installed_since_seconds": installed_since_seconds,
-        "served_since_at": served_since_at.isoformat() if served_since_at else None,
+        "served_since_at": (
+            served_since_at.isoformat()
+            if hasattr(served_since_at, "isoformat")
+            else served_since_at
+        ),
         "served_since_prefix": served_since_prefix,
         "served_since_label": served_since_label,
         "sort_timestamp": sort_timestamp,
@@ -480,16 +496,12 @@ def build_workflow_server_task(service, order, current_user=None, *, workflow_sn
     if service.status in POST_MEAL_WAITING_STATUSES:
         return None
 
+    # Phase paiement : pas de tâche workflow — le drawer affiche le bloc paiement.
+    if service.status == "bill_requested":
+        return None
+
     if workflow_snapshot is None and order:
         workflow_snapshot = get_service_workflow_snapshot(service, order, context="tasks")
-
-    if service.status == "bill_requested":
-        return serialize_workflow_task(
-            service,
-            order,
-            current_user=current_user,
-            workflow_snapshot=workflow_snapshot,
-        )
 
     read_ctx = workflow_snapshot.get("_ctx") if workflow_snapshot else None
     if read_ctx:
@@ -510,17 +522,12 @@ def build_workflow_server_task(service, order, current_user=None, *, workflow_sn
         if not order or not allowed:
             return None
 
-    task = serialize_workflow_task(
+    return serialize_workflow_task(
         service,
         order,
         current_user=current_user,
         workflow_snapshot=workflow_snapshot,
     )
-
-    if "addition" in task["title"].lower():
-        return None
-
-    return task
 
 
 def build_tasks_for_service(service, order, current_user=None):

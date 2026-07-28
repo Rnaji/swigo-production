@@ -29,9 +29,8 @@ from riad.services.service_category_readiness import (
     PHASE_WAITING_KITCHEN,
     _category_has_clear_step,
     _status_index,
+    build_served_since_info,
     get_category_phase_display,
-    get_clear_task_delay_seconds,
-    is_clear_delay_reached,
     kitchen_item_belongs_to_category,
 )
 
@@ -156,11 +155,17 @@ class WorkflowReadContext:
 
     def get_category_items_state(self, category):
         if category not in self._category_states:
+            from riad.services.service_category_readiness import count_category_progress
+
             items = self.get_category_workflow_items(category)
+            progress = count_category_progress(items)
             self._category_states[category] = {
                 "has_items": bool(items),
                 "all_done": bool(items) and all(item.is_done for item in items),
                 "all_served": bool(items) and all(item.is_served for item in items),
+                "ready_count": progress["ready_count"],
+                "served_count": progress["served_count"],
+                "preparing_count": progress["preparing_count"],
                 "items": items,
             }
         return self._category_states[category]
@@ -196,13 +201,7 @@ class WorkflowReadContext:
         if not state["all_done"] or not state["all_served"]:
             return False
 
-        if not state["all_served"]:
-            return False
-
-        delay_seconds = get_clear_task_delay_seconds(self.service.status)
-        if delay_seconds <= 0:
-            return True
-        return is_clear_delay_reached(self.service)
+        return True
 
     def get_category_phase(self, category):
         if category in self._category_phases:
@@ -219,30 +218,33 @@ class WorkflowReadContext:
             else:
                 state = self.get_category_items_state(category)
 
-                if not state["has_items"] or not state["all_done"]:
+                if not state["has_items"]:
                     phase = PHASE_WAITING_KITCHEN
-                elif not state["all_served"]:
-                    phase = PHASE_READY_TO_SERVE
-                else:
+                elif state["all_served"]:
                     served_status = CATEGORY_SERVED_STATUS.get(category)
                     if not served_status:
                         phase = PHASE_NOT_APPLICABLE
-                    elif _status_index(self.service.status) < _status_index(served_status):
-                        phase = PHASE_SERVED_WAITING_CLEAR
-                    elif self.service.status != served_status:
-                        if (
-                            cleared_status
-                            and _status_index(self.service.status) >= _status_index(cleared_status)
-                        ):
+                    elif not _category_has_clear_step(category):
+                        if _status_index(self.service.status) >= _status_index(served_status):
                             phase = PHASE_CLEARED
                         else:
                             phase = PHASE_SERVED_WAITING_CLEAR
-                    elif not _category_has_clear_step(category):
-                        phase = PHASE_CLEARED
-                    elif self.is_clear_task_allowed_for_category(category):
+                    elif (
+                        self.service.status == served_status
+                        and self.is_clear_task_allowed_for_category(category)
+                    ):
                         phase = PHASE_READY_TO_CLEAR
+                    elif (
+                        cleared_status
+                        and _status_index(self.service.status) >= _status_index(cleared_status)
+                    ):
+                        phase = PHASE_CLEARED
                     else:
                         phase = PHASE_SERVED_WAITING_CLEAR
+                elif state["ready_count"] > 0:
+                    phase = PHASE_READY_TO_SERVE
+                else:
+                    phase = PHASE_WAITING_KITCHEN
 
         self._category_phases[category] = phase
         return phase
@@ -265,10 +267,7 @@ class WorkflowReadContext:
         if not state["has_items"] or not state["all_done"] or not state["all_served"]:
             return False
 
-        delay_seconds = get_clear_task_delay_seconds(self.service.status)
-        if delay_seconds <= 0:
-            return True
-        return is_clear_delay_reached(self.service)
+        return True
 
     def build_category_phases(self):
         phases = {}
@@ -340,7 +339,14 @@ class WorkflowReadContext:
         if phase in (PHASE_NOT_APPLICABLE, PHASE_CLEARED):
             return None
 
-        return get_category_phase_display(category, phase)
+        state = self.get_category_items_state(category)
+        action = get_category_phase_display(category, phase, state)
+        if action and phase == PHASE_READY_TO_CLEAR:
+            served_info = build_served_since_info(category, state["items"])
+            if served_info:
+                action = {**action, **served_info}
+
+        return action
 
     def get_active_category_table_action(self):
         if not self.order:

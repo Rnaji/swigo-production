@@ -9,23 +9,15 @@ from riad.services.service_category_readiness import (
     CATEGORY_SECTIONS,
     WORKFLOW_TICKET_STATUSES,
     SERVICE_STEPS,
+    format_category_serve_title,
     get_category_workflow_items,
-    infer_ticket_category,
     is_category_fully_served,
+    item_serve_quantity,
     kitchen_item_belongs_to_category,
-    kitchen_item_section_name,
     log_serve_action_state,
     should_show_category_serve_task,
 )
 from riad.services.workflow_engine import advance_service_status_from_line_state
-
-CATEGORY_SERVE_TITLES = {
-    "mains": "Servir les plats",
-    "desserts": "Servir les desserts",
-    "starters": "Servir les entrées",
-    "drinks": "Servir les boissons",
-    "coffee": "Servir le thé / café",
-}
 
 SERVER_HIDDEN_NOTES = frozenset({
     "supplément",
@@ -146,37 +138,6 @@ def maybe_advance_service_after_category_served(service, order, category):
     )
 
 
-def mark_all_ready_category_items_served(service, category, now):
-    items = list(
-        KitchenTicketItem.objects
-        .filter(
-            ticket__service=service,
-            ticket__status__in=WORKFLOW_TICKET_STATUSES,
-            is_done=True,
-            is_served=False,
-        )
-        .select_related("ticket", "section", "product", "product__category")
-    )
-    category_items = [
-        item for item in items
-        if kitchen_item_belongs_to_category(item, category)
-    ]
-    if not category_items:
-        return []
-
-    KitchenTicketItem.objects.filter(
-        id__in=[item.id for item in category_items]
-    ).update(
-        is_served=True,
-        served_at=now,
-        serve_batch_id=None,
-        serve_claimed_by_id=None,
-        serve_claimed_at=None,
-    )
-
-    return category_items
-
-
 def clear_item_serve_state(item, *, clear_done=False):
     update_fields = []
 
@@ -285,6 +246,11 @@ def _ready_at_for_items(items):
     return timezone.now()
 
 
+def _serve_title_for_items(category, items):
+    count = sum(item_serve_quantity(item) for item in items)
+    return format_category_serve_title(category, count)
+
+
 def _serialize_serve_task(
     service,
     *,
@@ -353,7 +319,7 @@ def build_serve_tasks_for_service(service, order=None, current_user=None, *, wor
             _serialize_serve_task(
                 service,
                 task_key=available_task_key(category),
-                title=CATEGORY_SERVE_TITLES.get(category, "Servir"),
+                title=_serve_title_for_items(category, group_items),
                 items=group_items,
                 serve_category=category,
                 current_user=current_user,
@@ -385,12 +351,10 @@ def build_serve_tasks_for_service(service, order=None, current_user=None, *, wor
             extra_ticket_id = first.ticket_id
         else:
             task_key = batch_task_key(batch_id)
-            title = CATEGORY_SERVE_TITLES.get(category, "Servir")
+            title = _serve_title_for_items(category, group_items)
             extra_ticket_id = None
 
-        if order and category and not _should_show_serve(category):
-            continue
-
+        # Lots figés : toujours visibles, même si d'autres lignes sont encore en prep.
         tasks.append(
             _serialize_serve_task(
                 service,
@@ -474,7 +438,7 @@ def claim_serve_task(service, task_key, user):
         serialized = _serialize_serve_task(
             service,
             task_key=batch_task_key(batch_id),
-            title=CATEGORY_SERVE_TITLES.get(parsed["category"], "Servir"),
+            title=_serve_title_for_items(parsed["category"], refreshed),
             items=refreshed,
             serve_category=parsed["category"],
             current_user=user,
@@ -517,24 +481,53 @@ def release_serve_task(service, task_key, user):
 @transaction.atomic
 def complete_serve_task(service, order, task_key, user):
     parsed = parse_serve_task_key(task_key)
-    if not parsed or parsed["kind"] not in {"batch", "extra_batch"}:
+    if not parsed:
         return False, "Tâche de service invalide."
 
-    items = list(
-        KitchenTicketItem.objects
-        .select_for_update()
-        .filter(
-            ticket__service=service,
-            serve_batch_id=parsed["batch_id"],
-            is_served=False,
+    now = timezone.now()
+    user_id = user.id if user and user.is_authenticated else None
+
+    if parsed["kind"] in {"available", "extra_available"}:
+        # Figé le lot au moment de la validation s'il n'était pas encore pris.
+        freeze_items = _items_for_available_task(service, parsed)
+        if not freeze_items:
+            return False, "Cette tâche n'est plus disponible."
+
+        batch_id = uuid.uuid4()
+        KitchenTicketItem.objects.filter(
+            id__in=[item.id for item in freeze_items]
+        ).update(
+            serve_batch_id=batch_id,
+            serve_claimed_by_id=user_id,
+            serve_claimed_at=now,
         )
-        .select_related("ticket", "section", "product", "product__category")
-    )
+        items = list(
+            KitchenTicketItem.objects
+            .select_for_update()
+            .filter(
+                id__in=[item.id for item in freeze_items],
+                is_served=False,
+            )
+            .select_related("ticket", "section", "product", "product__category")
+        )
+    elif parsed["kind"] in {"batch", "extra_batch"}:
+        items = list(
+            KitchenTicketItem.objects
+            .select_for_update()
+            .filter(
+                ticket__service=service,
+                serve_batch_id=parsed["batch_id"],
+                is_served=False,
+            )
+            .select_related("ticket", "section", "product", "product__category")
+        )
+    else:
+        return False, "Tâche de service invalide."
 
     if not items:
         return False, "Cette tâche n'est plus active."
 
-    if user and user.is_authenticated:
+    if user and user.is_authenticated and parsed["kind"] in {"batch", "extra_batch"}:
         if any(item.serve_claimed_by_id != user.id for item in items):
             return False, "Cette tâche est prise par un autre serveur."
 
@@ -547,7 +540,6 @@ def complete_serve_task(service, order, task_key, user):
         if order:
             log_serve_action_state(service, order, category, "BEFORE")
 
-    now = timezone.now()
     KitchenTicketItem.objects.filter(
         id__in=[item.id for item in items]
     ).update(
@@ -566,11 +558,6 @@ def complete_serve_task(service, order, task_key, user):
         category = infer_item_category(item)
         if category:
             affected_categories.add(category)
-
-    for category in affected_categories:
-        extra_items = mark_all_ready_category_items_served(service, category, now)
-        for item in extra_items:
-            affected_tickets.add(item.ticket_id)
 
     for ticket_id in affected_tickets:
         ticket_items = list(

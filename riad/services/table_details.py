@@ -91,14 +91,6 @@ def build_table_details(
         data["next_action"]["type"] = "open_commande"
         data["next_action"]["has_wizard_draft"] = has_draft
 
-    if service.status == "bill_requested":
-        data["next_action"]["title"] = "Présenter le récapitulatif"
-        data["next_action"]["button"] = "Voir le pré-ticket"
-        data["next_action"]["type"] = "open_pre_ticket"
-        data["next_action"]["pre_ticket_url"] = (
-            f"/riad/table/{table.id}/pre-ticket/"
-        )
-
     if category_action:
         data["next_action"].update(category_action)
         if category_action.get("type") == "products" and order:
@@ -107,7 +99,19 @@ def build_table_details(
                 sections=category_action.get("sections") or [],
             )
 
-    data["action"] = data["next_action"]["title"]
+    if service.status == "bill_requested":
+        data["next_action"]["title"] = "Paiement"
+        data["next_action"]["button"] = ""
+        data["next_action"]["type"] = "payment"
+        data["next_action"].pop("pre_ticket_url", None)
+        data["next_action"].pop("sections", None)
+        data["next_action"]["items"] = []
+
+    # Carte Salle : afficher « X servis depuis… » ; le drawer garde le titre Débarrasser.
+    if category_action and category_action.get("served_since_label"):
+        data["action"] = category_action["served_since_label"]
+    else:
+        data["action"] = data["next_action"]["title"]
     data["icon"] = workflow.get("icon", data.get("icon"))
 
     data["summary"] = []
